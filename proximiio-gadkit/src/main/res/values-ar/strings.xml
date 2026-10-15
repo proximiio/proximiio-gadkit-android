@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="positioning_channel_name">تحديد الموقع في المتحف</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="positioning_channel_description">يظهر أثناء متابعة التطبيق لسوارك في المتحف.</string>
+    <string name="positioning_notification_title">غوغنهايم أبوظبي</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="positioning_notification_text">متابعة سوارك في المتحف.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="visit_channel_name">تقدّم الرحلة</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="visit_channel_description">يعرض محطتك التالية أثناء رحلتك.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="close_the_level_change">أغلق تغيير الطابق</string>
+</resources>

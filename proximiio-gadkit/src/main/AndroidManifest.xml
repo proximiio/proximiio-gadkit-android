@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The venue is downloaded once; the relay-api streams the wristband's positions. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      The SDK keeps positioning alive in the background with a foreground service of type
+      `location` (`ProximiioServiceOptions` in `VenueService`). From API 34 `startForeground`
+      needs the permission for the service type.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!--
+      Location: lets the SDK hold the `location` service type, and is sent with a wristband
+      take-over when the relay-api asks for it (`locationReadiness()`).
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- The ongoing positioning notification and the journey notification. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The QR code scanner of `WristbandPairingScreen`. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+      The foreground service keeps the process alive, so background location is never requested.
+      The phone scans nothing (relay-only), so no Bluetooth permission is requested either.
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
+        tools:node="remove" />
+
+    <application>
+        <!-- Shares the field log (`FieldLog.share`). Only a host that calls `FieldLog.start` writes one. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.gadkit.fieldlog"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/field_log_paths" />
+        </provider>
+    </application>
+</manifest>

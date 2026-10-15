@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SF Symbol chevron.backward stand-in; mirrored in right-to-left layouts. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:autoMirrored="true"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <path
+        android:pathData="M10.5,2.5 L5,8 L10.5,13.5"
+        android:strokeWidth="1.8"
+        android:strokeColor="#FF2B2B2B"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

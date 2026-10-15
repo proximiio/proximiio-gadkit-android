@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The field log only (`FieldLog`), shared from My Profile in debug and staging builds. -->
+<paths>
+    <files-path name="field_log" path="fieldlog/" />
+</paths>

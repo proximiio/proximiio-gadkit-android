@@ -1,0 +1,62 @@
+[versions]
+# Toolchain as in proximiio-android-sdk-v6 and proximiio-android-map-v6 (AGP 8 line, Kotlin 2.2).
+agp = "8.13.2"
+kotlin = "2.2.21"
+jvmTarget = "17"
+compileSdk = "37"
+targetSdk = "36"
+minSdk = "26"
+
+proximiioSdk = "6.0.0-beta.23"
+proximiioMap = "6.0.0-beta.21"
+
+coroutines = "1.11.0"
+androidxCore = "1.18.0"
+activity = "1.12.4"
+lifecycle = "2.10.0"
+navigation = "2.9.0"
+datastore = "1.2.1"
+composeBom = "2026.06.01"
+camera = "1.4.2"
+mlkitBarcode = "17.3.0"
+haze = "1.7.2"
+junit = "4.13.2"
+
+[libraries]
+proximiio-sdk = { module = "io.proximi.sdk:proximiio", version.ref = "proximiioSdk" }
+proximiio-blueiot = { module = "io.proximi.sdk:proximiio-blueiot", version.ref = "proximiioSdk" }
+proximiio-map = { module = "io.proximi.map:proximiio-map", version.ref = "proximiioMap" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-foundation = { module = "androidx.compose.foundation:foundation" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+
+camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camera" }
+camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camera" }
+camera-view = { module = "androidx.camera:camera-view", version.ref = "camera" }
+mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
+
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+
+junit = { module = "junit:junit", version.ref = "junit" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

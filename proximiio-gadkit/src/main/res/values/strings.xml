@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The ongoing notification of the positioning service (Android only; no iOS string). -->
+    <string name="positioning_channel_name">Museum positioning</string>
+    <string name="positioning_channel_description">Shown while the app follows your wristband in the museum.</string>
+    <string name="positioning_notification_title">Guggenheim Abu Dhabi</string>
+    <string name="positioning_notification_text">Following your wristband in the museum.</string>
+    <!-- The ongoing journey notification, in place of the iOS Live Activity (Android only; no iOS string). -->
+    <string name="visit_channel_name">Journey progress</string>
+    <string name="visit_channel_description">Shows your next stop while you walk your journey.</string>
+    <!-- TalkBack reads the action label after "Double-tap to", so Android uses the imperative; iOS keeps "Closes the level change" as a hint. -->
+    <string name="close_the_level_change">Close the level change</string>
+</resources>
