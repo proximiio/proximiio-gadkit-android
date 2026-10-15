@@ -9,7 +9,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.proximi.gadkit.DebugLaunch
+import io.proximi.gadkit.map.AccessibleRoutes
+import io.proximi.gadkit.map.AccessibleRoutesButton
 import io.proximi.gadkit.map.LocalRouteAccessibility
+import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.wristband.WristbandSession
@@ -126,7 +129,8 @@ public fun VisitScreen(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val holder: VisitHolder = viewModel(key = VisitHolder.KEY)
-    val accessibility = LocalRouteAccessibility.current
+    val isAccessibleRoutesOn by AccessibleRoutes.isOn(context).collectAsStateWithLifecycle()
+    val accessibility = RouteAccessibility.effective(LocalRouteAccessibility.current, isAccessibleRoutesOn)
     SideEffect {
         holder.onClose = onClose
         holder.onVisitEvent = onVisitEvent
@@ -298,6 +302,8 @@ private fun CardOverlay(model: VisitViewModel) {
                         },
                         contentDescription = stringResource(R.string.centre_on_me),
                     ) { MapIcon(GadIcon.Compass.glyph) }
+                    val isAccessibleRoutesOn by AccessibleRoutes.isOn(LocalContext.current).collectAsStateWithLifecycle()
+                    AccessibleRoutesButton(isAccessibleRoutesOn, model::setAccessibleRoutes)
                     val label = GuidanceText.floorLabel(selectedFloor.level)
                     GlassSquareButton(onClick = model.session::followMyFloor, contentDescription = stringResource(R.string.floor_x, label)) {
                         Text(label, style = GadTextStyle.LargeBodyBold.textStyle, color = Palette.ink)

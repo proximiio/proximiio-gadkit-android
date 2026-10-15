@@ -61,6 +61,9 @@ import io.proximi.gadkit.designsystem.StopNumberBadge
 import io.proximi.gadkit.designsystem.glassSurface
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import io.proximi.gadkit.map.VenuePlace
+import io.proximi.gadkit.designsystem.OutlineBadge
+import androidx.compose.ui.semantics.contentDescription
 
 /**
  * The journey as a list (Figma "Personalized Journey list"), as iOS `VisitStopList`. Stops are
@@ -76,6 +79,8 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
     // A curated tour lists no galleries and has no skip.
     val galleries = if (model.kind.listsGalleries) model.galleries else emptyList()
     val allowsSkip = model.kind.allowsSkip
+    // Places by id, for the artist and the badges of a stop.
+    val places = remember(model.places) { model.places.associateBy { it.id } }
     val groups = VisitPlan.galleryGroups(VisitPlan.artworks(journey).filter { it.state != StopState.SKIPPED }) { stop ->
         Gallery.containing(stop.coordinate, stop.level, galleries)?.name
     }
@@ -109,7 +114,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                         model.requestSkip(stop)
                     },
                 ) {
-                    StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id)
+                    StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id])
                 }
             }
         }
@@ -129,9 +134,12 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
     }
 }
 
-/** A stop as a frosted card (Figma journey list): number badge, title and floor. */
+/**
+ * A stop as a frosted card (Figma journey list): number badge, title, and the artist or else the
+ * floor; "AR" and an audio note from the artwork's `metadata`.
+ */
 @Composable
-private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean) {
+private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: VenuePlace?) {
     val isVisited = stop.state == StopState.DONE
     val isActive = stop.state == StopState.ACTIVE || stop.state == StopState.REACHED
     val visited = stringResource(R.string.visited)
@@ -157,10 +165,20 @@ private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean) {
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(stop.title, style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
-            stop.level?.let {
-                Text(stringResource(R.string.level_n, it.roundToInt()), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+            val artist = place?.artist
+            if (artist != null) {
+                Text(artist, style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+            } else {
+                stop.level?.let {
+                    Text(stringResource(R.string.level_n, it.roundToInt()), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+                }
             }
         }
+        if (place?.hasAR == true) {
+            val description = stringResource(R.string.ar_view)
+            OutlineBadge("AR", Modifier.semantics { contentDescription = description })
+        }
+        if (place?.hasAudio == true) OutlineBadge(R.drawable.ic_music_note, stringResource(R.string.audio))
     }
 }
 

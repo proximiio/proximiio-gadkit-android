@@ -42,6 +42,12 @@ public sealed interface VisitEvent {
     /** The visitor tapped "Centre on me". */
     public data object Recentred : VisitEvent
 
+    /**
+     * The visitor turned the accessible routes button on (`true`) or off. Routes avoid stairs,
+     * escalators, revolving doors and inaccessible paths while it is on.
+     */
+    public data class AccessibleRoutesChanged(val isOn: Boolean) : VisitEvent
+
     /** The visitor tapped Back during a visit in progress. `VisitScreen` asks before it closes. */
     public data object ExitRequested : VisitEvent
 

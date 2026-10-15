@@ -1,5 +1,7 @@
 package io.proximi.gadkit.map
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -79,6 +81,37 @@ internal fun GlassSquareButton(
             },
         contentAlignment = Alignment.Center,
     ) { content() }
+}
+
+/**
+ * The accessible routes button of the maps, as iOS `AccessibleRoutesButton`: a wheelchair on glass
+ * while it is off; white on a filled [Palette.position] square while it is on (PM 2026-10-14: an
+ * indicator for both states).
+ */
+@Composable
+internal fun AccessibleRoutesButton(isOn: Boolean, onToggle: (Boolean) -> Unit) {
+    val label = stringResource(R.string.accessible_routes)
+    val state = stringResource(if (isOn) R.string.on else R.string.off)
+    Box(
+        Modifier
+            .size(50.dp)
+            .glassSurface(ControlShape, GlassStrength.Frosted)
+            .then(if (isOn) Modifier.background(Palette.position, ControlShape) else Modifier)
+            .toggleable(
+                value = isOn,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Switch,
+                onValueChange = onToggle,
+            )
+            .semantics {
+                contentDescription = label
+                stateDescription = state
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(R.drawable.ic_accessible), contentDescription = null, Modifier.size(22.dp), tint = if (isOn) Palette.white else Palette.ink)
+    }
 }
 
 /** An icon of the design, 24 dp, in ink. */

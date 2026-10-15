@@ -29,6 +29,7 @@ import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.DebugLaunch
 import io.proximi.gadkit.map.JourneyMapLayers
 import io.proximi.gadkit.map.MapStyle
+import io.proximi.gadkit.map.AccessibleRoutes
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.gadIcon
 import io.proximi.gadkit.map.toCore
@@ -316,6 +317,12 @@ internal class VisitViewModel(
 
     private fun reportStopNearby(position: VenuePosition?, stop: MapJourneyStop?, guidance: RouteGuidance?) {
         stopNearby.update(position, stop, guidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
+    }
+
+    /** The accessible routes button. `VisitScreen` routes the leg again with the new needs. */
+    fun setAccessibleRoutes(isOn: Boolean) {
+        AccessibleRoutes.set(application, isOn)
+        onEvent(VisitEvent.AccessibleRoutesChanged(isOn))
     }
 
     /** The host app changed the accessibility needs: the leg on screen is routed again. */

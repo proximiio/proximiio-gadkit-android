@@ -1,5 +1,8 @@
 package io.proximi.gadkit.designsystem
 
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -62,6 +65,20 @@ public fun OutlineBadge(text: String, modifier: Modifier = Modifier) {
             style = GadTextStyle.Caption.textStyle.copy(fontWeight = FontWeight.SemiBold, fontSize = 10.sp, letterSpacing = 0.06.em),
             color = Palette.ink,
         )
+    }
+}
+
+/** [OutlineBadge] with a 10 dp glyph in place of the text, for example the audio note of a journey stop. */
+@Composable
+public fun OutlineBadge(@DrawableRes icon: Int, contentDescription: String?, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .defaultMinSize(minWidth = 25.dp, minHeight = 20.dp)
+            .border(1.dp, Palette.ink, RoundedCornerShape(6.dp))
+            .padding(horizontal = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(icon), contentDescription, Modifier.size(10.dp), tint = Palette.ink)
     }
 }
 

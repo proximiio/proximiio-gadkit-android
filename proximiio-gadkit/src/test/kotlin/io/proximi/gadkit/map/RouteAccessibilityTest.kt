@@ -38,4 +38,14 @@ class RouteAccessibilityTest {
         assertEquals(RouteAccessibility(avoidsStairs = true, avoidsRevolvingDoors = true), DebugLaunch.routeAvoid("stairs, revolvingDoors"))
         assertEquals(RouteAccessibility.NONE, DebugLaunch.routeAvoid(null))
     }
+
+    @Test
+    fun theAccessibleRoutesButtonAvoidsAllFour() {
+        val host = RouteAccessibility(avoidsStairs = true)
+        assertEquals(host, RouteAccessibility.effective(host, accessibleRoutes = false))
+        assertEquals(
+            setOf(Avoidance.STAIRCASES, Avoidance.ESCALATORS, Avoidance.REVOLVING_DOORS, Avoidance.NARROW_PATHS),
+            RouteAccessibility.effective(host, accessibleRoutes = true).routeOptions.effectiveAvoidances,
+        )
+    }
 }

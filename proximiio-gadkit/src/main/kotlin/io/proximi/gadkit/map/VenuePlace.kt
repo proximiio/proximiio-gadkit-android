@@ -34,6 +34,12 @@ public data class VenuePlace(
      * Gallery and amenity POIs have none of the three.
      */
     val isArtwork: Boolean = false,
+    /** `metadata.artist_name`: a string, or an i18n object like `title_i18n`. The journey list shows it under the title. */
+    val artist: String? = null,
+    /** `metadata.has_ar`: the journey list shows "AR". */
+    val hasAR: Boolean = false,
+    /** `metadata.has_audio`: the journey list shows a note. */
+    val hasAudio: Boolean = false,
 ) {
     public companion object {
         /**
@@ -52,6 +58,7 @@ public data class VenuePlace(
             if (!longitude.isFinite() || !latitude.isFinite()) return null
 
             val properties = feature.properties
+            val metadata = properties?.get("metadata") as? Map<*, *>
             val image = (properties?.get("images") as? List<*>)?.firstOrNull()?.let(::text)
                 ?.takeIf { runCatching { URI(it).scheme != null }.getOrDefault(false) }
             return VenuePlace(
@@ -67,6 +74,9 @@ public data class VenuePlace(
                 imageUrl = image,
                 remoteId = text(properties?.get("remote_id")),
                 isArtwork = isArtwork(text(properties?.get("amenity")), properties?.get("metadata"), text(properties?.get("remote_id"))),
+                artist = metadata?.let { localized(it["artist_name"], language) ?: text(it["artist_name"]) },
+                hasAR = flag(metadata?.get("has_ar")),
+                hasAudio = flag(metadata?.get("has_audio")),
             )
         }
 
@@ -141,6 +151,14 @@ public data class VenuePlace(
         }
 
         private fun text(value: Any?): String? = (value as? String)?.takeIf { it.isNotEmpty() }
+
+        /** A metadata flag: `true`, `"true"` in any case, or a non-zero number. Pure; covered by tests. */
+        internal fun flag(value: Any?): Boolean = when (value) {
+            is Boolean -> value
+            is String -> value.equals("true", ignoreCase = true)
+            is Number -> value.toDouble() != 0.0
+            else -> false
+        }
 
         private fun fold(text: String): String =
             Normalizer.normalize(text, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase()

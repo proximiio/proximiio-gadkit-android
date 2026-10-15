@@ -109,7 +109,8 @@ internal fun MuseumMapView(
     var selectedAmenity by remember { mutableStateOf<AmenityKind?>(null) }
     var detailPlace by remember { mutableStateOf<VenuePlace?>(null) }
 
-    val accessibility = LocalRouteAccessibility.current
+    val isAccessibleRoutesOn by AccessibleRoutes.isOn(context).collectAsStateWithLifecycle()
+    val accessibility = RouteAccessibility.effective(LocalRouteAccessibility.current, isAccessibleRoutesOn)
     val currentAccessibility by rememberUpdatedState(accessibility)
 
     val activity = LocalActivity.current
@@ -276,6 +277,7 @@ internal fun MuseumMapView(
                             contentDescription = stringResource(R.string.centre_on_me),
                             enabled = hasPosition,
                         ) { MapIcon(GadIcon.Compass.glyph) }
+                        AccessibleRoutesButton(isAccessibleRoutesOn) { AccessibleRoutes.set(context, it) }
                         FloorButton(session, hasPosition, floors, selectedFloor.level)
                     }
                 }
