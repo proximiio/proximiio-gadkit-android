@@ -70,10 +70,12 @@ class AmenityKindTest {
     }
 
     // ProximiioGADKit `GuidanceTextTests` (0.11.0): the card names the route's next level change.
-    private val stairsThenLift = listOf(
-        LevelChangeMarker("staircase", fromLevel = 1.0, toLevel = 3.0, isCompleted = false),
-        LevelChangeMarker("elevator", fromLevel = 3.0, toLevel = 4.0, isCompleted = false),
-    )
+    private val point = Coordinate(24.5, 54.4)
+
+    private fun marker(type: String, from: Double, to: Double, completed: Boolean = false, at: Coordinate = point) =
+        LevelChangeMarker(type, fromLevel = from, toLevel = to, isCompleted = completed, coordinate = at)
+
+    private val stairsThenLift = listOf(marker("staircase", 1.0, 3.0), marker("elevator", 3.0, 4.0))
 
     private fun take(changer: String, level: Int) =
         UiText.Resource("guidance_take_level_changer", listOf(UiText.Resource("guidance_level_changer_$changer"), level))
@@ -82,6 +84,38 @@ class AmenityKindTest {
     fun levelChangeTitleNamesTheRoutesFirstChangeFromTheVisitorsFloor() {
         assertEquals(take("stairs", 3), GuidanceText.levelChangeTitle(stairsThenLift, visitorLevel = 1.0, stopLevel = 4))
         assertEquals(take("lift", 4), GuidanceText.levelChangeTitle(stairsThenLift, visitorLevel = 3.0, stopLevel = 4))
+    }
+
+    /**
+     * ProximiioGADKit 0.13.0, Monday 2026-10-15: the SDK router splits one ride into a change per
+     * floor with paths at the staircase or lift (stairs 1→3, 3→4; the lift 1→2, 2→3, 3→4). The card
+     * names the end of the ride.
+     */
+    @Test
+    fun levelChangesInTheSameStaircaseOrLiftAreOneRide() {
+        val stairs = listOf(marker("staircase", 1.0, 3.0), marker("staircase", 3.0, 4.0))
+        assertEquals(take("stairs", 4), GuidanceText.levelChangeTitle(stairs, visitorLevel = 1.0, stopLevel = 4))
+        val lift = listOf(marker("elevator", 1.0, 2.0), marker("elevator", 2.0, 3.0), marker("elevator", 3.0, 4.0))
+        assertEquals(take("lift", 4), GuidanceText.levelChangeTitle(lift, visitorLevel = 1.0, stopLevel = 4))
+        val other = Coordinate(24.5003, 54.4)
+        val twoStaircases = listOf(marker("staircase", 1.0, 3.0), marker("staircase", 3.0, 4.0, at = other))
+        assertEquals(take("stairs", 3), GuidanceText.levelChangeTitle(twoStaircases, visitorLevel = 1.0, stopLevel = 4))
+        assertEquals(4, GuidanceText.rideEnd("staircase", point, from = 1.0, to = 3.0, markers = stairs))
+        assertEquals(3, GuidanceText.rideEnd("staircase", point, from = 1.0, to = 3.0, markers = emptyList()))
+    }
+
+    /** The instruction at the staircase names the end of the ride as the card does. */
+    @Test
+    fun theInstructionNamesTheEndOfTheRide() {
+        val stairs = listOf(marker("staircase", 1.0, 3.0), marker("staircase", 3.0, 4.0))
+        val guidance = RouteGuidance(
+            hasArrived = false,
+            isOffRoute = false,
+            distanceToManoeuvreMeters = 4.0,
+            manoeuvre = Manoeuvre.LevelChange("staircase", toLevel = 3.0, fromLevel = 1.0, coordinate = point),
+        )
+        assertEquals(take("stairs", 4), GuidanceText.instruction(guidance, stairs))
+        assertEquals(take("stairs", 3), GuidanceText.instruction(guidance))
     }
 
     @Test

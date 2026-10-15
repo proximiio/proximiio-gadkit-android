@@ -118,7 +118,10 @@ internal fun MuseumMapView(
 
     val activity = LocalActivity.current
     val debug = remember { DebugLaunch.read(activity) }
-    val layers = remember { if (debug?.galleryFills == true) JourneyMapLayers() else null }
+    // The lifts, staircases and escalators on every floor they serve; in a debug build with
+    // `gad.mapGalleryFills` also the gallery fills.
+    val layers = remember { JourneyMapLayers() }
+    DisposableEffect(layers) { onDispose { layers.detach() } }
 
     /** Computes a route from the current position to [place] with the SDK's on-device router. */
     suspend fun route(place: VenuePlace) {
@@ -191,6 +194,15 @@ internal fun MuseumMapView(
         onDispose { session.onFeatureTap = null }
     }
 
+    LaunchedEffect(Unit) {
+        val levelChangers = venue.levelChangers()
+        layers.updateLevelChangers(levelChangers)
+        session.hiddenFeatureIds = levelChangers.map { it.id }.toSet()
+    }
+    if (debug?.galleryFills != true) {
+        LaunchedEffect(selectedFloor) { layers.update(emptyList(), selectedFloor.level) }
+    }
+
     LaunchedEffect(language) {
         places = venue.places(language)
         // The picked places take their titles in the new language.
@@ -220,7 +232,7 @@ internal fun MuseumMapView(
             DebugLaunch.log("route to ${place.title} (level ${place.level.roundToInt()})")
             route(place)
         }
-        if (layers != null) DebugGalleryFills(venue, session, layers, language)
+        if (debug.galleryFills) DebugGalleryFills(venue, session, layers, language)
         LaunchedEffect(session) {
             launch { session.lastError.collect { if (it != null) DebugLaunch.log("map error: $it") } }
             launch { session.hasFramedVenue.collect { DebugLaunch.log("map framed venue: $it") } }
@@ -234,7 +246,7 @@ internal fun MuseumMapView(
         ProximiioMap(
             session = session,
             modifier = Modifier.fillMaxSize().glassBackdrop(backdrop),
-            configure = { canvas -> layers?.attach(canvas) },
+            configure = { canvas -> layers.attach(canvas) },
         )
         ProvideGlassBackdrop(backdrop) {
             Column(
@@ -288,7 +300,8 @@ internal fun MuseumMapView(
                 val picked = selectedPlace
                 if (routed != null) {
                     val coreGuidance = guidance?.toCore()
-                    val instruction = routeError?.let { stringResource(it) } ?: coreGuidance?.let { GuidanceText.instruction(it).mapText() }
+                    val markers = session.routeRenderer?.geometry?.markers.orEmpty().map { it.toCore() }
+                    val instruction = routeError?.let { stringResource(it) } ?: coreGuidance?.let { GuidanceText.instruction(it, markers).mapText() }
                     val remaining = guidance
                         ?.takeIf { routeError == null && !it.isOffRoute && !it.hasArrived }
                         ?.let { remainingText(it.remainingMeters, resources) }
@@ -324,7 +337,7 @@ internal fun MuseumMapView(
                 }
             }
         }
-        LevelChangeAnimation(session, venue)
+        FollowsVisitorFloor(session, venue)
     }
 
     detailPlace?.let { place ->
@@ -408,6 +421,5 @@ private fun DebugGalleryFills(venue: VenueService, session: ProximiioMapSession,
         val fills = onFloor.mapIndexed { index, gallery -> GalleryFill(gallery, isDestination = index == 0) }
         layers.update(fills, level)
     }
-    DisposableEffect(layers) { onDispose { layers.detach() } }
 }
 

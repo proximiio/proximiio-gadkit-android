@@ -34,15 +34,4 @@ class TrackingHealthTest {
         assertEquals("c", VenuePlace.nearest(here, 3.0, places)?.id)
         assertNull(VenuePlace.nearest(null, 1.0, places))
     }
-
-    @Test
-    fun welcomeDeskIsFoundByTitleOrAmenity() {
-        val coordinate = Coordinate(0.0, 0.0)
-        assertEquals("d", VenuePlace.welcomeDesk(listOf(VenuePlace(id = "d", title = "Help Desk", coordinate = coordinate, level = 0.0)))?.id)
-        assertEquals(
-            "e",
-            VenuePlace.welcomeDesk(listOf(VenuePlace(id = "e", title = "Desk", coordinate = coordinate, level = 0.0, amenityId = "services:information")))?.id,
-        )
-        assertNull(VenuePlace.welcomeDesk(listOf(VenuePlace(id = "f", title = "Café", coordinate = coordinate, level = 0.0))))
-    }
 }

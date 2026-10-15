@@ -1,6 +1,7 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.map.VenuePlace
+import io.proximi.gadkit.wristband.TrackingHealth
 import io.proximi.map.core.JourneyEvent
 
 /** The two presentations of the journey in `VisitScreen`. */
@@ -30,10 +31,7 @@ public sealed interface VisitEvent {
     /** The visitor picked an amenity on the map. A card shows it with "Go here". */
     public data class AmenitySelected(val place: VenuePlace) : VisitEvent
 
-    /**
-     * The amenity is now a detour of the journey: the visitor confirmed "Change your route?", or
-     * chose the route to the Welcome Desk in a tracking alert.
-     */
+    /** The amenity is now a detour of the journey: the visitor confirmed "Change your route?". */
     public data class DetourStarted(val place: VenuePlace) : VisitEvent
 
     /** The visitor tapped "Resume your Journey" or "Show the route from here". */
@@ -72,6 +70,12 @@ public sealed interface VisitEvent {
      * still ahead are ordered again from the visitor.
      */
     public data class ArtworkVisitedOutOfOrder(val stop: JourneyStop) : VisitEvent
+
+    /**
+     * The wristband's positions stopped or came back ([TrackingHealth]). `VisitScreen` shows no
+     * alert: the host app handles the wristband states (PM 2026-10-15).
+     */
+    public data class TrackingChanged(val health: TrackingHealth) : VisitEvent
 
     /**
      * An event of the journey navigator: `LegChanged`, `StopSkipped`, `Rerouted`, `DetourStarted`,

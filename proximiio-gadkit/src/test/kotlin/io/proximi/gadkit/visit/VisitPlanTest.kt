@@ -2,6 +2,7 @@ package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.Gallery
+import io.proximi.gadkit.map.VenueGeofence
 import io.proximi.gadkit.map.VenuePlace
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -68,6 +69,30 @@ class VisitPlanTest {
         val square = ArtworkArea(null, radius = 0.0, polygon = listOf(listOf(54.4, 24.5), listOf(54.401, 24.5), listOf(54.401, 24.501), listOf(54.4, 24.501)))
         assertTrue(square.contains(Coordinate(24.5005, 54.4005)))
         assertFalse(square.contains(Coordinate(24.502, 54.4005)))
+    }
+
+    /**
+     * ProximiioGADKit 0.13.0, GAD data 2026-10-15: "DCT Mother/Earth" shares `remote_id` with the
+     * Guggenheim artwork. Only the first geofence was kept, so the visitor inside the DCT one did not
+     * reach it.
+     */
+    @Test
+    fun everyGeofenceOfAnArtworkIsKept() {
+        val guggenheim = Coordinate(24.5, 54.4)
+        val dct = Coordinate(25.2, 55.3)
+        fun geofence(id: String, center: Coordinate, remoteId: String, type: String = "artwork") =
+            VenueGeofence(id, name = null, polygon = null, floorId = null, remoteId = remoteId, geofenceType = type, center = center, radius = 2.0)
+        val areas = VisitController.artworkAreas(
+            listOf(
+                geofence("g", guggenheim, "GAD.2018.00034"),
+                geofence("d", dct, "GAD.2018.00034"),
+                geofence("n", dct, ""),
+                geofence("x", dct, "e07fe5d7", type = "gallery"),
+            ),
+        )
+        assertEquals(listOf("GAD.2018.00034"), areas.keys.sorted())
+        assertTrue(areas.getValue("GAD.2018.00034").any { it.contains(dct) })
+        assertTrue(areas.getValue("GAD.2018.00034").any { it.contains(guggenheim) })
     }
 
     @Test

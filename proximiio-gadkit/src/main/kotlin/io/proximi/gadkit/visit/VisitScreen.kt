@@ -15,7 +15,6 @@ import io.proximi.gadkit.map.LocalRouteAccessibility
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
 import io.proximi.gadkit.VenueService
-import io.proximi.gadkit.wristband.WristbandSession
 import kotlinx.coroutines.CoroutineScope
 import android.content.pm.PackageManager
 import android.os.Build
@@ -65,7 +64,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.proximi.gadkit.R
 import io.proximi.gadkit.map.AmenityKind
 import io.proximi.gadkit.map.GuidanceText
-import io.proximi.gadkit.wristband.TrackingHealth
 import io.proximi.gadkit.visit.VisitCardState
 import io.proximi.gadkit.visit.VisitCardText
 import io.proximi.gadkit.visit.VisitPlan
@@ -81,7 +79,7 @@ import io.proximi.gadkit.map.BottomGlassBar
 import io.proximi.gadkit.map.GlassSquareButton
 import io.proximi.gadkit.map.PlaceInfoCard
 import io.proximi.gadkit.map.placeSubtitle
-import io.proximi.gadkit.map.LevelChangeAnimation
+import io.proximi.gadkit.map.FollowsVisitorFloor
 import io.proximi.gadkit.map.MapGlassFrame
 import io.proximi.gadkit.map.MapIcon
 import io.proximi.gadkit.map.MapListToggle
@@ -90,8 +88,6 @@ import io.proximi.gadkit.map.StopInfoCard
 import io.proximi.gadkit.map.mapText
 import io.proximi.gadkit.map.remainingText
 import io.proximi.gadkit.map.toCore
-import io.proximi.gadkit.wristband.TrackingAlerts
-import io.proximi.gadkit.wristband.WristbandPairingScreen
 import io.proximi.map.compose.ProximiioMap
 import kotlin.math.roundToInt
 
@@ -103,8 +99,10 @@ import kotlin.math.roundToInt
  * shown.
  *
  * The screen saves [journey] in [VisitStore] on every change. It keeps its state while the
- * activity is recreated, and ends the visit's work (notification, tracking alerts, navigator) when
- * it leaves the composition for good.
+ * activity is recreated, and ends the visit's work (notification, tracking monitor, navigator) when
+ * it leaves the composition for good. It shows no wristband alerts: the host app handles the
+ * wristband states, and the screen reports lost and returning positions as
+ * [VisitEvent.TrackingChanged] (PM 2026-10-15).
  *
  * @param onClose called after the visitor confirmed leaving, or after the journey is complete.
  * @param kind [JourneyKind.PERSONALISED] names the gallery of the next stop first, lists the stops
@@ -112,20 +110,14 @@ import kotlin.math.roundToInt
  *   artwork, lists no galleries and has no skip.
  * @param onVisitEvent receives a [VisitEvent] for each visitor action and each journey change, on
  *   the main thread.
- * @param wristbandConnectionScreen the host app's screen for "Connect a wristband" after the
- *   wristband session ended, in place of [io.proximi.gadkit.wristband.WristbandPairingScreen]. It
- *   gets a function that closes it. When it closes with an active session, the screen reopens the
- *   wristband's position stream; without one, the "wristband no longer connected" sheet shows again.
  */
 @Composable
 public fun VisitScreen(
     venue: VenueService,
-    wristband: WristbandSession,
     journey: Journey,
     onClose: () -> Unit,
     kind: JourneyKind = JourneyKind.PERSONALISED,
     onVisitEvent: (VisitEvent) -> Unit = {},
-    wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -140,7 +132,6 @@ public fun VisitScreen(
         VisitViewModel(
             context.applicationContext as Application,
             venue,
-            wristband,
             journey,
             scope,
             DebugLaunch.read(activity),
@@ -155,7 +146,7 @@ public fun VisitScreen(
         onDispose { if (activity?.isChangingConfigurations != true) holder.close(model) }
     }
     LaunchedEffect(model, accessibility) { model.setAccessibility(accessibility) }
-    VisitContent(model, wristbandConnectionScreen)
+    VisitContent(model)
 }
 
 /**
@@ -199,7 +190,7 @@ internal class VisitHolder : ViewModel() {
 }
 
 @Composable
-private fun VisitContent(model: VisitViewModel, wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)?) {
+private fun VisitContent(model: VisitViewModel) {
     val language = LocalConfiguration.current.locales[0]?.language
     LaunchedEffect(language) { model.setLanguage(language) }
     // The journey notification stands in for the iOS Live Activity.
@@ -253,8 +244,8 @@ private fun VisitContent(model: VisitViewModel, wristbandConnectionScreen: (@Com
                 )
             }
         }
-        LevelChangeAnimation(model.session, model.venue)
-        VisitSheets(model, wristbandConnectionScreen)
+        FollowsVisitorFloor(model.session, model.venue)
+        VisitSheets(model)
     }
 }
 
@@ -375,12 +366,9 @@ private fun VisitCard(model: VisitViewModel) {
     val showsGuidance = VisitCardText.showsGuidance(state)
     val galleryAhead = model.galleryAhead?.name
     // The route's next level change, from the drawn route (not a flow: read when the card recomposes).
+    val markers = model.levelChangeMarkers
     val levelChangeTitle = (state as? VisitCardState.NextStopOnOtherLevel)?.let {
-        GuidanceText.levelChangeTitle(
-            model.session.routeRenderer?.geometry?.markers.orEmpty().map { marker -> marker.toCore() },
-            model.session.position.value?.floor?.level,
-            it.level,
-        )
+        GuidanceText.levelChangeTitle(markers, model.session.position.value?.floor?.level, it.level)
     }
     val title = VisitCardText.title(state, galleryAhead, levelChangeTitle)
     val instruction = if (model.hasNoAccessibleRoute) {
@@ -388,7 +376,7 @@ private fun VisitCard(model: VisitViewModel) {
         // reaches, with no route line. In a personalised journey the visitor can skip it.
         stringResource(R.string.no_route_to_this_stop_with_your)
     } else {
-        VisitCardText.instruction(state, guidance?.let { GuidanceText.instruction(it.toCore()) }, title)?.mapText()
+        VisitCardText.instruction(state, guidance?.let { GuidanceText.instruction(it.toCore(), markers) }, title)?.mapText()
     }
     val remaining = guidance
         ?.takeIf { showsGuidance && !model.hasNoAccessibleRoute && !it.isOffRoute && !it.hasArrived }
@@ -418,7 +406,7 @@ private fun VisitCard(model: VisitViewModel) {
 
 /** The sheets and full-screen covers of the journey screen, in the order iOS presents them. */
 @Composable
-private fun VisitSheets(model: VisitViewModel, wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)?) {
+private fun VisitSheets(model: VisitViewModel) {
     if (model.isConfirmingExit) {
         val progress = VisitPlan.progress(model.progress.journey)
         ExitConfirmationSheet(
@@ -434,31 +422,11 @@ private fun VisitSheets(model: VisitViewModel, wristbandConnectionScreen: (@Comp
     model.stopToSkip?.let { stop ->
         SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = model::keepStop)
     }
-    // The off-route warning, unless another prompt is up. The tracking alert has priority over it.
+    // The off-route warning, unless another prompt is up. No tracking or wristband alerts: the
+    // host app handles the wristband states (PM 2026-10-15).
     val isOffRoute by model.controller.isOffRoute.collectAsStateWithLifecycle()
-    val health by model.monitor.health.collectAsStateWithLifecycle()
-    val isTracking = health == TrackingHealth.TRACKING || health == TrackingHealth.WAITING
-    if (isOffRoute && isTracking && model.stopToSkip == null && model.amenityToConfirm == null) {
+    if (isOffRoute && model.stopToSkip == null && model.amenityToConfirm == null) {
         OffRouteWarning(onReroute = model::resumeJourney, onClose = model::dismissOffRoute)
-    }
-    TrackingAlerts(
-        monitor = model.monitor,
-        wristband = model.wristband,
-        places = model.places,
-        activeStopNumber = model.activeStopNumber,
-        isBlocked = model.isPairing || model.isLeaving || model.stopToSkip != null || model.amenityToConfirm != null,
-        onSearchAgain = model::searchAgain,
-        onRouteToDesk = model::routeToDesk,
-        onConnect = model::connectWristband,
-        onBackToHub = model::backToHub,
-    )
-    model.pairing?.let { flow ->
-        BackHandler(onBack = model::pairingClosed)
-        if (wristbandConnectionScreen != null) {
-            wristbandConnectionScreen(model::pairingClosed)
-        } else {
-            WristbandPairingScreen(flow, onFinish = model::pairingClosed)
-        }
     }
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)
 }

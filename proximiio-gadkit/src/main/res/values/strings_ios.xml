@@ -19,9 +19,7 @@
     <string name="centre_on_me">Centre on me</string>
     <string name="change_your_route">Change your route?</string>
     <string name="close">Close</string>
-    <string name="closes_the_level_change">Closes the level change</string>
     <string name="connect">Connect</string>
-    <string name="connect_a_wristband">Connect a wristband</string>
     <string name="connect_this_wristband_at_the_reception_desk">Connect this wristband at the reception desk.</string>
     <string name="connected">connected!</string>
     <string name="continue_action">Continue</string>
@@ -45,23 +43,18 @@
     <string name="go_to_level_n">Go to level %d</string>
     <string name="go_to_museum">Go to Museum</string>
     <string name="go_to_settings">Go to Settings</string>
-    <string name="going_to_level_n">Going to level %d</string>
     <string name="guide_me">Guide Me</string>
     <string name="head_straight_for_n_m">Head straight for %d m</string>
     <string name="help_desk">Help Desk</string>
     <string name="hold_the_qr_code_on_the_back">Hold the QR code on the back of your wristband inside the frame</string>
-    <string name="in_the_lift">In the lift</string>
     <string name="it_will_be_ready_when_you_arrive">It will be ready when you arrive at GAD</string>
     <string name="it_will_be_removed_from_your_route">It will be removed from your route. Artworks you have visited stay saved.</string>
-    <string name="its_battery_may_have_run_out_your">Its battery may have run out. Your journey is saved - nothing is lost.</string>
-    <string name="its_battery_may_have_run_out_your_2">Its battery may have run out. Your journey is saved at Stop %d - nothing is lost.</string>
     <string name="journey_complete">JOURNEY COMPLETE</string>
     <string name="journey_complete_2">Journey complete</string>
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
     <string name="journey_complete_3" tools:ignore="MissingTranslation">Journey Complete</string>
     <string name="keep_it">Keep it</string>
     <string name="keep_it_on_your_wrist_the_galleries">Keep it on your wrist - the galleries will pick it up as you walk through.</string>
-    <string name="last_seen">Last Seen</string>
     <string name="last_stop">LAST STOP</string>
     <string name="learning_engagement">Learning &amp; Engagement</string>
     <string name="leave_the_tour">Leave the tour</string>
@@ -112,7 +105,6 @@
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
     <string name="sculptural_works_exploring_negative_space_and_mass_2" tools:ignore="MissingTranslation">Sculptural works exploring negative space and mass - six pieces, unfolding through the room.</string>
     <string name="search">Search</string>
-    <string name="search_again">Search Again</string>
     <string name="search_the_museum">Search the museum</string>
     <string name="show_the_route_from_here">Show the route from here</string>
     <string name="single_artist_gallery">Single Artist Gallery</string>
@@ -125,7 +117,6 @@
     <string name="start">Start</string>
     <string name="start_the_journey">Start the Journey</string>
     <string name="stop_n_of_n">Stop %1$d of %2$d</string>
-    <string name="swap_it_at_the_welcome_desk">Swap it at the Welcome Desk</string>
     <string name="swipe_left_to_skip_an_artwork">Swipe left to skip an artwork</string>
     <string name="take_the_x_to_level_n">Take the %1$s to level %2$d</string>
     <string name="take_your_time_leaving_here_s_what">Take your time leaving - here\'s what\'s next</string>
@@ -164,14 +155,11 @@
     <string name="undo_skip">Undo skip</string>
     <string name="visited">Visited</string>
     <string name="waiting_for_your_position">Waiting for your position.</string>
-    <string name="walk_a_few_steps_toward_the_centre">Walk a few steps toward the centre of the gallery and we’ll find you again.</string>
     <string name="we_couldn_t_connect">We couldn’t connect</string>
-    <string name="we_ve_lost_your_place_in_the">We’ve lost your place in the room</string>
     <string name="women_s_restroom">Women’s restroom</string>
     <string name="wristband">Wristband</string>
     <string name="wristband_code">Wristband code</string>
     <string name="wristband_x">Wristband %s</string>
-    <string name="you_are_now_on_level_n">You are now on level %d</string>
     <string name="you_entered_this_area">You entered this area.</string>
     <string name="you_have_arrived">You have arrived</string>
     <string name="you_have_left_the_route">You have left the route</string>
@@ -187,7 +175,6 @@
     <string name="your_visit_time_is_over">Your visit time is over.</string>
     <string name="your_wristband">your wristband</string>
     <string name="your_wristband_has_stopped_responding">Your wristband has stopped responding</string>
-    <string name="your_wristband_is_no_longer_connected">Your wristband is no longer connected</string>
     <string name="your_wristband_tracks_where_you_are_in_2">Your wristband tracks where you are in the galleries. Pair it now, or later when your journey begins.</string>
     <string name="your_wristband_was_scanned_by_another_phone">Your wristband was scanned by another phone. Connect it again to follow it on this phone.</string>
 </resources>

@@ -36,11 +36,7 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="close">إغلاق</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="closes_the_level_change">يغلق تغيير الطابق</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="connect">اربط</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="connect_a_wristband">اربط سوارًا</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="connect_this_wristband_at_the_reception_desk">اربط هذا السوار عند مكتب الاستقبال.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -87,8 +83,6 @@
     <string name="go_to_museum">اذهب إلى المتحف</string>
     <string name="go_to_settings">الانتقال إلى الإعدادات</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="going_to_level_n">متجه إلى الطابق %d</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="guide_me">أرشدني</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="head_straight_for_n_m">تابع مباشرةً لمسافة %d م</string>
@@ -97,15 +91,9 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="hold_the_qr_code_on_the_back">ضع رمز QR الموجود على ظهر سوارك داخل الإطار</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="in_the_lift">في المصعد</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="it_will_be_ready_when_you_arrive">ستكون جاهزة عند وصولك إلى غوغنهايم أبوظبي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="it_will_be_removed_from_your_route">ستتم إزالته من مسارك. تبقى الأعمال الفنية التي زرتها محفوظة.</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="its_battery_may_have_run_out_your">ربما نفدت بطاريته. رحلتك محفوظة - لم يضِع شيء.</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="its_battery_may_have_run_out_your_2">ربما نفدت بطاريته. رحلتك محفوظة عند المحطة %d - لم يضِع شيء.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="journey_complete">اكتملت الرحلة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -114,8 +102,6 @@
     <string name="keep_it">إبقاؤه</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="keep_it_on_your_wrist_the_galleries">أبقِه على معصمك - ستتعرّف عليه القاعات أثناء تجوّلك.</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="last_seen">آخر ظهور</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="last_stop">المحطة الأخيرة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -206,8 +192,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="search">بحث</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="search_again">البحث مجددًا</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="search_the_museum">ابحث في المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="show_the_route_from_here">عرض المسار من هنا</string>
@@ -231,8 +215,6 @@
     <string name="start_the_journey">ابدأ الرحلة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="stop_n_of_n">المحطة %1$d من %2$d</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="swap_it_at_the_welcome_desk">استبدله في مكتب الاستقبال</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="swipe_left_to_skip_an_artwork">اسحب لليسار لتخطي عمل فني</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -311,11 +293,7 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="waiting_for_your_position">في انتظار تحديد موقعك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="walk_a_few_steps_toward_the_centre">امشِ بضع خطوات نحو وسط القاعة وسنحدد موقعك مجددًا.</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="we_couldn_t_connect">لم نتمكن من ربط</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="we_ve_lost_your_place_in_the">فقدنا موقعك في القاعة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="women_s_restroom">دورة مياه النساء</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -324,8 +302,6 @@
     <string name="wristband_code">رمز السوار</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="wristband_x">السوار %s</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="you_are_now_on_level_n">أنت الآن في الطابق %d</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="you_entered_this_area">لقد دخلت هذه المنطقة.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -356,8 +332,6 @@
     <string name="your_wristband">سوارك</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_wristband_has_stopped_responding">توقف سوارك عن الاستجابة</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="your_wristband_is_no_longer_connected">سوارك لم يعد متصلًا</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_wristband_tracks_where_you_are_in_2">يتتبّع سوارك موقعك داخل القاعات. اربطه الآن، أو لاحقًا عند بدء رحلتك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

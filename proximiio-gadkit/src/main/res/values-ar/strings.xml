@@ -12,8 +12,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="visit_channel_description">يعرض محطتك التالية أثناء رحلتك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="close_the_level_change">أغلق تغيير الطابق</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="alerts_channel_name">المناطق والمحطات</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="alerts_channel_description">يُعلمك عندما تدخل منطقة أو تغادرها، وعندما تقترب محطتك التالية.</string>

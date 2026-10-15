@@ -1,5 +1,7 @@
 package io.proximi.gadkit.map
 
+import io.proximi.gadkit.Coordinate
+
 /**
  * A GeoJSON geometry. [coordinates] holds nested lists of numbers as decoded from JSON,
  * e.g. `[lon, lat]` for a Point and `[[[lon, lat], …]]` for a Polygon.
@@ -24,10 +26,14 @@ internal data class VenueGeofence(
     val name: String?,
     val polygon: List<List<Double>>?,
     val floorId: String?,
-    /** `remote_id`: the gallery's id, which an artwork names in `metadata.gallery_id`. */
+    /** `remote_id`: an artwork geofence holds the artwork's collection id, as the artwork POI. */
     val remoteId: String? = null,
     /** `metadata.geofence_type`: `gallery` or `artwork`. */
     val geofenceType: String? = null,
+    /** The centre of a circle geofence. */
+    val center: Coordinate? = null,
+    /** The radius of a circle geofence, in metres. */
+    val radius: Double = 0.0,
 )
 
 /** A JSON number as a double, or `null`. */

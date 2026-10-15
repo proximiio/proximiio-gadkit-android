@@ -24,9 +24,9 @@ import io.proximi.gadkit.visit.StopState
 import io.proximi.gadkit.visit.VisitActivity
 import io.proximi.gadkit.visit.VisitCardState
 import io.proximi.gadkit.visit.VisitPlan
-import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.DebugLaunch
 import io.proximi.gadkit.map.JourneyMapLayers
+import io.proximi.gadkit.map.LevelChangeMarker
 import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.map.AccessibleRoutes
 import io.proximi.gadkit.map.RouteAccessibility
@@ -35,13 +35,11 @@ import io.proximi.gadkit.map.toCore
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.map.artworkAreas
 import io.proximi.gadkit.map.galleries
-import io.proximi.gadkit.map.galleryNames
+import io.proximi.gadkit.map.levelChangers
 import io.proximi.gadkit.map.isArtwork
 import io.proximi.gadkit.map.isGallery
 import io.proximi.gadkit.map.places
 import io.proximi.gadkit.wristband.TrackingMonitor
-import io.proximi.gadkit.wristband.WristbandPairingFlow
-import io.proximi.gadkit.wristband.WristbandSession
 import io.proximi.gadkit.map.LocalNotices
 import io.proximi.map.core.RouteGuidance
 import io.proximi.sdk.wayfinding.NoRouteReason
@@ -59,6 +57,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.toJavaDuration
@@ -69,7 +68,8 @@ import kotlin.time.toJavaDuration
  * (a language change); [close] when the screen leaves. Main thread only.
  *
  * It owns the map session (the map view attaches to it), the [VisitController], the
- * [TrackingMonitor], the journey map layers and the visit notification.
+ * [TrackingMonitor] (reported as [VisitEvent.TrackingChanged], no alert), the journey map layers
+ * and the visit notification.
  *
  * @param onClose the host app's `onClose` of `VisitScreen` (iOS `onClose`).
  * @param onEvent the host app's `onVisitEvent` of `VisitScreen` (iOS `onVisitEvent`).
@@ -77,7 +77,6 @@ import kotlin.time.toJavaDuration
 internal class VisitViewModel(
     private val application: Application,
     val venue: VenueService,
-    val wristband: WristbandSession,
     journey: Journey,
     parentScope: CoroutineScope,
     private val debug: DebugLaunch.Options?,
@@ -199,14 +198,6 @@ internal class VisitViewModel(
     var lowConfidenceStop by mutableStateOf<JourneyStop?>(null)
         private set
 
-    /** The pairing flow, opened from the wristband-ended sheet. */
-    var pairing by mutableStateOf<WristbandPairingFlow?>(null)
-        private set
-
-    /** `true` from "Connect a wristband" until the pairing flow closes. Hides the alert sheet. */
-    var isPairing by mutableStateOf(false)
-        private set
-
     /**
      * The time of the visitor's last answer per prompt kind. A kind is not shown again for
      * [GadSettings.locationQuestionQuietPeriod].
@@ -250,6 +241,8 @@ internal class VisitViewModel(
             }
         }
         monitor.start()
+        // No tracking or wristband alerts: the host app handles the wristband states (PM 2026-10-15).
+        scope.launch { monitor.health.drop(1).collect { onEvent(VisitEvent.TrackingChanged(it)) } }
         scope.launch {
             loadVenue()
             refreshMapLayers()
@@ -358,10 +351,13 @@ internal class VisitViewModel(
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }
         controller.artworkAreas = venue.artworkAreas()
         // The journey map shows artworks only as the numbered stop markers. Amenities, galleries
-        // and level changers stay (PM review 2026-10-12).
-        session.hiddenFeatureIds = places.filter { it.isArtwork }.map { it.id }.toSet()
+        // and level changers stay (PM review 2026-10-12). [layers] draws the level changers on
+        // every floor they serve.
+        val levelChangers = venue.levelChangers()
+        layers.updateLevelChangers(levelChangers)
+        session.hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
         galleries = venue.galleries(language)
-        galleryNames = venue.galleryNames()
+        galleryNames = Gallery.names(places)
         if (FieldLog.isEnabled) {
             FieldLog.log("galleries: " + galleries.joinToString { "${it.name} L${it.level.toInt()}" } + " · ${galleryNames.size} named by id")
         }
@@ -477,9 +473,17 @@ internal class VisitViewModel(
 
     // Notification (iOS Live Activity)
 
+    /** The route's level changes, from the drawn route. */
+    val levelChangeMarkers: List<LevelChangeMarker>
+        get() = session.routeRenderer?.geometry?.markers.orEmpty().map { it.toCore() }
+
     private fun updateNotification() {
         if (isClosed) return
-        val instruction = if (hasNoAccessibleRoute) UiText.Resource("visit_no_accessible_route") else guidance?.let { GuidanceText.instruction(it.toCore()) }
+        val instruction = if (hasNoAccessibleRoute) {
+            UiText.Resource("visit_no_accessible_route")
+        } else {
+            guidance?.let { GuidanceText.instruction(it.toCore(), levelChangeMarkers) }
+        }
         notification.update(VisitActivity.contentState(cardState, progress.journey, progress.activeStop?.id, instruction))
     }
 
@@ -577,13 +581,8 @@ internal class VisitViewModel(
         }
     }
 
-    /** `true` once the visit closes: no tracking alert shows while it goes. */
-    var isLeaving by mutableStateOf(false)
-        private set
-
     /** "Leave", once the exit sheet has gone. */
     fun leave() {
-        isLeaving = true
         isConfirmingExit = false
         onEvent(VisitEvent.ExitConfirmed)
         onClose()
@@ -597,14 +596,8 @@ internal class VisitViewModel(
 
     /** Journey Complete closed: the visit is over. */
     fun finishVisit() {
-        isLeaving = true
         isShowingWrapUp = false
         controller.end()
-        onClose()
-    }
-
-    fun backToHub() {
-        isLeaving = true
         onClose()
     }
 
@@ -612,8 +605,7 @@ internal class VisitViewModel(
 
     private val isPresentingSomething: Boolean
         get() = lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
-            controller.isOffRoute.value || amenityToConfirm != null || isShowingWrapUp || isPairing ||
-            wristband.bindingState.value is BindingState.Ended
+            controller.isOffRoute.value || amenityToConfirm != null || isShowingWrapUp
 
     private fun evaluateAmbiguity() {
         if (isPresentingSomething || monitor.health.value != TrackingHealth.TRACKING) return
@@ -645,37 +637,6 @@ internal class VisitViewModel(
         lowConfidenceStop = null
     }
 
-    // Tracking alerts
-
-    /** Re-attaches the wristband binding's provider, which reopens its relay-api stream. */
-    fun searchAgain() {
-        scope.launch { venue.attachBinding() }
-    }
-
-    /** Adds the Welcome Desk as a detour, so the route leads there and then back to the journey. */
-    fun routeToDesk() {
-        val desk = VenuePlace.welcomeDesk(places) ?: return
-        onEvent(VisitEvent.DetourStarted(desk))
-        scope.launch { controller.detour(desk) }
-        mode = VisitMode.MAP
-    }
-
-    /** Closes the wristband-ended sheet and opens the pairing flow once the sheet is gone. */
-    fun connectWristband() {
-        isPairing = true
-        scope.launch {
-            delay(SHEET_SWAP_DELAY_MILLIS)
-            pairing = WristbandPairingFlow.of(wristband, scope)
-        }
-    }
-
-    /** After a bind, re-attaching the provider reopens the relay-api position stream. */
-    fun pairingClosed() {
-        pairing = null
-        isPairing = false
-        if (wristband.isActive) scope.launch { venue.attachBinding() }
-    }
-
     /** Ends the screen's work: the notification, the monitor, the navigator and the map session. The journey stays stored. */
     fun close() {
         if (isClosed) return
@@ -699,8 +660,5 @@ internal class VisitViewModel(
          * every fix (PM review 2026-10-12, screen recording 21-26-05), as iOS `showsConnector`.
          */
         const val SHOWS_CONNECTOR = false
-
-        /** A sheet opens this long after the one before it starts to close, as on iOS. */
-        const val SHEET_SWAP_DELAY_MILLIS = 400L
     }
 }

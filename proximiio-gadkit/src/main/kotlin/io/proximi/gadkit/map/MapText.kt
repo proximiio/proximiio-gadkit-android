@@ -6,6 +6,7 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalResources
+import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.R
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.map.AmenityKind
@@ -73,7 +74,8 @@ internal fun UiText.mapText(resources: Resources): String = when (this) {
 internal fun UiText.mapText(): String = mapText(LocalResources.current)
 
 /** The level change as the core rules see it. */
-internal fun RouteGeometry.Marker.toCore(): LevelChangeMarker = LevelChangeMarker(featureType, from.level, to.level, isCompleted)
+internal fun RouteGeometry.Marker.toCore(): LevelChangeMarker =
+    LevelChangeMarker(featureType, from.level, to.level, isCompleted, Coordinate(coordinate.latitude, coordinate.longitude))
 
 /** Remaining distance and time, e.g. "70 m · <1 min" (iOS `GuidanceText.remaining`). */
 internal fun remainingText(metres: Double, resources: Resources): String {
@@ -96,7 +98,12 @@ private fun RouteManoeuvre.Kind.toCore(): Manoeuvre = when (this) {
     RouteManoeuvre.Kind.TurnRight -> Manoeuvre.Turn(TurnDirection.RIGHT)
     RouteManoeuvre.Kind.TurnSharpRight -> Manoeuvre.Turn(TurnDirection.SHARP_RIGHT)
     RouteManoeuvre.Kind.TurnSlightRight -> Manoeuvre.Turn(TurnDirection.SLIGHT_RIGHT)
-    is RouteManoeuvre.Kind.LevelChange -> Manoeuvre.LevelChange(change.featureType, change.toLevel)
+    is RouteManoeuvre.Kind.LevelChange -> Manoeuvre.LevelChange(
+        change.featureType,
+        change.toLevel,
+        change.fromLevel,
+        Coordinate(change.coordinate.latitude, change.coordinate.longitude),
+    )
     RouteManoeuvre.Kind.Arrive -> Manoeuvre.Arrive
     RouteManoeuvre.Kind.Start, RouteManoeuvre.Kind.ContinueStraight -> Manoeuvre.Straight
 }

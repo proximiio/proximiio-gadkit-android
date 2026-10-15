@@ -4,6 +4,7 @@ import kotlin.math.roundToInt
 import org.maplibre.android.style.layers.SymbolLayer
 import io.proximi.gadkit.designsystem.GadIcon
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import android.graphics.Paint
 import android.graphics.Color
 import android.graphics.Canvas
@@ -38,16 +39,18 @@ import org.maplibre.geojson.Polygon
  * - a connector from the visitor to the start of the route ahead: `#3F69FF`, 6 dp, round cap, under
  *   the route. `VisitViewModel` draws none while `SHOWS_CONNECTOR` is false.
  * - the lift or stairs of the route's next level change on the shown floor: a 30 dp red marker with
- *   a white ring and the design's glyph, above the route ([updateLevelChanger]).
+ *   a white ring and the design's glyph, above the route ([updateLevelChanger]; PM 2026-10-15,
+ *   "Level changer highlighting").
+ * - every other lift, staircase and escalator that serves the shown floor, with its amenity marker
+ *   ([updateLevelChangers], [LevelChangerPlace]; Monday "All level changers visible", 2026-10-15).
  *
  * The layers are added after each style load and show the selected floor only. The gallery fills
- * go over the venue's
- * floor and room fills and under its walls, labels and POI icons
+ * go over the venue's floor and room fills and under its walls, labels and POI icons
  * (`MapCanvasLayerAnchor.AboveVenueFills`, map 6.0.0-beta.18), as iOS uses `.aboveVenueFills`.
  *
  * Main thread only. [attach] it from `ProximiioMap(configure = …)`, then call [update] whenever the
  * journey, the galleries or the selected floor change. `VisitViewModel` uses it with
- * `JourneyMapContent.fills`.
+ * `JourneyMapContent.fills`; the museum map uses it for the level changers only.
  */
 internal class JourneyMapLayers {
     private var canvas: ProximiioMapCanvas? = null
@@ -56,11 +59,17 @@ internal class JourneyMapLayers {
     private var level: Double = 0.0
     private var connector: List<Coordinate> = emptyList()
     private var levelChanger: LevelChanger? = null
+    private var levelChangers: List<LevelChangerPlace> = emptyList()
 
     /** The level changer of the route's next level change: its anchor, the floor it leaves and its type. */
     data class LevelChanger(val coordinate: Coordinate, val level: Double, val featureType: String) {
         /** The style image of the marker. Stairs and escalators share the stairs glyph. */
         val imageName: String get() = "$LEVEL_CHANGER_IMAGE-$featureType"
+
+        internal companion object {
+            /** The style image of a level changer that is not on the route: its amenity marker. */
+            fun standardImageName(featureType: String): String = "$LEVEL_CHANGER_IMAGE-standard-$featureType"
+        }
     }
 
     /** Installs the layers on every style [canvas] loads, the loaded one included. */
@@ -77,12 +86,22 @@ internal class JourneyMapLayers {
         canvas = null
     }
 
-    /** Draws [fills] on [level]. Does nothing when nothing changed. */
+    /** Draws [fills] on [level], the shown floor. Does nothing when nothing changed. */
     fun update(fills: List<GalleryFill>, level: Double) {
         if (fills == this.fills && level == this.level) return
+        val levelChanged = level != this.level
         this.fills = fills
         this.level = level
-        canvas?.style?.let(::apply)
+        val style = canvas?.style ?: return
+        apply(style)
+        if (levelChanged) applyLevelChanger(style)
+    }
+
+    /** The venue's lifts, staircases and escalators. Each shows on the floors it serves. */
+    fun updateLevelChangers(changers: List<LevelChangerPlace>) {
+        if (changers == levelChangers) return
+        levelChangers = changers
+        canvas?.style?.let(::applyLevelChanger)
     }
 
     /** The line from the visitor to the start of the route ahead. `null` removes it. */
@@ -103,9 +122,11 @@ internal class JourneyMapLayers {
     // Style
 
     private fun install(canvas: ProximiioMapCanvas, style: Style) {
-        for (type in LEVEL_CHANGER_TYPES) {
+        for (type in LevelChangerPlace.FEATURE_TYPES) {
             val name = LevelChanger(Coordinate(0.0, 0.0), 0.0, type).imageName
             if (style.getImage(name) == null) levelChangerImage(canvas.context, type)?.let { style.addImage(name, it) }
+            val standard = LevelChanger.standardImageName(type)
+            if (style.getImage(standard) == null) standardLevelChangerImage(canvas.context, type)?.let { style.addImage(standard, it) }
         }
         if (style.getSource(LEVEL_CHANGER_SOURCE) == null) {
             style.addSource(GeoJsonSource(LEVEL_CHANGER_SOURCE))
@@ -113,6 +134,8 @@ internal class JourneyMapLayers {
                 PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
                 PropertyFactory.iconAllowOverlap(true),
                 PropertyFactory.iconIgnorePlacement(true),
+                // The highlighted level changer over the others.
+                PropertyFactory.symbolSortKey(Expression.get(SORT_PROPERTY)),
             )
             canvas.addLayer(layer, MapCanvasLayerAnchor.Above(ProximiioMapLayer.ROUTE))
         }
@@ -143,18 +166,34 @@ internal class JourneyMapLayers {
 
     private fun applyLevelChanger(style: Style) {
         val source = style.getSource(LEVEL_CHANGER_SOURCE) as? GeoJsonSource ?: return
-        val changer = levelChanger?.takeIf { VenueLevel.same(it.level, level) }
-        val point = changer?.let {
-            Feature.fromGeometry(Point.fromLngLat(it.coordinate.longitude, it.coordinate.latitude)).apply {
-                addStringProperty(IMAGE_PROPERTY, it.imageName)
-            }
+        val highlighted = levelChanger?.takeIf { VenueLevel.same(it.level, level) }
+        val features = levelChangers
+            .filter { it.serves(level) && it.coordinate != highlighted?.coordinate }
+            .map { point(it.coordinate, LevelChanger.standardImageName(it.featureType), sort = 0) }
+            .toMutableList()
+        if (highlighted != null) features += point(highlighted.coordinate, highlighted.imageName, sort = 1)
+        source.setGeoJson(FeatureCollection.fromFeatures(features))
+    }
+
+    private fun point(coordinate: Coordinate, image: String, sort: Int): Feature =
+        Feature.fromGeometry(Point.fromLngLat(coordinate.longitude, coordinate.latitude)).apply {
+            addStringProperty(IMAGE_PROPERTY, image)
+            addNumberProperty(SORT_PROPERTY, sort)
         }
-        source.setGeoJson(FeatureCollection.fromFeatures(listOfNotNull(point)))
+
+    /** The design's icon of a level changer type. */
+    private fun icon(featureType: String): GadIcon = if (featureType == "elevator") GadIcon.Elevator else GadIcon.Stairs
+
+    /** The 30 dp amenity marker of a level changer that is not on the route ([MapStyle.amenityImage]). */
+    private fun standardLevelChangerImage(context: Context, featureType: String): Bitmap? {
+        val marker = icon(featureType).marker ?: return null
+        val size = (MARKER_DP * context.resources.displayMetrics.density).roundToInt()
+        return ContextCompat.getDrawable(context, marker)?.toBitmap(size, size)
     }
 
     /** 30 dp: a red circle with a white 2 dp ring and the white glyph in its middle 18 dp. */
     private fun levelChangerImage(context: Context, featureType: String): Bitmap? {
-        val glyph = if (featureType == "elevator") GadIcon.Elevator.glyph else GadIcon.Stairs.glyph
+        val glyph = icon(featureType).glyph
         val drawable = ContextCompat.getDrawable(context, glyph)?.mutate() ?: return null
         val density = context.resources.displayMetrics.density
         val size = (MARKER_DP * density).roundToInt()
@@ -215,7 +254,7 @@ internal class JourneyMapLayers {
         const val LEVEL_CHANGER_LAYER = "gad-level-changer"
         const val LEVEL_CHANGER_IMAGE = "gad-level-changer"
         const val IMAGE_PROPERTY = "image"
-        val LEVEL_CHANGER_TYPES = listOf("elevator", "staircase", "escalator")
+        const val SORT_PROPERTY = "sort"
         const val MARKER_DP = 30
         const val MARKER_COLOR = 0xFFED3731.toInt()
     }

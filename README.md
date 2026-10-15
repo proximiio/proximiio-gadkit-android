@@ -155,8 +155,8 @@ val configuration = GadConfiguration(
 
 | Setting | Default | Effect |
 |---|---|---|
-| `trackingLostAfter` | 110 s | Time without positioning before "We've lost your place". The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
-| `trackingStoppedAfter` | 170 s | Time without positioning before "Your wristband has stopped responding" (about 3 min). |
+| `trackingLostAfter` | 110 s | Time without positioning before `VisitEvent.TrackingChanged(LOST_PLACE)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
+| `trackingStoppedAfter` | 170 s | Time without positioning before `VisitEvent.TrackingChanged(STOPPED_RESPONDING)` (about 3 min). |
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
@@ -164,7 +164,7 @@ val configuration = GadConfiguration(
 | `offRouteMeters`, `offRouteAfter` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
-| `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Time of fixes inside a lift outline before "In the lift" or "Level up", and the fixes outside that end the ride. |
+| `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Time of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `journeyNotificationMinimumInterval` | 5 s | The shortest gap between two updates of the instruction in the journey notification. |
@@ -213,34 +213,23 @@ scope.launch {
   phone's session ends.
 - `isActive`, `state` (`StateFlow<BlueiotBindingState>`) and `endNotice` describe the session.
   Positions arrive only while it is active. `end()` ends the session on the relay-api.
-- When the session ends during a visit, `VisitScreen` shows "wristband no longer connected" with
-  "Connect a wristband". That button opens the host app's screen:
-
-```kotlin
-VisitScreen(
-    venue, wristband, journey,
-    onClose = { isVisiting = false },
-    wristbandConnectionScreen = { close -> MyWristbandScanner(onFinish = close) },  // calls connect(code)
-)
-```
-
-Without `wristbandConnectionScreen`, the button opens `WristbandPairingScreen`, the pairing flow of
-the Proximi GAD app. When the screen closes with an active session, `VisitScreen` reopens the
-wristband's position stream; without one, the "wristband no longer connected" sheet shows again.
+- `VisitScreen` shows no wristband alerts: the host app handles the wristband states, for example
+  an ended session (`state`, `endNotice`). `VisitScreen` reports lost and returning positions as
+  `VisitEvent.TrackingChanged(TrackingHealth)`.
 
 ## Screens
 
 | Composable | Content |
 |---|---|
 | `MuseumMapScreen(venue, onBack)` | The museum map: floors, amenities, the visitor's position, a route to a tapped place, the accessible routes button. |
-| `VisitScreen(venue, wristband, journey, onClose, kind, onVisitEvent, wristbandConnectionScreen)` | The journey: map and list with a toggle, skip and undo, the stop card, tracking alerts, the journey notification. `kind` is `JourneyKind.PERSONALISED` (default) or `CURATED`. |
+| `VisitScreen(venue, journey, onClose, kind, onVisitEvent)` | The journey: map and list with a toggle, skip and undo, the stop card, the journey notification. `kind` is `JourneyKind.PERSONALISED` (default) or `CURATED`. |
 | `WristbandPairingScreen(flow, onFinish)` | Optional: the pairing flow of the Proximi GAD app, with its QR scanner. Create the flow with `WristbandPairingFlow.of(wristband, scope)`. |
 | `VisitPlanPicker(places, onStart, onCancel)` | Choosing stops by hand. |
 | `JourneyReadyScreen(meta, isAtMuseum, onStart, onBack)` | "Journey ready" (02.10A). |
 | `ManageJourneySheet(title, summary, onEdit, onCraftNew, onDelete, onClose)` | "Manage journey" (02.11). Each action runs once the sheet has gone. |
 
 `VisitScreen` keeps its state while the activity is recreated, for example after a language change.
-It ends the visit's work (notification, tracking alerts, navigator) when it leaves the composition
+It ends the visit's work (notification, tracking monitor, navigator) when it leaves the composition
 for good. `onClose` is called after the visitor confirmed leaving, or after the journey is complete.
 
 A journey from Proximi.io POI ids, for example from the audio guide:
@@ -280,10 +269,12 @@ Without `artist_name` the row shows the level.
 | `artist_name` | String, or an i18n object like `title_i18n` | The artist under the title. |
 | `has_ar` | `true`, `"true"` or a non-zero number | "AR". |
 | `has_audio` | `true`, `"true"` or a non-zero number | A note. |
-| `gallery_id` | The `remote_id` of a gallery geofence | The stop's gallery header. |
+| `gallery_id` | The `remote_id` of a gallery POI | The stop's gallery header. |
 
-The header of a stop is its gallery by `gallery_id`, named by the gallery geofence with that
-`remote_id`; else the gallery outline it lies in; else its level ("Level 4").
+The header of a stop is its gallery by `gallery_id`, named by the title of the POI whose
+`remote_id` is that id ("G403 Weaving"); else the gallery outline it lies in; else its level
+("Level 4"). The GAD venue data on 2026-10-15 has `gallery_id` on artworks in 18 galleries; 14 of
+the 18 have a gallery POI.
 
 ## Accessibility
 
@@ -324,7 +315,7 @@ CompositionLocalProvider(LocalRouteAccessibility provides RouteAccessibility(avo
 action and each journey change, on the main thread:
 
 ```kotlin
-VisitScreen(venue, wristband, journey, onClose = onClose, onVisitEvent = { event ->
+VisitScreen(venue, journey, onClose = onClose, onVisitEvent = { event ->
     when (event) {
         is VisitEvent.SkipRequested -> log("Swiped ${event.stop.title}")
         is VisitEvent.StopSkipped -> log("Skipped ${event.stop.title}")
@@ -342,7 +333,7 @@ VisitScreen(venue, wristband, journey, onClose = onClose, onVisitEvent = { event
 | `SkipCancelled(JourneyStop)` | "Keep it". |
 | `SkipUndone(JourneyStop)` | "Undo skip" in the list. |
 | `AmenitySelected(VenuePlace)` | An amenity picked on the map. A card shows it. |
-| `DetourStarted(VenuePlace)` | "Change your route?" confirmed, or the route to the Welcome Desk from a tracking alert. |
+| `DetourStarted(VenuePlace)` | "Change your route?" confirmed. |
 | `JourneyResumed` | "Resume your Journey" or "Show the route from here". |
 | `Recentred` | "Centre on me". |
 | `AccessibleRoutesChanged(Boolean)` | The accessible routes button turned on (`true`) or off. |
@@ -352,6 +343,7 @@ VisitScreen(venue, wristband, journey, onClose = onClose, onVisitEvent = { event
 | `StopNearby(JourneyStop)` | The active stop is less than 5 m away on the visitor's level. Once per stop per visit. |
 | `ArtworkReached(JourneyStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The stop is done 2 s later, when the event arrives, and the route leads to the next stop. |
 | `ArtworkVisitedOutOfOrder(JourneyStop)` | The visitor stayed at an artwork further down the journey. The stop is done and the stops ahead are ordered again. |
+| `TrackingChanged(TrackingHealth)` | The wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`) or came back (`TRACKING`). `VisitScreen` shows no alert. |
 | `Journey(JourneyEvent)` | Every event of the journey navigator: `LegChanged`, `StopSkipped`, `Rerouted`, `DetourStarted`, `StopReached` (detours only), `JourneyFinished` and others. The navigator does not report artworks reached: use `ArtworkReached`. |
 
 ## Journey notification
@@ -362,7 +354,7 @@ needs the notification permission.
 
 ## Design system
 
-`Palette`, `GadTextStyle`, `GuggenheimSansDisplay`, `PrimaryButton`, `GhostButton`,
+`Palette`, `GadTextStyle`, `GuggenheimSansDisplay`, `PrimaryButton`, `GhostButton`, `SmallButton`,
 `TextActionButton`, `OutlineBadge`, `Modifier.glassSurface`, `ProvideGlassBackdrop`,
 `Modifier.glassBackdrop`, `AuroraBox`, `BackButton`, `OverlaySheet` and `Chip` are the Figma tokens and
 components, for the host app's own screens (package `io.proximi.gadkit.designsystem` and
@@ -455,9 +447,11 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `GADSettings` (`var`s, seconds as `TimeInterval`) | `GadSettings` (data class, `Duration`) | `offRouteSeconds` is `offRouteAfter`; `liveActivityMinimumInterval` is `journeyNotificationMinimumInterval`. |
 | `WristbandSession(configuration:)` + `run()` | `WristbandSession(context, configuration, scope)` | It follows the binding state in `scope`; there is no `run()`. |
 | `VenueService.start` asks for location | The host app asks for location first | Android needs an activity for the dialog. |
-| `VisitView(venue:wristband:journey:kind:onClose:)` with the modifiers `onVisitEvent`, `wristbandConnectionScreen` | `VisitScreen(venue, wristband, journey, onClose, kind, onVisitEvent, wristbandConnectionScreen)` | Compose takes lambdas as parameters. |
+| `VisitView(venue:journey:kind:onClose:)` with the modifier `onVisitEvent` | `VisitScreen(venue, journey, onClose, kind, onVisitEvent)` | Compose takes lambdas as parameters. |
 | `.routeAccessibility(_:)` | `CompositionLocalProvider(LocalRouteAccessibility provides …)` | |
 | `VisitEvent` enum cases (`.skipRequested(stop)`) | `VisitEvent` sealed interface (`VisitEvent.SkipRequested(stop)`) | `journey(JourneyEvent)` is `Journey(event)`. The stop is the library's `JourneyStop`. |
+| `TrackingHealth` cases (`.lostPlace`) | `TrackingHealth` enum (`LOST_PLACE`) | |
+| `.buttonStyle(.small(selected:strength:))` | `SmallButton(text, onClick, selected = …, strength = …)` | |
 | `WristbandPairing` + `WristbandPairingView(pairing:onFinish:)` | `WristbandPairingFlow.of(wristband, scope)` + `WristbandPairingScreen(flow, onFinish)` | |
 | `WristbandCopy.message(for:)` returns `String` | `WristbandCopy.message(error)` returns `UiText` | Resolve it with `resolve(context)` or `asString()` in Compose. |
 | `UserDefaults` `ProximiioGADKit.accessibleRoutes` | Shared preferences `proximiio_gadkit`, same key | |
@@ -491,11 +485,55 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
+The behaviour of the iOS package 0.13.0.
+
+#### Removed
+
+- **BREAKING:** `VisitScreen` has no `wristband` and no `wristbandConnectionScreen` parameter. Remove
+  both arguments: `VisitScreen(venue, journey, onClose, kind, onVisitEvent)`. The screen no longer
+  offers "Connect a wristband"; the host app handles an ended wristband session itself
+  (`WristbandSession.state`, `endNotice`).
+- **BREAKING:** `VenuePlace.welcomeDesk(places)` is removed. It served the route to the Welcome Desk
+  of the tracking alert. Remove the call. A host app that needs the desk finds it in
+  `venue.places(language)` by its title or `amenityId`.
+- **Visible:** the tracking alerts "We've lost your place in the room" and "Your wristband has
+  stopped responding", and the "Your wristband is no longer connected" sheet with "Connect a
+  wristband" and the route to the Welcome Desk. The host app handles the wristband states
+  (PM 2026-10-15). Use `VisitEvent.TrackingChanged` to show your own.
+- **Visible:** the level change animation over the map ("Level up", "In the lift"). The map still
+  moves to the visitor's floor. No change in the host app.
+
+#### Added
+
+- **BREAKING:** `VisitEvent.TrackingChanged(health)` with the public enum `TrackingHealth`
+  (`WAITING`, `TRACKING`, `LOST_PLACE` after `GadSettings.trackingLostAfter`, `STOPPED_RESPONDING`
+  after `trackingStoppedAfter`). A `when` over `VisitEvent` without `else` needs the case.
+- `SmallButton(…, strength = …)`: the glass of the button, `GlassStrength.Light` by default.
+
+#### Changed
+
+- **Visible:** the gallery headers of the journey list show the title of the POI whose `remote_id`
+  is the artwork's `metadata.gallery_id` ("G403 Weaving"), not the name of the gallery geofence.
+  No change in the host app.
+- **Visible:** the stop card, the instruction and the journey notification name the floor where a
+  ride in one staircase or lift ends ("Take the stairs to level 4"). The SDK router splits a ride
+  into one level change per floor, and the card named the first one ("level 3"). No change in the
+  host app.
+- **Visible:** lifts, staircases and escalators show on their floor and on every floor in their
+  `levels`, on the journey map and the museum map. The route's next one stays red. No change in the
+  host app.
+- **Visible:** the amenity buttons of the map search use the frosted glass, so their titles are
+  readable over the map. No change in the host app.
+
 #### Fixed
 
 - **Visible:** the map's amenity markers (restrooms, café, help desk, prayer room, shop, stairs,
   elevator) are white circles with a dark icon, as in the iOS package. In 0.12.0 the circles were
   black, and the icons were hard to see. No change in the host app.
+- **Visible:** an artwork with several geofences of the same `remote_id` is reached in any of them.
+  Each DCT test artwork shares its `remote_id` with the Guggenheim artwork, and only the first
+  geofence counted, so a visitor in the DCT geofence did not reach "DCT Mother/Earth", at the start
+  of a journey or out of order. No change in the host app.
 
 ### [0.12.0] — 2026-10-15
 

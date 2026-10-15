@@ -2,8 +2,6 @@ package io.proximi.gadkit.wristband
 
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.Coordinate
-import io.proximi.gadkit.map.VenuePlace
-import io.proximi.gadkit.wristband.TrackingHealth
 import io.proximi.sdk.Proximiio
 import io.proximi.sdk.positionProviderConnections
 import io.proximi.sdk.positioningAvailabilityChanges
@@ -16,21 +14,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import java.util.Locale
 import io.proximi.gadkit.GadSettings
 
 /**
  * Reports when the wristband stops delivering positions during a visit (Figma "Wristband", edge
  * cases "Lost tracking mid-narration" and "Device removed or battery dead"), as iOS `TrackingMonitor`.
+ * `VisitScreen` reports the state as `VisitEvent.TrackingChanged` and shows no alert (PM 2026-10-15).
  *
  * The signal is the SDK's `positioningAvailabilityChanges()`: it turns `false` about 10 s after the
  * last fix from the relay provider, whether the socket failed or the tag stopped sending positions. Core's
- * [TrackingHealth] turns it into "lost your place" and, after [GadSettings.trackingStoppedAfter],
- * "stopped responding"; the monitor re-evaluates every [TrackingHealth.REEVALUATE_INTERVAL] so the
- * second follows while nothing else changes. The position stream only feeds "Last Seen".
+ * [TrackingHealth] turns it into [TrackingHealth.LOST_PLACE] and, after
+ * [GadSettings.trackingStoppedAfter], [TrackingHealth.STOPPED_RESPONDING]; the monitor re-evaluates
+ * every [TrackingHealth.REEVALUATE_INTERVAL] so the second follows while nothing else changes. The
+ * position stream only feeds [lastFix], for "Probably at …".
  *
  * [start] it when the visit screen appears and [stop] it when it goes, as iOS `onAppear` /
  * `onDisappear`; [scope] is the screen's (a ViewModel's) scope.
@@ -41,8 +38,8 @@ internal class TrackingMonitor(
     private val settings: GadSettings = GadSettings.STANDARD,
     private val now: () -> Instant = Instant::now,
 ) {
-    /** The last position, for "Last Seen". [time] is the fix time. */
-    data class LastFix(val time: Instant, val coordinate: Coordinate, val level: Double?, val accuracy: Double)
+    /** The last position, for "Probably at …". */
+    data class LastFix(val coordinate: Coordinate, val level: Double?, val accuracy: Double)
 
     private val mutableHealth = MutableStateFlow(TrackingHealth.WAITING)
     val health: StateFlow<TrackingHealth> = mutableHealth.asStateFlow()
@@ -60,7 +57,6 @@ internal class TrackingMonitor(
             var logged = 0L
             sdk.positions().collect { update ->
                 mutableLastFix.value = LastFix(
-                    time = Instant.ofEpochMilli(update.timestamp),
                     coordinate = Coordinate(update.coordinate.latitude, update.coordinate.longitude),
                     level = update.level,
                     accuracy = update.horizontalAccuracy,
@@ -112,13 +108,5 @@ internal class TrackingMonitor(
         if (health == mutableHealth.value) return
         FieldLog.log("tracking health: $health")
         mutableHealth.value = health
-    }
-
-    /** "Gallery 2, 9:38": the nearest place on the last floor and the time of the last position. */
-    fun lastSeen(places: List<VenuePlace>, locale: Locale = Locale.getDefault()): String? {
-        val fix = lastFix.value ?: return null
-        val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).format(fix.time.atZone(ZoneId.systemDefault()))
-        val place = VenuePlace.nearest(fix.coordinate, fix.level, places) ?: return time
-        return "${place.title}, $time"
     }
 }

@@ -72,16 +72,16 @@ public data class Gallery(
         }
 
         /**
-         * Gallery names by the gallery's id: the `remote_id` of a gallery geofence, which an
-         * artwork names in `metadata.gallery_id` ([VenuePlace.galleryId]). On 2026-10-15 the GAD
-         * data names galleries on every floor this way; gallery outlines with a gallery POI exist
-         * on level 3 only. Pure; covered by tests.
+         * Gallery names by the gallery's id: the title of the POI whose `remote_id` is the id that an
+         * artwork names in `metadata.gallery_id` ([VenuePlace.galleryId]), such as "G403 Weaving"
+         * (PM 2026-10-15). Artworks are left out: their `remote_id` is a collection id. Pure;
+         * covered by tests.
          */
-        internal fun names(geofences: List<VenueGeofence>): Map<String, String> = buildMap {
-            for (geofence in geofences) {
-                if (geofence.geofenceType != "gallery") continue
-                val id = geofence.remoteId?.takeIf { it.isNotEmpty() } ?: continue
-                val name = geofence.name?.takeIf { it.isNotEmpty() } ?: continue
+        internal fun names(places: List<VenuePlace>): Map<String, String> = buildMap {
+            for (place in places) {
+                if (place.isArtwork) continue
+                val id = place.remoteId?.takeIf { it.isNotEmpty() } ?: continue
+                val name = place.title.trim().takeIf { it.isNotEmpty() } ?: continue
                 putIfAbsent(id, name)
             }
         }

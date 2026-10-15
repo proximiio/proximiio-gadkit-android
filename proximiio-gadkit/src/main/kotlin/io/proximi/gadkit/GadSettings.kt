@@ -10,16 +10,16 @@ import kotlin.time.Duration.Companion.seconds
  * 2026-10-14.
  */
 public data class GadSettings(
-    // Wristband tracking alerts
+    // Wristband tracking
 
     /**
-     * Time without positioning before "We've lost your place". The SDK reports positioning
-     * unavailable about 10 s after the last fix, so 110 s is about 2 min after it.
+     * Time without positioning before `VisitEvent.TrackingChanged(LOST_PLACE)`. The SDK reports
+     * positioning unavailable about 10 s after the last fix, so 110 s is about 2 min after it.
      */
     val trackingLostAfter: Duration = 110.seconds,
     /**
-     * Time without positioning before "Your wristband has stopped responding". Must be more than
-     * [trackingLostAfter]. 170 s is about 3 min after the last fix.
+     * Time without positioning before `VisitEvent.TrackingChanged(STOPPED_RESPONDING)`. Must be
+     * more than [trackingLostAfter]. 170 s is about 3 min after the last fix.
      */
     val trackingStoppedAfter: Duration = 170.seconds,
 
@@ -67,8 +67,8 @@ public data class GadSettings(
     // Lift
 
     /**
-     * Time of fixes inside a lift outline before the visitor counts as riding it ("In the lift",
-     * "Level up"). A shorter stay is walking past the lift.
+     * Time of fixes inside a lift outline before the visitor counts as riding it. A shorter stay is
+     * walking past the lift.
      */
     val liftRideDwell: Duration = 3.seconds,
     /** Consecutive fixes outside the lift outline that end the ride. */

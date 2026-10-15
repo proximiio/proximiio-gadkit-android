@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.roundedInt
 import kotlin.math.ceil
@@ -17,8 +18,16 @@ internal data class RouteGuidance(
 internal sealed interface Manoeuvre {
     data class Turn(val direction: TurnDirection) : Manoeuvre
 
-    /** [featureType] is the level changer's feature type, e.g. `elevator`. */
-    data class LevelChange(val featureType: String, val toLevel: Double) : Manoeuvre
+    /**
+     * [featureType] is the level changer's feature type, e.g. `elevator`; [coordinate] is the level
+     * changer. [GuidanceText.rideEnd] uses [fromLevel] and [coordinate].
+     */
+    data class LevelChange(
+        val featureType: String,
+        val toLevel: Double,
+        val fromLevel: Double = toLevel,
+        val coordinate: Coordinate? = null,
+    ) : Manoeuvre
 
     data object Arrive : Manoeuvre
 
@@ -71,8 +80,11 @@ internal object GuidanceText {
      * `guidance_turn_right` "Turn right in %d m", `guidance_bear_right` "Bear right in %d m",
      * `guidance_take_level_changer` "Take the %1$s to level %2$d" (args: [levelChanger] text, level),
      * `guidance_arrive_in` "Arrive in %d m", `guidance_head_straight` "Head straight for %d m".
+     *
+     * [markers] are the route's level changes (the drawn route's markers), which give the floor a
+     * ride ends on ([rideEnd]).
      */
-    internal fun instruction(guidance: RouteGuidance): UiText {
+    internal fun instruction(guidance: RouteGuidance, markers: List<LevelChangeMarker> = emptyList()): UiText {
         if (guidance.hasArrived) return UiText.Resource("guidance_arrived")
         if (guidance.isOffRoute) return UiText.Resource("guidance_off_route")
         val metres = guidance.distanceToManoeuvreMeters.roundedInt()
@@ -85,7 +97,10 @@ internal object GuidanceText {
             }
             is Manoeuvre.LevelChange -> UiText.Resource(
                 "guidance_take_level_changer",
-                listOf(levelChanger(manoeuvre.featureType), manoeuvre.toLevel.roundedInt()),
+                listOf(
+                    levelChanger(manoeuvre.featureType),
+                    rideEnd(manoeuvre.featureType, manoeuvre.coordinate, manoeuvre.fromLevel, manoeuvre.toLevel, markers),
+                ),
             )
             Manoeuvre.Arrive -> UiText.Resource("guidance_arrive_in", listOf(metres))
             Manoeuvre.Straight, null -> UiText.Resource("guidance_head_straight", listOf(metres))
@@ -140,7 +155,7 @@ internal object GuidanceText {
     /**
      * The card title while the next stop is on another floor: the route's first level change that
      * leaves the visitor's floor, e.g. "Take the stairs to level 3". A route from level 1 to level 4
-     * can take the stairs to level 3 first (PM 2026-10-15). Without a level change on the route:
+     * can take the stairs to level 3 and then the lift. Without a level change on the route:
      * `visit_go_to_level` "Go to level %d". The key and arguments of a change are those of
      * [instruction], so the card can compare the two. Pure; covered by tests.
      */
@@ -148,9 +163,38 @@ internal object GuidanceText {
         val pending = markers.filter { !it.isCompleted }
         val fromHere = visitorLevel?.let { level -> pending.firstOrNull { it.fromLevel.roundedInt() == level.roundedInt() } }
         val change = fromHere ?: pending.firstOrNull() ?: return UiText.Resource("visit_go_to_level", listOf(stopLevel))
-        return UiText.Resource("guidance_take_level_changer", listOf(levelChanger(change.featureType), change.toLevel.roundedInt()))
+        val level = rideEnd(change.featureType, change.coordinate, change.fromLevel, change.toLevel, pending)
+        return UiText.Resource("guidance_take_level_changer", listOf(levelChanger(change.featureType), level))
+    }
+
+    /**
+     * The floor a ride in one staircase or lift ends on. The SDK router splits a ride into one level
+     * change per floor with paths near the staircase or lift: from level 1 to level 4 the stairs go
+     * to level 3, then from level 3 to level 4, at the same coordinate (Monday "Instructions guide
+     * first to level 3, then level 4", 2026-10-15). The level changes in [markers] that follow the
+     * one from [from] to [to], with the same type and coordinate, are the same ride. Pure; covered
+     * by tests.
+     */
+    internal fun rideEnd(featureType: String, coordinate: Coordinate?, from: Double, to: Double, markers: List<LevelChangeMarker>): Int {
+        fun isSameChanger(marker: LevelChangeMarker) = marker.featureType == featureType && marker.coordinate == coordinate
+        var end = to.roundedInt()
+        val start = markers.indexOfFirst {
+            isSameChanger(it) && it.fromLevel.roundedInt() == from.roundedInt() && it.toLevel.roundedInt() == end
+        }
+        if (start < 0) return end
+        for (marker in markers.drop(start + 1)) {
+            if (!isSameChanger(marker) || marker.fromLevel.roundedInt() != end) break
+            end = marker.toLevel.roundedInt()
+        }
+        return end
     }
 }
 
-/** A level change of the drawn route (the map library's `RouteGeometry.Marker`). */
-internal data class LevelChangeMarker(val featureType: String, val fromLevel: Double, val toLevel: Double, val isCompleted: Boolean)
+/** A level change of the drawn route (the map library's `RouteGeometry.Marker`). [coordinate] is the level changer. */
+internal data class LevelChangeMarker(
+    val featureType: String,
+    val fromLevel: Double,
+    val toLevel: Double,
+    val isCompleted: Boolean,
+    val coordinate: Coordinate,
+)

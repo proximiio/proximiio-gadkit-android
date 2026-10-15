@@ -2,6 +2,7 @@ package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.map.RouteAccessibility
+import io.proximi.gadkit.map.VenueGeofence
 import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.Coordinate
@@ -144,7 +145,7 @@ internal class VisitController(
     var artworkRemoteIds: Map<String, String> = emptyMap()
 
     /** Artwork geofence shapes, by `remote_id`. Set once the venue's geofences are loaded. */
-    var artworkAreas: Map<String, ArtworkArea> = emptyMap()
+    var artworkAreas: Map<String, List<ArtworkArea>> = emptyMap()
 
     /**
      * Called when an artwork stop is done: `true` for the active stop (its geofence, 2 s after the
@@ -270,10 +271,10 @@ internal class VisitController(
             if (stop.kind == JourneyStop.Kind.DETOUR) continue
             if (stop.state != JourneyStop.State.PENDING && stop.state != JourneyStop.State.ACTIVE && stop.state != JourneyStop.State.REACHED) continue
             val remoteId = artworkRemoteIds[stop.poiId ?: stop.id] ?: continue
-            val area = artworkAreas[remoteId] ?: continue
+            val areas = artworkAreas[remoteId] ?: continue
             val stopLevel = stop.floor?.level
             if (!VenueLevel.matches(stopLevel, level)) continue
-            if (!area.contains(point)) continue
+            if (areas.none { it.contains(point) }) continue
             if (stop.id == activeId) artworkGeofenceEntered(remoteId) else inside += stop.id
         }
         for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) markOutOfOrder(id)
@@ -405,5 +406,14 @@ internal class VisitController(
          */
         val artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds = Double.POSITIVE_INFINITY)
 
+        /**
+         * The shapes of the artwork geofences, by `remote_id`. One artwork can have several
+         * geofences: on 2026-10-15 each DCT test artwork shares its `remote_id` with the Guggenheim
+         * artwork. Pure; covered by tests.
+         */
+        internal fun artworkAreas(geofences: List<VenueGeofence>): Map<String, List<ArtworkArea>> =
+            geofences
+                .filter { it.geofenceType == "artwork" && !it.remoteId.isNullOrEmpty() }
+                .groupBy({ it.remoteId.orEmpty() }, { ArtworkArea(it.center, it.radius, it.polygon) })
     }
 }

@@ -63,23 +63,27 @@ class GalleryTest {
     }
 }
 
-/** Port of ProximiioGADKit `GalleryNameTests` (0.12.0). */
+/** Port of ProximiioGADKit `GalleryNameTests` (0.13.0). */
 class GalleryNameTest {
-    private fun geofence(id: String, name: String?, remoteId: String?, type: String = "gallery") =
-        VenueGeofence(id, name, polygon = null, floorId = null, remoteId = remoteId, geofenceType = type)
+    private fun place(id: String, title: String, remoteId: String?, isArtwork: Boolean = false) =
+        VenuePlace(id = id, title = title, coordinate = Coordinate(24.5, 54.4), level = 4.0, remoteId = remoteId, isArtwork = isArtwork)
 
-    /** GAD data 2026-10-15: the artworks of "Gallery 403" (level 4) name it in `metadata.gallery_id`. */
+    /**
+     * GAD data 2026-10-15: the artworks of "G403 Weaving" (level 4) name it in `metadata.gallery_id`,
+     * and the gallery POI holds that id in `remote_id`.
+     */
     @Test
-    fun galleryGeofencesNameGalleriesByTheirRemoteId() {
+    fun galleryPOIsNameGalleriesByTheirRemoteId() {
         val names = Gallery.names(
             listOf(
-                geofence("a", "Gallery 403", "e07fe5d7"),
-                geofence("b", "Gallery 102", ""),
-                geofence("c", null, "x"),
-                geofence("d", "Untitled", "GAD.2010.00033", type = "artwork"),
+                place("a", "G403 Weaving", "e07fe5d7"),
+                place("b", "G304 Histories ", "24096077"),
+                place("c", "Gallery 102", ""),
+                place("d", "Café", null),
+                place("e", "Untitled", "GAD.2010.00033", isArtwork = true),
             ),
         )
-        assertEquals(mapOf("e07fe5d7" to "Gallery 403"), names)
+        assertEquals(mapOf("e07fe5d7" to "G403 Weaving", "24096077" to "G304 Histories"), names)
     }
 }
 
@@ -95,5 +99,39 @@ class GalleryOutlineTest {
         assertEquals(Coordinate(24.5, 54.401), ring[1])
         assertEquals(4, Gallery.outerRing("MultiPolygon", listOf(square))?.size)
         assertNull(Gallery.outerRing("Point", square))
+    }
+}
+
+/** Port of ProximiioGADKit `LevelChangerPlaceTests` (0.13.0). */
+class LevelChangerPlaceTest {
+    private fun feature(id: String, type: String, level: Double, levels: List<Double>?, geometry: String = "Point") = VenueFeature(
+        id = id,
+        type = type,
+        geometry = Geometry(geometry, listOf(54.399, 24.5397)),
+        properties = buildMap {
+            put("type", type)
+            put("level", level)
+            if (levels != null) put("levels", levels)
+        },
+        level = level,
+    )
+
+    /** GAD data 2026-10-15: the lift is a POI on level 0 with `levels` [1, 2, 3, 4]; the web map shows it on levels 1 to 4 as well. */
+    @Test
+    fun aLevelChangerServesItsFloorAndItsLevels() {
+        val changers = LevelChangerPlace.all(
+            listOf(
+                feature("lift", "elevator", 0.0, listOf(1.0, 2.0, 3.0, 4.0)),
+                feature("stairs", "staircase", 1.0, null),
+                feature("cafe", "poi", 0.0, listOf(1.0)),
+                feature("outline", "elevator", 1.0, null, geometry = "MultiPolygon"),
+            ),
+        )
+        assertEquals(listOf("lift", "stairs"), changers.map { it.id })
+        val lift = changers.first()
+        assertEquals(Coordinate(24.5397, 54.399), lift.coordinate)
+        assertTrue(listOf(0.0, 1.0, 4.0).all { lift.serves(it) })
+        assertFalse(lift.serves(5.0))
+        assertTrue(changers[1].serves(1.0) && !changers[1].serves(2.0))
     }
 }

@@ -13,7 +13,7 @@ internal data class LevelChange(val from: Int, val to: Int) {
 /**
  * Detects a change of the visitor's floor, as iOS `LevelChangeDetector`. A floor counts as changed
  * after [confirmations] consecutive fixes on the new floor. The default is 1: the map switches
- * floors on the first fix on the new floor, and the animation starts on the same fix. Covered by tests.
+ * floors on the first fix on the new floor. Covered by tests.
  */
 internal class LevelChangeDetector(private val confirmations: Int = 1) {
     /** The visitor's floor, `null` before the first fix with a floor. */
@@ -108,14 +108,4 @@ internal class LiftDetector(private val dwellMillis: Long = 3_000, private val e
         isRiding = false
         return Event.LEFT
     }
-}
-
-/** What the level change overlay shows: the ride, then the arrival on the new floor (iOS `LevelChangeCard`). */
-internal data class LevelChangeCard(
-    val phase: Phase,
-    val from: Int,
-    /** The floor the visitor goes to. During a ride it comes from the route's level change at this lift, and is `null` without one. */
-    val to: Int?,
-) {
-    internal enum class Phase { RIDING, ARRIVED }
 }

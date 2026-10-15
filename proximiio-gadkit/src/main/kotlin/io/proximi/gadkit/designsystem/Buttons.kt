@@ -80,15 +80,24 @@ public fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = M
     }
 }
 
-/** Figma "Button Small" and chips, 32 dp; a selected chip has an ink outline. */
+/**
+ * Figma "Button Small" and chips, 32 dp; a selected chip has an ink outline. [strength] is the
+ * glass, [GlassStrength.Light] by default.
+ */
 @Composable
-public fun SmallButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, selected: Boolean = false) {
+public fun SmallButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    strength: GlassStrength = GlassStrength.Light,
+) {
     PressableBox(onClick, true, 0.95f, 1f, modifier) { m ->
         Box(
             m.defaultMinSize(minHeight = 32.dp)
                 // Before the glass: a border earlier in the chain draws over the glass's white edge.
                 .then(if (selected) Modifier.border(1.5.dp, Palette.ink, ButtonShape) else Modifier)
-                .glassSurface(ButtonShape, GlassStrength.Light)
+                .glassSurface(ButtonShape, strength)
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center,
         ) {

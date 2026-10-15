@@ -125,19 +125,27 @@ internal fun MapIcon(icon: Int, modifier: Modifier = Modifier, size: Int = 24) {
 internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, onPick: (AmenityKind) -> Unit) {
     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
         kinds.forEach { kind ->
-            AmenityChip(kind, selected = kind == selected, onClick = { onPick(kind) })
+            // Frosted: on the clear glass the titles were hard to read over the map
+            // (PM 2026-10-15, "Search menu transparency").
+            AmenityChip(kind, selected = kind == selected, onClick = { onPick(kind) }, strength = GlassStrength.Frosted)
         }
     }
 }
 
 /** "Button Small" with the amenity icon before the title. */
 @Composable
-internal fun AmenityChip(kind: AmenityKind, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun AmenityChip(
+    kind: AmenityKind,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    strength: GlassStrength = GlassStrength.Light,
+) {
     Row(
         modifier
             .defaultMinSize(minHeight = 32.dp)
             .then(if (selected) Modifier.border(1.5.dp, Palette.ink, ControlShape) else Modifier)
-            .glassSurface(ControlShape, GlassStrength.Light)
+            .glassSurface(ControlShape, strength)
             .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected }
             .padding(horizontal = 10.dp),

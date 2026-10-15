@@ -41,8 +41,8 @@ public data class VenuePlace(
     /** `metadata.has_audio`: the journey list shows a note. */
     val hasAudio: Boolean = false,
     /**
-     * `metadata.gallery_id`: the gallery of an artwork. The gallery's geofence holds the same value
-     * in `remote_id`.
+     * `metadata.gallery_id`: the gallery of an artwork. The gallery's POI holds the same value in
+     * `remote_id` ([Gallery.names]).
      */
     val galleryId: String? = null,
 ) {
@@ -99,16 +99,6 @@ public data class VenuePlace(
                 places.firstOrNull { it.id == identifier }?.let { return it }
             }
             return null
-        }
-
-        /** The visitor service desk: an amenity id or title naming the help, welcome or information desk. */
-        public fun welcomeDesk(places: List<VenuePlace>): VenuePlace? {
-            val names = listOf("welcome desk", "help desk", "information", "front desk", "info desk")
-            return places.firstOrNull { place ->
-                val title = place.title.lowercase()
-                val amenity = place.amenityId?.lowercase() ?: ""
-                names.any { title.contains(it) } || amenity.contains("help") || amenity.contains("info")
-            }
         }
 
         /** Case- and diacritic-insensitive substring match on the title. An empty query matches all. */
