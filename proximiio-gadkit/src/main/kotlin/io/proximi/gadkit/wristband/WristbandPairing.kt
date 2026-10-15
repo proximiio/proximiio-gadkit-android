@@ -29,6 +29,26 @@ public interface WristbandConnecting {
 }
 
 /**
+ * Binds this phone to the band with [code], as iOS `WristbandConnecting.connect(code:)`: the code a
+ * host app's own QR scanner read, or the code the visitor typed. The relay-api resolves every label
+ * format. Whitespace around the code is dropped. When the relay-api needs the phone's location for
+ * a take-over, the location dialog comes first. Returns when the session is active; the new session
+ * replaces any current one. A band that another phone follows is taken over when the relay-api
+ * allows it.
+ *
+ * With [WristbandSession], the location dialog needs [WristbandLocationDialogHost] on screen.
+ *
+ * @throws BindingError when the bind fails, [BindingError.InvalidTagId] for an empty code.
+ *   `WristbandCopy.message(error)` is the text for the visitor.
+ */
+public suspend fun WristbandConnecting.connect(code: String) {
+    val label = code.trim()
+    if (label.isEmpty()) throw BindingError.InvalidTagId()
+    locationAsk()?.let { ask(it) }
+    bind(label)
+}
+
+/**
  * State of the "Connect your wristband" flow (Figma section "Wristband", node 9330:83108).
  *
  * Steps: intro → scan the QR code or enter the code → looking for the wristband →
@@ -120,9 +140,8 @@ internal class WristbandPairing(private val connector: WristbandConnecting) {
 
     private suspend fun connect(label: String, isTyped: Boolean) {
         mutableState.update { it.copy(step = Step.Looking(label)) }
-        connector.locationAsk()?.let { connector.ask(it) }
         try {
-            connector.bind(label)
+            connector.connect(label)
             mutableState.update { it.copy(failedAttempts = 0, step = Step.Connected(label)) }
         } catch (error: CancellationException) {
             throw error

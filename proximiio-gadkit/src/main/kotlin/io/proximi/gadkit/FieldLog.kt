@@ -64,6 +64,11 @@ public object FieldLog {
         writer.value.execute { append(file, line) }
     }
 
+    /** Appends the line [message] builds, without building it while the log is off. */
+    public inline fun log(message: () -> String) {
+        if (isEnabled) log(message())
+    }
+
     /** Opens the share sheet with the log, for the host app's "Share debug log" button. */
     public fun share(context: Context) {
         if (!isEnabled) return

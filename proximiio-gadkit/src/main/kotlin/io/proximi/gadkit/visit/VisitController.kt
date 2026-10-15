@@ -100,6 +100,12 @@ internal class VisitController(
     /** Artwork geofence shapes, by `remote_id`. Set once the venue's geofences are loaded. */
     var artworkAreas: Map<String, ArtworkArea> = emptyMap()
 
+    /**
+     * Called when an artwork stop is done: `true` for the active stop (its geofence, 2 s after the
+     * arrival), `false` for an artwork visited out of order. The stop is read after `markDone`.
+     */
+    var onArtworkDone: ((JourneyStop, isActiveStop: Boolean) -> Unit)? = null
+
     /** Stops whose move to the next artwork is scheduled. */
     private val scheduledDone = mutableSetOf<String>()
 
@@ -233,7 +239,7 @@ internal class VisitController(
             try {
                 if (navigator.journey.value.stops.firstOrNull { it.id == stopId }?.state != JourneyStop.State.PENDING) return@launch
                 FieldLog.log("artwork visited out of order: $stopId")
-                navigator.markDone(stopId)
+                if (navigator.markDone(stopId)) doneStop(stopId)?.let { onArtworkDone?.invoke(it, false) }
                 orderRemaining()
                 save()
             } finally {
@@ -252,10 +258,13 @@ internal class VisitController(
                 scheduledDone.remove(stopId)
             }
             if (navigator.activeStop?.id != stopId) return@launch
-            navigator.markDone(stopId)
+            val changed = navigator.markDone(stopId)
             save()
+            if (changed) doneStop(stopId)?.let { onArtworkDone?.invoke(it, true) }
         }
     }
+
+    private fun doneStop(stopId: String): JourneyStop? = navigator.journey.value.stops.firstOrNull { it.id == stopId }
 
     suspend fun skip(stopId: String) {
         if (!navigator.skip(stopId)) return

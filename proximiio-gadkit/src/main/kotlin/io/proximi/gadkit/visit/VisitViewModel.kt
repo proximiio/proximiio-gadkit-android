@@ -42,6 +42,8 @@ import io.proximi.gadkit.wristband.WristbandPairingFlow
 import io.proximi.gadkit.wristband.WristbandSession
 import io.proximi.gadkit.map.LocalNotices
 import io.proximi.map.core.RouteGuidance
+import io.proximi.map.core.VenuePosition
+import io.proximi.map.core.JourneyStop as MapJourneyStop
 import io.proximi.map.live.ProximiioMapSession
 import io.proximi.sdk.geofenceEvents
 import io.proximi.sdk.geofencing.GeofenceEvent
@@ -66,6 +68,7 @@ import kotlinx.coroutines.launch
  * [TrackingMonitor], the journey map layers and the visit notification.
  *
  * @param onClose the host app's `onClose` of `VisitScreen` (iOS `onClose`).
+ * @param onEvent the host app's `onVisitEvent` of `VisitScreen` (iOS `onVisitEvent`).
  */
 internal class VisitViewModel(
     private val application: Application,
@@ -75,9 +78,9 @@ internal class VisitViewModel(
     parentScope: CoroutineScope,
     private val debug: DebugLaunch.Options?,
     private val onClose: () -> Unit,
+    /** The host app's `onVisitEvent` of `VisitScreen`. Called on the main thread. */
+    private val onEvent: (VisitEvent) -> Unit = {},
 ) {
-    enum class Mode { MAP, LIST }
-
     /** What the navigator reports, read on each change of its journey. */
     data class Progress(
         val journey: Journey,
@@ -118,7 +121,16 @@ internal class VisitViewModel(
     /** Floor level of the visitor's last position. */
     var visitorLevel by mutableStateOf<Double?>(null)
         private set
-    var mode by mutableStateOf(if (debug?.visitList == true) Mode.LIST else Mode.MAP)
+    private var modeState by mutableStateOf(if (debug?.visitList == true) VisitMode.LIST else VisitMode.MAP)
+
+    /** Map or List. A change reports [VisitEvent.ModeChanged]. */
+    var mode: VisitMode
+        get() = modeState
+        set(value) {
+            if (value == modeState) return
+            modeState = value
+            onEvent(VisitEvent.ModeChanged(value))
+        }
     var places by mutableStateOf(emptyList<VenuePlace>())
         private set
     var galleries by mutableStateOf(emptyList<Gallery>())
@@ -138,8 +150,11 @@ internal class VisitViewModel(
     /** Galleries the visitor has been in during this visit. */
     private var visitedGalleries = emptySet<String>()
 
+    /** The stop of "Skip artwork?". */
     var stopToSkip by mutableStateOf<JourneyStop?>(null)
+        private set
     var isConfirmingExit by mutableStateOf(false)
+        private set
     /** Journey Complete, once every stop is done or skipped. */
     var isShowingWrapUp by mutableStateOf(false)
     var isShowingAmenities by mutableStateOf(false)
@@ -191,6 +206,10 @@ internal class VisitViewModel(
 
     init {
         session.journeyStopMarkerStyle = MapStyle.journeyStops
+        controller.onArtworkDone = { stop, isActiveStop ->
+            onEvent(if (isActiveStop) VisitEvent.ArtworkReached(stop.toCore()) else VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))
+        }
+        scope.launch { controller.navigator.events.collect { onEvent(VisitEvent.Journey(it)) } }
         monitor.start()
         scope.launch {
             loadVenue()
@@ -217,13 +236,13 @@ internal class VisitViewModel(
                 refreshMapLayers()
                 refreshConnector()
                 updateNotification()
-                stopNearby.update(session.position.value, navigator.activeStop, guidance)
+                reportStopNearby(session.position.value, navigator.activeStop, guidance)
             }
         }
         scope.launch {
             session.position.collect { position ->
                 if (position == null) return@collect
-                stopNearby.update(position, controller.navigator.activeStop, controller.navigator.guidance.value)
+                reportStopNearby(position, controller.navigator.activeStop, controller.navigator.guidance.value)
                 if (visitorLevel != position.floor?.level) {
                     visitorLevel = position.floor?.level
                     updateNotification()
@@ -264,6 +283,10 @@ internal class VisitViewModel(
                 evaluateAmbiguity()
             }
         }
+    }
+
+    private fun reportStopNearby(position: VenuePosition?, stop: MapJourneyStop?, guidance: RouteGuidance?) {
+        stopNearby.update(position, stop, guidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
     }
 
     /** The app language changed: map labels and place titles follow it. */
@@ -399,18 +422,41 @@ internal class VisitViewModel(
 
     /** "Resume your Journey" after a detour and "Show the route from here" after leaving the route. */
     fun resumeJourney() {
+        onEvent(VisitEvent.JourneyResumed)
         scope.launch { controller.resumeJourney() }
+    }
+
+    /** "Centre on me". */
+    fun centreOnMe() {
+        onEvent(VisitEvent.Recentred)
+        recentre(reason = "Centre on me")
     }
 
     fun dismissOffRoute() = controller.dismissOffRoute()
 
+    /** A swipe on [stop] in the list, or its "Skip" accessibility action: "Skip artwork?". */
+    fun requestSkip(stop: JourneyStop) {
+        stopToSkip = stop
+        onEvent(VisitEvent.SkipRequested(stop))
+    }
+
     fun confirmSkip() {
         val stop = stopToSkip ?: return
         stopToSkip = null
+        onEvent(VisitEvent.StopSkipped(stop))
         scope.launch { controller.skip(stop.id) }
     }
 
+    /** "Keep it". */
+    fun keepStop() {
+        val stop = stopToSkip ?: return
+        stopToSkip = null
+        onEvent(VisitEvent.SkipCancelled(stop))
+    }
+
     fun undoSkip() {
+        val id = controller.lastSkippedStopId.value
+        progress.journey.stops.firstOrNull { it.id == id }?.let { onEvent(VisitEvent.SkipUndone(it)) }
         scope.launch { controller.undoSkip() }
     }
 
@@ -423,6 +469,7 @@ internal class VisitViewModel(
         val here = session.position.value
         val from = here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) }
         selectedAmenity = kind.nearest(places, from, here?.floor?.level)
+        selectedAmenity?.let { onEvent(VisitEvent.AmenitySelected(it)) }
     }
 
     /** "Go here" on the amenity card: asks "Change your route?" first. */
@@ -435,6 +482,7 @@ internal class VisitViewModel(
     fun goToAmenity() {
         val place = amenityToConfirm ?: return
         amenityToConfirm = null
+        onEvent(VisitEvent.DetourStarted(place))
         scope.launch { controller.detour(place) }
     }
 
@@ -451,12 +499,25 @@ internal class VisitViewModel(
 
     /** Back: a visit in progress asks first (03.10); a visit not started or finished closes. */
     fun requestClose() {
-        if (VisitPlan.asksBeforeLeaving(progress.journey, progress.isFinished)) isConfirmingExit = true else onClose()
+        if (VisitPlan.asksBeforeLeaving(progress.journey, progress.isFinished)) {
+            isConfirmingExit = true
+            onEvent(VisitEvent.ExitRequested)
+        } else {
+            onClose()
+        }
     }
 
+    /** "Leave". */
     fun leave() {
         isConfirmingExit = false
+        onEvent(VisitEvent.ExitConfirmed)
         onClose()
+    }
+
+    /** "Carry on". */
+    fun carryOn() {
+        isConfirmingExit = false
+        onEvent(VisitEvent.ExitCancelled)
     }
 
     /** Journey Complete closed: the visit is over. */
@@ -510,7 +571,7 @@ internal class VisitViewModel(
         when (val action = option.action) {
             is LocationChoice.Action.ActivateStop -> {
                 scope.launch { controller.activate(action.stopId) }
-                mode = Mode.MAP
+                mode = VisitMode.MAP
             }
             is LocationChoice.Action.InGallery -> currentGallery = action.name
             LocationChoice.Action.SomewhereElse -> Unit
@@ -545,8 +606,9 @@ internal class VisitViewModel(
     /** Adds the Welcome Desk as a detour, so the route leads there and then back to the journey. */
     fun routeToDesk() {
         val desk = VenuePlace.welcomeDesk(places) ?: return
+        onEvent(VisitEvent.DetourStarted(desk))
         scope.launch { controller.detour(desk) }
-        mode = Mode.MAP
+        mode = VisitMode.MAP
     }
 
     /** Closes the wristband-ended sheet and opens the pairing flow once the sheet is gone. */

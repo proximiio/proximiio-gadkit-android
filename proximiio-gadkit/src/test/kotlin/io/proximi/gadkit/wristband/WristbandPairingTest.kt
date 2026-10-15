@@ -6,6 +6,7 @@ import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -134,5 +135,20 @@ class WristbandCopyTest {
     fun logLineHoldsNoSessionDetails() {
         assertEquals("ended, TIMEOUT", WristbandCopy.logLine(BindingState.Ended(BindingEndReason.Timeout)))
         assertEquals("unbound", WristbandCopy.logLine(BindingState.Unbound))
+    }
+
+    @Test
+    fun connectAsksForLocationThenBindsTheTrimmedCode() = runBlocking {
+        val connector = FakeConnector(listOf(null), locationAnswer = WristbandLocationAsk.PERMISSION)
+        connector.connect(" GAD-0x3B9B9EFA \n")
+        assertEquals(listOf(WristbandLocationAsk.PERMISSION), connector.asked)
+        assertEquals(listOf("GAD-0x3B9B9EFA"), connector.bound)
+    }
+
+    @Test
+    fun connectWithAnEmptyCodeThrowsInvalidTagIdAndBindsNothing() = runBlocking {
+        val connector = FakeConnector(listOf(null))
+        assertFailsWith<BindingError.InvalidTagId> { connector.connect("  ") }
+        assertTrue(connector.bound.isEmpty())
     }
 }

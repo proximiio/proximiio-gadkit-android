@@ -104,7 +104,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                     isEnabled = stop.state == StopState.PENDING || stop.state == StopState.ACTIVE,
                     onSkip = {
                         revealedStopId = null
-                        model.stopToSkip = stop
+                        model.requestSkip(stop)
                     },
                 ) {
                     StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id)

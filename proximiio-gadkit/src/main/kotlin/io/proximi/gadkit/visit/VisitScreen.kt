@@ -99,8 +99,15 @@ import kotlin.math.roundToInt
  *
  * The screen saves [journey] in [VisitStore] on every change. It keeps its state while the
  * activity is recreated, and ends the visit's work (notification, tracking alerts, navigator) when
- * it leaves the composition for good. [onClose] is called after the visitor confirmed leaving,
- * or after the journey is complete.
+ * it leaves the composition for good.
+ *
+ * @param onClose called after the visitor confirmed leaving, or after the journey is complete.
+ * @param onVisitEvent receives a [VisitEvent] for each visitor action and each journey change, on
+ *   the main thread.
+ * @param wristbandConnectionScreen the host app's screen for "Connect a wristband" after the
+ *   wristband session ended, in place of [io.proximi.gadkit.wristband.WristbandPairingScreen]. It
+ *   gets a function that closes it. When it closes with an active session, the screen reopens the
+ *   wristband's position stream; without one, the "wristband no longer connected" sheet shows again.
  */
 @Composable
 public fun VisitScreen(
@@ -108,11 +115,16 @@ public fun VisitScreen(
     wristband: WristbandSession,
     journey: Journey,
     onClose: () -> Unit,
+    onVisitEvent: (VisitEvent) -> Unit = {},
+    wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     val holder: VisitHolder = viewModel(key = VisitHolder.KEY)
-    SideEffect { holder.onClose = onClose }
+    SideEffect {
+        holder.onClose = onClose
+        holder.onVisitEvent = onVisitEvent
+    }
     val model = holder.visit(journey) { scope ->
         VisitViewModel(
             context.applicationContext as Application,
@@ -122,13 +134,14 @@ public fun VisitScreen(
             scope,
             DebugLaunch.read(activity),
             onClose = { holder.onClose() },
+            onEvent = { holder.onVisitEvent(it) },
         )
     }
     DisposableEffect(model) {
         // A recreated activity (a language change) shows the same visit again.
         onDispose { if (activity?.isChangingConfigurations != true) holder.close(model) }
     }
-    VisitContent(model)
+    VisitContent(model, wristbandConnectionScreen)
 }
 
 /**
@@ -141,6 +154,9 @@ internal class VisitHolder : ViewModel() {
 
     /** The host app's latest `onClose`. */
     var onClose: () -> Unit = {}
+
+    /** The host app's latest `onVisitEvent`. */
+    var onVisitEvent: (VisitEvent) -> Unit = {}
 
     /** The visit of [journey]; a different journey ends the visit before it. */
     fun visit(journey: Journey, create: (CoroutineScope) -> VisitViewModel): VisitViewModel {
@@ -169,7 +185,7 @@ internal class VisitHolder : ViewModel() {
 }
 
 @Composable
-private fun VisitContent(model: VisitViewModel) {
+private fun VisitContent(model: VisitViewModel, wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)?) {
     val language = LocalConfiguration.current.locales[0]?.language
     LaunchedEffect(language) { model.setLanguage(language) }
     // The journey notification stands in for the iOS Live Activity.
@@ -200,7 +216,7 @@ private fun VisitContent(model: VisitViewModel) {
                     )
                     // The list covers the map with white: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
-                    ProvideGlassBackdrop(if (model.mode == VisitViewModel.Mode.MAP) mapBackdrop else null) { CardOverlay(model) }
+                    ProvideGlassBackdrop(if (model.mode == VisitMode.MAP) mapBackdrop else null) { CardOverlay(model) }
                 }
                 BottomGlassBar(
                     leading = {
@@ -209,9 +225,9 @@ private fun VisitContent(model: VisitViewModel) {
                         }
                     },
                     trailing = {
-                        val showsList = model.mode == VisitViewModel.Mode.LIST
+                        val showsList = model.mode == VisitMode.LIST
                         RoundGlassButton(
-                            onClick = { model.mode = if (showsList) VisitViewModel.Mode.MAP else VisitViewModel.Mode.LIST },
+                            onClick = { model.mode = if (showsList) VisitMode.MAP else VisitMode.LIST },
                             contentDescription = stringResource(if (showsList) R.string.map else R.string.list),
                         ) { MapIcon(if (showsList) R.drawable.ic_map else R.drawable.ic_list, size = 22) }
                     },
@@ -219,14 +235,14 @@ private fun VisitContent(model: VisitViewModel) {
             }
         }
         LevelChangeAnimation(model.session, model.venue)
-        VisitSheets(model)
+        VisitSheets(model, wristbandConnectionScreen)
     }
 }
 
 /** List mode: the stop list over the map, faded in. */
 @Composable
 private fun ListOverlay(model: VisitViewModel) {
-    AnimatedVisibility(model.mode == VisitViewModel.Mode.LIST, enter = fadeIn(), exit = fadeOut()) {
+    AnimatedVisibility(model.mode == VisitMode.LIST, enter = fadeIn(), exit = fadeOut()) {
         VisitStopList(model, Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.92f)))
     }
 }
@@ -238,10 +254,10 @@ private fun ListOverlay(model: VisitViewModel) {
  */
 @Composable
 private fun CardOverlay(model: VisitViewModel) {
-    val isMap = model.mode == VisitViewModel.Mode.MAP
+    val isMap = model.mode == VisitMode.MAP
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitViewModel.Mode.LIST else VisitViewModel.Mode.MAP })
+            MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP })
             Spacer(Modifier.weight(1f))
             if (isMap) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -269,7 +285,7 @@ private fun CardOverlay(model: VisitViewModel) {
                     GlassSquareButton(
                         onClick = {
                             model.session.followMyFloor()
-                            model.recentre(reason = "Centre on me")
+                            model.centreOnMe()
                         },
                         contentDescription = stringResource(R.string.centre_on_me),
                     ) { MapIcon(GadIcon.Compass.glyph) }
@@ -355,21 +371,21 @@ private fun VisitCard(model: VisitViewModel) {
 
 /** The sheets and full-screen covers of the journey screen, in the order iOS presents them. */
 @Composable
-private fun VisitSheets(model: VisitViewModel) {
+private fun VisitSheets(model: VisitViewModel, wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)?) {
     if (model.isConfirmingExit) {
         val progress = VisitPlan.progress(model.progress.journey)
         ExitConfirmationSheet(
             visited = progress.visited,
             total = progress.total,
             onLeave = model::leave,
-            onCarryOn = { model.isConfirmingExit = false },
+            onCarryOn = model::carryOn,
         )
     }
     model.lowConfidenceStop?.let { stop ->
         LowConfidencePrompt(stop.title, onConfirm = model::confirmLowConfidence, onNotHere = model::rejectLowConfidence)
     }
     model.stopToSkip?.let { stop ->
-        SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = { model.stopToSkip = null })
+        SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = model::keepStop)
     }
     model.amenityToConfirm?.let { place ->
         ChangeRouteConfirmation(place.title, model.nextStopName, onGo = model::goToAmenity, onClose = { model.amenityToConfirm = null })
@@ -405,7 +421,11 @@ private fun VisitSheets(model: VisitViewModel) {
     }
     model.pairing?.let { flow ->
         BackHandler(onBack = model::pairingClosed)
-        WristbandPairingScreen(flow, onFinish = model::pairingClosed)
+        if (wristbandConnectionScreen != null) {
+            wristbandConnectionScreen(model::pairingClosed)
+        } else {
+            WristbandPairingScreen(flow, onFinish = model::pairingClosed)
+        }
     }
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)
 }
