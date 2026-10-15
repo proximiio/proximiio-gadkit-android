@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.VenuePlace
@@ -30,7 +31,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.roundToInt
 import io.proximi.gadkit.visit.Journey as CoreJourney
 
 /**
@@ -219,7 +219,7 @@ internal class VisitController(
             val remoteId = artworkRemoteIds[stop.poiId ?: stop.id] ?: continue
             val area = artworkAreas[remoteId] ?: continue
             val stopLevel = stop.floor?.level
-            if (stopLevel != null && level != null && stopLevel.roundToInt() != level.roundToInt()) continue
+            if (!VenueLevel.matches(stopLevel, level)) continue
             if (!area.contains(point)) continue
             if (stop.id == activeId) artworkGeofenceEntered(remoteId) else inside += stop.id
         }

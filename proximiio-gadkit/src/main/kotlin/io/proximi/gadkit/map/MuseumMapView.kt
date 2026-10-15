@@ -389,7 +389,7 @@ private fun DebugGalleryFills(venue: VenueService, session: ProximiioMapSession,
     }
     LaunchedEffect(galleries, selectedFloor) {
         val level = selectedFloor.level
-        val onFloor = galleries.filter { it.level.roundToInt() == level.roundToInt() }
+        val onFloor = galleries.filter { VenueLevel.same(it.level, level) }
         val fills = onFloor.mapIndexed { index, gallery -> GalleryFill(gallery, isDestination = index == 0) }
         layers.update(fills, level)
     }

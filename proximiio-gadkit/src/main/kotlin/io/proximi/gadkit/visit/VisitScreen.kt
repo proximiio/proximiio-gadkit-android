@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.proximi.gadkit.DebugLaunch
+import io.proximi.gadkit.ui.AskNotificationPermission
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.wristband.WristbandSession
 import kotlinx.coroutines.CoroutineScope
@@ -171,6 +172,7 @@ internal class VisitHolder : ViewModel() {
 private fun VisitContent(model: VisitViewModel) {
     val language = LocalConfiguration.current.locales[0]?.language
     LaunchedEffect(language) { model.setLanguage(language) }
+    // The journey notification stands in for the iOS Live Activity.
     AskNotificationPermission()
     BackHandler(onBack = model::requestClose)
     // The first position zooms in on the visitor, once the map shows (iOS `onChange(of: position == nil)`).
@@ -408,21 +410,3 @@ private fun VisitSheets(model: VisitViewModel) {
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)
 }
 
-/**
- * Asks once for the notification permission (Android 13+) when a visit opens, for the journey
- * notification that stands in for the iOS Live Activity. A refusal shows no notification.
- */
-@Composable
-private fun AskNotificationPermission() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-    val context = LocalContext.current
-    var asked by rememberSaveable { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(Unit) {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        if (!granted && !asked) {
-            asked = true
-            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-}

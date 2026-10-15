@@ -1,6 +1,5 @@
 package io.proximi.gadkit.map
 
-import io.proximi.gadkit.sameFloor
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.StopState
 
@@ -40,7 +39,7 @@ internal object JourneyMapContent {
 
     /** The fills shown on [level]. */
     internal fun fillsOn(level: Double, fills: List<GalleryFill>): List<GalleryFill> =
-        fills.filter { sameFloor(it.gallery.level, level) }
+        fills.filter { VenueLevel.same(it.gallery.level, level) }
 }
 
 /** The language the map draws its labels and floor names in. */

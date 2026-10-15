@@ -8,6 +8,9 @@
     <!-- The ongoing journey notification, in place of the iOS Live Activity (Android only; no iOS string). -->
     <string name="visit_channel_name">Journey progress</string>
     <string name="visit_channel_description">Shows your next stop while you walk your journey.</string>
+    <!-- Geofence and next-stop notifications (Android only; iOS has no channels). -->
+    <string name="alerts_channel_name">Areas and stops</string>
+    <string name="alerts_channel_description">Tells you when you enter or leave an area, and when your next stop is close.</string>
     <!-- TalkBack reads the action label after "Double-tap to", so Android uses the imperative; iOS keeps "Closes the level change" as a hint. -->
     <string name="close_the_level_change">Close the level change</string>
 </resources>

@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.R
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.wristband.TrackingAlert
@@ -53,6 +54,7 @@ import io.proximi.gadkit.designsystem.PrimaryButton
 import io.proximi.gadkit.designsystem.TextActionButton
 import io.proximi.gadkit.ui.asHeading
 import io.proximi.gadkit.ui.asString
+import java.time.temporal.ChronoUnit
 
 /**
  * The visit's tracking alerts, as the `isShowingTrackingAlert` sheet of iOS `VisitView`: the
@@ -90,6 +92,15 @@ internal fun TrackingAlerts(
     // The sheet keeps its content while it slides out.
     val lastAlert = remember { mutableStateOf<TrackingAlert?>(null) }
     if (alert != null) lastAlert.value = alert
+    LaunchedEffect(alert) {
+        if (!FieldLog.isEnabled || alert == null) return@LaunchedEffect
+        val lastFix = monitor.lastFix.value?.time?.truncatedTo(ChronoUnit.SECONDS)?.toString() ?: "-"
+        when (alert) {
+            TrackingAlert.WRISTBAND_ENDED ->
+                FieldLog.log("sheet: wristband ended (${WristbandCopy.logLine(binding)}), last fix $lastFix")
+            TrackingAlert.LOST_PLACE, TrackingAlert.STOPPED_RESPONDING -> FieldLog.log("sheet: tracking $health, last fix $lastFix")
+        }
+    }
 
     AlertOverlay(visible = alert != null) {
         when (alert ?: lastAlert.value) {

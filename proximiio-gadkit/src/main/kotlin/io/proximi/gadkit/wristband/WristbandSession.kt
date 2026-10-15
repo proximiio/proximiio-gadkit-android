@@ -13,6 +13,7 @@ import io.proximi.sdk.blueiot.binding.BlueiotBindingError
 import io.proximi.sdk.blueiot.binding.BlueiotBindingState
 import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -58,9 +59,26 @@ public class WristbandSession(context: Context, configuration: GadConfiguration,
         scope.launch {
             binding.stateChanges().collect {
                 mutableState.value = it
-                if (FieldLog.isEnabled) FieldLog.log("wristband: ${WristbandCopy.logLine(it.toCore())}")
+                if (FieldLog.isEnabled) {
+                    FieldLog.log("wristband: ${WristbandCopy.logLine(it.toCore())}")
+                    BindingLog.session(it)?.let { session -> FieldLog.log("wristband session: $session") }
+                    logDiagnostics()
+                }
             }
         }
+        // The counters of the binding client while a session is active, for the ended-session analysis.
+        if (FieldLog.isEnabled) {
+            scope.launch {
+                while (true) {
+                    delay(DIAGNOSTICS_INTERVAL_MILLIS)
+                    if (this@WristbandSession.isActive) logDiagnostics()
+                }
+            }
+        }
+    }
+
+    private suspend fun logDiagnostics() {
+        FieldLog.log("binding diagnostics: ${BindingLog.diagnostics(binding.diagnostics())}")
     }
 
     /** What to ask for before a bind, or `null` when nothing needs to be asked. */
@@ -103,6 +121,8 @@ public class WristbandSession(context: Context, configuration: GadConfiguration,
     }
 
     public companion object {
+        private const val DIAGNOSTICS_INTERVAL_MILLIS = 10_000L
+
         /**
          * The binding configuration for [configuration]. `runsInBackground` keeps the position
          * stream open after the app leaves the screen.

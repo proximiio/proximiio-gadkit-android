@@ -2,7 +2,6 @@ package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.roundedInt
-import io.proximi.gadkit.sameFloor
 
 /**
  * A gallery has a name, a level and an outline. Galleries come from the venue's polygon
@@ -18,7 +17,7 @@ public data class Gallery(
     public val ring: List<Coordinate>,
 ) {
     internal fun contains(coordinate: Coordinate, level: Double?): Boolean {
-        if (level != null && !sameFloor(level, this.level)) return false
+        if (level != null && !VenueLevel.same(level, this.level)) return false
         return ringContains(ring, coordinate)
     }
 

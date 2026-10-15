@@ -36,6 +36,3 @@ public data class Coordinate(val latitude: Double, val longitude: Double) {
 
 /** Swift `Int(x.rounded())`: half away from zero. Kotlin's `round` is half to even. */
 public fun Double.roundedInt(): Int = (sign * floor(abs(this) + 0.5)).toInt()
-
-/** True when both levels round to the same floor. */
-public fun sameFloor(a: Double, b: Double): Boolean = a.roundedInt() == b.roundedInt()

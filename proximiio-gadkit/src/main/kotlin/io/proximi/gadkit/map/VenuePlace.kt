@@ -1,7 +1,6 @@
 package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
-import io.proximi.gadkit.sameFloor
 import java.net.URI
 import java.text.Collator
 import java.text.Normalizer
@@ -119,7 +118,7 @@ public data class VenuePlace(
         public fun nearest(coordinate: Coordinate?, level: Double?, places: List<VenuePlace>): VenuePlace? {
             if (coordinate == null) return null
             return places
-                .filter { level == null || sameFloor(it.level, level) }
+                .filter { VenueLevel.matches(it.level, level) }
                 .minByOrNull { it.coordinate.squaredDegrees(coordinate) }
         }
 

@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.VenueLevel
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,7 @@ import io.proximi.gadkit.map.places
 import io.proximi.gadkit.wristband.TrackingMonitor
 import io.proximi.gadkit.wristband.WristbandPairingFlow
 import io.proximi.gadkit.wristband.WristbandSession
+import io.proximi.gadkit.map.LocalNotices
 import io.proximi.map.core.RouteGuidance
 import io.proximi.map.live.ProximiioMapSession
 import io.proximi.sdk.geofenceEvents
@@ -104,6 +106,9 @@ internal class VisitViewModel(
     val monitor = TrackingMonitor(venue.sdk, scope)
     val layers = JourneyMapLayers()
     private val notification = VisitNotification(application)
+
+    /** "The next stop of your journey is less than 5 m away", once per stop in this visit. */
+    private val stopNearby = StopNearbyNotifier { notice -> LocalNotices.post(application, notice, StopNearbyNotifier.NOTIFICATION_ID) }
 
     var progress by mutableStateOf(readProgress())
         private set
@@ -212,11 +217,13 @@ internal class VisitViewModel(
                 refreshMapLayers()
                 refreshConnector()
                 updateNotification()
+                stopNearby.update(session.position.value, navigator.activeStop, guidance)
             }
         }
         scope.launch {
             session.position.collect { position ->
                 if (position == null) return@collect
+                stopNearby.update(position, controller.navigator.activeStop, controller.navigator.guidance.value)
                 if (visitorLevel != position.floor?.level) {
                     visitorLevel = position.floor?.level
                     updateNotification()
@@ -310,11 +317,11 @@ internal class VisitViewModel(
                 FieldLog.log(
                     String.format(
                         Locale.ROOT,
-                        "guidance stop %s L%s · visitor L%s acc %.1f · remaining %.1f arrived %s dwell %.2f offRoute %.1f m · gallery %s",
+                        "guidance stop %s L%s · visitor L%s acc %.1f · remaining %.1f arrived %s dwell %.2f offRoute %s (%.1f m) · gallery %s",
                         stop?.title ?: "-", stop?.floor?.level?.roundToInt()?.toString() ?: "-",
                         position?.floor?.level?.roundToInt()?.toString() ?: "-", position?.horizontalAccuracy ?: -1.0,
                         guidance?.remainingMeters ?: -1.0, navigator.hasArrived, guidance?.arrivalProgress ?: 0.0,
-                        guidance?.offRouteMeters ?: -1.0, currentGallery ?: "-",
+                        guidance?.isOffRoute ?: false, guidance?.offRouteMeters ?: -1.0, currentGallery ?: "-",
                     ),
                 )
             }
@@ -365,7 +372,7 @@ internal class VisitViewModel(
         val guidance = guidance
         val start = guidance?.progress?.point
         val position = session.position.value
-        val onFloor = position?.floor?.let { it.level.roundToInt() == session.selectedFloor.value.level.roundToInt() } ?: true
+        val onFloor = position?.floor?.let { VenueLevel.same(it.level, session.selectedFloor.value.level) } ?: true
         // Within CONNECTOR_END_METERS of the route's end there is no line: it would lead straight
         // to the stop, through walls (PM review 2026-10-12). Off while SHOWS_CONNECTOR is false.
         if (!SHOWS_CONNECTOR || guidance == null || guidance.hasArrived || guidance.remainingMeters < CONNECTOR_END_METERS ||

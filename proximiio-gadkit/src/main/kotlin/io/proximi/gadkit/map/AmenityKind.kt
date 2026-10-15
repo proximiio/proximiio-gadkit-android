@@ -1,7 +1,6 @@
 package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
-import io.proximi.gadkit.sameFloor
 
 /**
  * The amenity shortcuts and legend of the map (Figma "MAP Functionality Approach 02",
@@ -59,7 +58,7 @@ internal enum class AmenityKind(
     internal fun nearest(places: List<VenuePlace>, from: Coordinate?, level: Double?): VenuePlace? {
         val matching = places.filter(::matches)
         if (from == null) return matching.firstOrNull()
-        val sameLevel = matching.filter { level != null && sameFloor(it.level, level) }
+        val sameLevel = matching.filter { level != null && VenueLevel.same(it.level, level) }
         return VenuePlace.nearest(from, null, sameLevel.ifEmpty { matching })
     }
 

@@ -2,7 +2,7 @@ package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.VenuePlace
-import io.proximi.gadkit.sameFloor
+import io.proximi.gadkit.map.VenueLevel
 
 /**
  * Returns the prompt that asks the visitor to confirm their location (Figma "Other Use Cases",
@@ -54,7 +54,7 @@ internal sealed interface LocationAmbiguity {
             fun sameLevel(level: Double?): Boolean {
                 val visitor = input.level
                 if (level == null || visitor == null) return true
-                return sameFloor(level, visitor)
+                return VenueLevel.same(level, visitor)
             }
 
             if (input.currentGallery == null) {
