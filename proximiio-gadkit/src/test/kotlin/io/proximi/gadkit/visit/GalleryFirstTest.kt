@@ -49,7 +49,7 @@ class GalleryFirstTest {
         assertFalse(VisitCardText.showsStopNumber(walking, galleryAhead = "Gallery 106"))
         val otherLevel = VisitCardState.NextStopOnOtherLevel("Tongari-kun", 3)
         assertEquals(UiText.Resource("visit_next_stop_is", listOf("Gallery 106")), VisitCardText.caption(otherLevel, false, null, "Gallery 106"))
-        assertEquals(UiText.Resource("visit_take_the_lift_to_level", listOf(3)), VisitCardText.title(otherLevel, "Gallery 106"))
+        assertEquals(UiText.Resource("visit_go_to_level", listOf(3)), VisitCardText.title(otherLevel, "Gallery 106"))
         assertFalse(VisitCardText.showsStopNumber(otherLevel, "Gallery 106"))
         assertEquals(UiText.Resource("visit_next_stop"), VisitCardText.caption(VisitCardState.Starting, false, null, "Gallery 106"))
         assertEquals(UiText.Resource("visit_your_journey"), VisitCardText.title(VisitCardState.Starting, "Gallery 106"))

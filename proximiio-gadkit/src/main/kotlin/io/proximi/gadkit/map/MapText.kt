@@ -17,6 +17,7 @@ import io.proximi.gadkit.map.TurnDirection
 import io.proximi.gadkit.designsystem.GadIcon
 import io.proximi.gadkit.ui.resolve
 import io.proximi.map.core.RouteManoeuvre
+import io.proximi.map.core.RouteGeometry
 import io.proximi.map.core.RouteGuidance as MapRouteGuidance
 
 /** String resources of the keys core's map rules return ([GuidanceText], [AmenityKind]). */
@@ -70,6 +71,9 @@ internal fun UiText.mapText(resources: Resources): String = when (this) {
 
 @Composable
 internal fun UiText.mapText(): String = mapText(LocalResources.current)
+
+/** The level change as the core rules see it. */
+internal fun RouteGeometry.Marker.toCore(): LevelChangeMarker = LevelChangeMarker(featureType, from.level, to.level, isCompleted)
 
 /** Remaining distance and time, e.g. "70 m · <1 min" (iOS `GuidanceText.remaining`). */
 internal fun remainingText(metres: Double, resources: Resources): String {

@@ -17,8 +17,6 @@ class LocationAmbiguityTest {
         accuracy: Double = 3.0,
         stops: List<String> = listOf("a", "b", "c"),
         active: String? = null,
-        galleries: List<VenuePlace> = emptyList(),
-        currentGallery: String? = null,
     ): LocationAmbiguity.Input {
         val journey = VisitPlan.journey(stops, artworks)
         return LocationAmbiguity.Input(
@@ -26,8 +24,6 @@ class LocationAmbiguityTest {
             level = 1.0,
             horizontalAccuracy = accuracy,
             activeStop = active?.let { id -> journey.stops.firstOrNull { it.id == id } },
-            galleries = galleries,
-            currentGallery = currentGallery,
         )
     }
 
@@ -38,23 +34,10 @@ class LocationAmbiguityTest {
     }
 
     @Test
-    fun betweenGalleriesOnlyOutsideAGalleryGeofence() {
-        val galleries = listOf(place("g1", "Gallery 101", 8.0), place("g2", "Gallery 102", -8.0), place("g3", "Gallery 103", 80.0))
-        val outside = input(stops = listOf("c"), galleries = galleries)
-        assertEquals("galleries", LocationAmbiguity.evaluate(outside)?.kind)
-        assertNull(LocationAmbiguity.evaluate(input(stops = listOf("c"), galleries = galleries, currentGallery = "Gallery 101")))
-    }
-
-    @Test
     fun uncertainPositionNearTheActiveStopIsASoftPrompt() {
         assertNull(LocationAmbiguity.evaluate(input(accuracy = 12.0, stops = listOf("c"), active = "c")))
         assertEquals("low", LocationAmbiguity.evaluate(input(accuracy = 40.0, stops = listOf("c"), active = "c"))?.kind)
         assertNull(LocationAmbiguity.evaluate(input(accuracy = 5.0, stops = listOf("c"), active = "c")))
-    }
-
-    @Test
-    fun galleriesAreFoundByTitle() {
-        assertEquals(listOf("g"), LocationAmbiguity.galleries(artworks + place("g", "Gallery 101", 0.0)).map { it.id })
     }
 
     private companion object {

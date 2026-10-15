@@ -55,16 +55,9 @@ private val strings: Map<String, Int> = mapOf(
     "visit_gallery_x" to R.string.gallery_x,
     "visit_next_stop" to R.string.next_stop,
     "visit_current_artwork" to R.string.current_artwork,
-    "visit_take_the_lift_to_level" to R.string.take_the_lift_to_level_n,
+    "visit_go_to_level" to R.string.go_to_level_n,
     "visit_walked_your_route" to R.string.you_ve_walked_your_route,
-    "visit_go_to_the_lift" to R.string.go_to_the_lift,
     "visit_level_n" to R.string.level_n,
-    // LocationChoice
-    "location_somewhere_else" to R.string.somewhere_else,
-    "location_between_galleries" to R.string.you_re_between_galleries,
-    "location_which_one_are_you_in" to R.string.which_one_are_you_in,
-    "location_where_are_you" to R.string.where_are_you,
-    "location_pick_the_artwork" to R.string.pick_the_artwork_you_are_at,
 )
 
 /** Keys whose first argument is the plural count. */

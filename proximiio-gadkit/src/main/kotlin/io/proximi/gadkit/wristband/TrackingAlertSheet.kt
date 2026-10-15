@@ -65,7 +65,6 @@ import java.time.temporal.ChronoUnit
  * @param isBlocked another sheet or the pairing flow is on screen.
  * @param onSearchAgain re-attach the binding's provider (`VenueService.attachBinding()`).
  * @param onRouteToDesk add the Welcome Desk as a detour. Offered only when [places] has one.
- * @param onPickStop open the manual stop choice (EC04).
  * @param onConnect open the pairing flow; after a bind, re-attach the provider.
  */
 @Composable
@@ -77,7 +76,6 @@ internal fun TrackingAlerts(
     isBlocked: Boolean,
     onSearchAgain: () -> Unit,
     onRouteToDesk: () -> Unit,
-    onPickStop: () -> Unit,
     onConnect: () -> Unit,
     onBackToHub: () -> Unit,
 ) {
@@ -113,7 +111,6 @@ internal fun TrackingAlerts(
                 canRouteToDesk = VenuePlace.welcomeDesk(places) != null,
                 onSearchAgain = { dismiss(); onSearchAgain() },
                 onRouteToDesk = { dismiss(); onRouteToDesk() },
-                onPickStop = { dismiss(); onPickStop() },
                 onDismiss = dismiss,
             )
             null -> Unit
@@ -136,7 +133,6 @@ internal fun ColumnScope.TrackingAlertSheet(
     canRouteToDesk: Boolean,
     onSearchAgain: () -> Unit,
     onRouteToDesk: () -> Unit,
-    onPickStop: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertMark()
@@ -152,8 +148,8 @@ internal fun ColumnScope.TrackingAlertSheet(
     } else {
         Title(stringResource(R.string.we_ve_lost_your_place_in_the))
         Body(stringResource(R.string.walk_a_few_steps_toward_the_centre))
-        PrimaryButton(stringResource(R.string.pick_my_stop_manually), onPickStop, Modifier.padding(top = 20.dp))
-        TextActionButton(stringResource(R.string.dismiss), onDismiss)
+        // No "Pick my stop manually" (PM 2026-10-15: the view should not exist).
+        PrimaryButton(stringResource(R.string.dismiss), onDismiss, Modifier.padding(top = 20.dp))
     }
 }
 

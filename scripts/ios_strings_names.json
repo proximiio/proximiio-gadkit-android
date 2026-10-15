@@ -78,6 +78,7 @@
   "Go here": "go_here",
   "Go to Museum": "go_to_museum",
   "Go to Settings": "go_to_settings",
+  "Go to level %lld": "go_to_level_n",
   "Go to the Museum": "go_to_the_museum",
   "Go to the lift": "go_to_the_lift",
   "Going to level %lld": "going_to_level_n",

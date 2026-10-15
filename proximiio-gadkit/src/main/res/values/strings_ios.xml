@@ -17,8 +17,7 @@
     <string name="cancel">Cancel</string>
     <string name="carry_on">Carry on</string>
     <string name="centre_on_me">Centre on me</string>
-    <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
-    <string name="change_your_route" tools:ignore="MissingTranslation">Change your route?</string>
+    <string name="change_your_route">Change your route?</string>
     <string name="close">Close</string>
     <string name="closes_the_level_change">Closes the level change</string>
     <string name="connect">Connect</string>
@@ -43,9 +42,9 @@
     <string name="follow_my_floor">Follow my floor</string>
     <string name="gallery_x">GALLERY · %s</string>
     <string name="go_here">Go here</string>
+    <string name="go_to_level_n">Go to level %d</string>
     <string name="go_to_museum">Go to Museum</string>
     <string name="go_to_settings">Go to Settings</string>
-    <string name="go_to_the_lift">Go to the lift</string>
     <string name="going_to_level_n">Going to level %d</string>
     <string name="guide_me">Guide Me</string>
     <string name="head_straight_for_n_m">Head straight for %d m</string>
@@ -87,10 +86,8 @@
         <item quantity="one">%d stop</item>
         <item quantity="other">%d stops</item>
     </plurals>
-    <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
-    <string name="navigating_to_x_adds_a_stop_to" tools:ignore="MissingTranslation">Navigating to %1$s adds a stop to your route to %2$s. Your journey progress is kept.</string>
-    <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
-    <string name="navigating_to_x_adds_a_stop_to_2" tools:ignore="MissingTranslation">Navigating to %s adds a stop to your route. Your journey progress is kept.</string>
+    <string name="navigating_to_x_adds_a_stop_to">Navigating to %1$s adds a stop to your route to %2$s. Your journey progress is kept.</string>
+    <string name="navigating_to_x_adds_a_stop_to_2">Navigating to %s adds a stop to your route. Your journey progress is kept.</string>
     <string name="new_route_from_here">New route from here</string>
     <string name="next_stop">NEXT STOP</string>
     <string name="next_stop_is_x">NEXT STOP IS %s</string>
@@ -103,8 +100,6 @@
     <string name="other">Other</string>
     <string name="paired">Paired</string>
     <string name="permission_denied">permission denied</string>
-    <string name="pick_my_stop_manually">Pick my stop manually</string>
-    <string name="pick_the_artwork_you_are_at">Pick the artwork you are at</string>
     <string name="plan_your_visit">Plan your visit</string>
     <string name="please_find_a_host_that_can_help">Please find a host that can help pair it for you.</string>
     <string name="prayer_room">Prayer Room</string>
@@ -119,14 +114,12 @@
     <string name="search">Search</string>
     <string name="search_again">Search Again</string>
     <string name="search_the_museum">Search the museum</string>
-    <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
-    <string name="show_the_route_from_here" tools:ignore="MissingTranslation">Show the route from here</string>
+    <string name="show_the_route_from_here">Show the route from here</string>
     <string name="single_artist_gallery">Single Artist Gallery</string>
     <string name="skip">Skip</string>
     <string name="skip_artwork">Skip artwork</string>
     <string name="skip_for_now">Skip for now</string>
     <string name="skip_this_artwork">Skip this artwork?</string>
-    <string name="somewhere_else">Somewhere else</string>
     <string name="stairs">Stairs</string>
     <string name="stairs_2">stairs</string>
     <string name="start">Start</string>
@@ -134,7 +127,6 @@
     <string name="stop_n_of_n">Stop %1$d of %2$d</string>
     <string name="swap_it_at_the_welcome_desk">Swap it at the Welcome Desk</string>
     <string name="swipe_left_to_skip_an_artwork">Swipe left to skip an artwork</string>
-    <string name="take_the_lift_to_level_n">Take the lift to level %d</string>
     <string name="take_the_x_to_level_n">Take the %1$s to level %2$d</string>
     <string name="take_your_time_leaving_here_s_what">Take your time leaving - here\'s what\'s next</string>
     <string name="thank_you_for_visiting_guggenheim_abu_dhabi">Thank you for visiting Guggenheim Abu Dhabi.</string>
@@ -144,8 +136,7 @@
     <string name="the_museum_s_server_cannot_be_reached">The museum’s server cannot be reached. Check your connection and try again.</string>
     <string name="the_museum_s_server_failed_try_again">The museum’s server failed. Try again in a moment.</string>
     <string name="the_next_stop_of_your_journey_is">The next stop of your journey is less than %d m away.</string>
-    <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
-    <string name="the_route_stays_as_it_is_until" tools:ignore="MissingTranslation">The route stays as it is until you return to it.</string>
+    <string name="the_route_stays_as_it_is_until">The route stays as it is until you return to it.</string>
     <string name="the_staff_released_this_wristband">The staff released this wristband.</string>
     <string name="the_wristband_left_the_museum">The wristband left the museum.</string>
     <string name="the_wristband_session_has_ended_connect_the">The wristband session has ended. Connect the wristband again.</string>
@@ -176,8 +167,6 @@
     <string name="walk_a_few_steps_toward_the_centre">Walk a few steps toward the centre of the gallery and we’ll find you again.</string>
     <string name="we_couldn_t_connect">We couldn’t connect</string>
     <string name="we_ve_lost_your_place_in_the">We’ve lost your place in the room</string>
-    <string name="where_are_you">Where are you?</string>
-    <string name="which_one_are_you_in">Which one are you in?</string>
     <string name="women_s_restroom">Women’s restroom</string>
     <string name="wristband">Wristband</string>
     <string name="wristband_code">Wristband code</string>
@@ -187,9 +176,7 @@
     <string name="you_have_arrived">You have arrived</string>
     <string name="you_have_left_the_route">You have left the route</string>
     <string name="you_left_this_area">You left this area.</string>
-    <string name="you_re_between_galleries">You\'re between galleries.</string>
-    <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
-    <string name="you_ve_left_your_route" tools:ignore="MissingTranslation">You\'ve left your route</string>
+    <string name="you_ve_left_your_route">You\'ve left your route</string>
     <string name="you_ve_visited_n_of_n_stops">You\'ve visited %1$d of %2$d stops. Your journey is saved.</string>
     <string name="you_ve_walked_your_route">You\'ve walked your route</string>
     <string name="your_journey_2">Your journey</string>

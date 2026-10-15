@@ -23,6 +23,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -229,6 +230,11 @@ private fun VisitContent(model: VisitViewModel, wristbandConnectionScreen: (@Com
                     )
                     // The list covers the map with white: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
+                    // Behind the "Change your route?" card the map is dimmed.
+                    // The scope-free overload: inside the frame's Box the Column scope of the screen is also in reach.
+                    androidx.compose.animation.AnimatedVisibility(model.amenityToConfirm != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+                        Box(Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.5f)))
+                    }
                     ProvideGlassBackdrop(if (model.mode == VisitMode.MAP) mapBackdrop else null) { CardOverlay(model) }
                 }
                 BottomGlassBar(
@@ -311,7 +317,22 @@ private fun CardOverlay(model: VisitViewModel) {
                 }
             }
             val amenity = model.selectedAmenity
-            if (amenity != null) {
+            val detour = model.amenityToConfirm
+            if (detour != null) {
+                // "Change your route?" is a card on the map; the map behind it is dimmed.
+                val nextStop = model.nextStopName
+                PlaceInfoCard(
+                    title = stringResource(R.string.change_your_route),
+                    subtitle = if (nextStop != null) {
+                        stringResource(R.string.navigating_to_x_adds_a_stop_to, detour.title, nextStop)
+                    } else {
+                        stringResource(R.string.navigating_to_x_adds_a_stop_to_2, detour.title)
+                    },
+                    primary = stringResource(R.string.go_here),
+                    onPrimary = model::goToAmenity,
+                    onClose = model::cancelAmenity,
+                )
+            } else if (amenity != null) {
                 val resources = LocalResources.current
                 PlaceInfoCard(
                     title = amenity.title,
@@ -352,21 +373,30 @@ private fun VisitCard(model: VisitViewModel) {
     val guidance = model.guidance
     val isLast = progress.activeStop?.let { VisitPlan.isLastOpenStop(it, progress.journey) } ?: false
     val showsGuidance = VisitCardText.showsGuidance(state)
+    val galleryAhead = model.galleryAhead?.name
+    // The route's next level change, from the drawn route (not a flow: read when the card recomposes).
+    val levelChangeTitle = (state as? VisitCardState.NextStopOnOtherLevel)?.let {
+        GuidanceText.levelChangeTitle(
+            model.session.routeRenderer?.geometry?.markers.orEmpty().map { marker -> marker.toCore() },
+            model.session.position.value?.floor?.level,
+            it.level,
+        )
+    }
+    val title = VisitCardText.title(state, galleryAhead, levelChangeTitle)
     val instruction = if (model.hasNoAccessibleRoute) {
+        // The navigator keeps a stop that no route with the visitor's accessibility needs
+        // reaches, with no route line. In a personalised journey the visitor can skip it.
         stringResource(R.string.no_route_to_this_stop_with_your)
-    } else if (showsGuidance) {
-        (guidance?.let { GuidanceText.instruction(it.toCore()) } ?: VisitCardText.instructionWithoutGuidance(state))?.mapText()
     } else {
-        null
+        VisitCardText.instruction(state, guidance?.let { GuidanceText.instruction(it.toCore()) }, title)?.mapText()
     }
     val remaining = guidance
         ?.takeIf { showsGuidance && !model.hasNoAccessibleRoute && !it.isOffRoute && !it.hasArrived }
         ?.let { remainingText(it.remainingMeters, resources) }
     val number = model.activeStopNumber
-    val galleryAhead = model.galleryAhead?.name
     StopInfoCard(
         caption = VisitCardText.caption(state, isLast, model.cardVisitorGallery?.name, galleryAhead).mapText(),
-        title = VisitCardText.title(state, galleryAhead).mapText(),
+        title = title.mapText(),
         instruction = instruction,
         remaining = remaining,
         icon = {
@@ -404,14 +434,11 @@ private fun VisitSheets(model: VisitViewModel, wristbandConnectionScreen: (@Comp
     model.stopToSkip?.let { stop ->
         SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = model::keepStop)
     }
-    model.amenityToConfirm?.let { place ->
-        ChangeRouteConfirmation(place.title, model.nextStopName, onGo = model::goToAmenity, onClose = { model.amenityToConfirm = null })
-    }
     // The off-route warning, unless another prompt is up. The tracking alert has priority over it.
     val isOffRoute by model.controller.isOffRoute.collectAsStateWithLifecycle()
     val health by model.monitor.health.collectAsStateWithLifecycle()
     val isTracking = health == TrackingHealth.TRACKING || health == TrackingHealth.WAITING
-    if (isOffRoute && isTracking && model.stopToSkip == null && model.amenityToConfirm == null && model.locationChoice == null) {
+    if (isOffRoute && isTracking && model.stopToSkip == null && model.amenityToConfirm == null) {
         OffRouteWarning(onReroute = model::resumeJourney, onClose = model::dismissOffRoute)
     }
     TrackingAlerts(
@@ -419,23 +446,12 @@ private fun VisitSheets(model: VisitViewModel, wristbandConnectionScreen: (@Comp
         wristband = model.wristband,
         places = model.places,
         activeStopNumber = model.activeStopNumber,
-        isBlocked = model.isPairing || model.stopToSkip != null || model.locationChoice != null || model.amenityToConfirm != null,
+        isBlocked = model.isPairing || model.stopToSkip != null || model.amenityToConfirm != null,
         onSearchAgain = model::searchAgain,
         onRouteToDesk = model::routeToDesk,
-        onPickStop = model::openManualChoice,
         onConnect = model::connectWristband,
         onBackToHub = model::backToHub,
     )
-    model.locationChoice?.let { choice ->
-        val level = model.visitorLevel?.let { stringResource(R.string.level_n, it.roundToInt()) }
-        LocationChoiceScreen(
-            choice = choice,
-            level = level,
-            gallery = model.currentGallery,
-            onPick = { model.pick(it, choice) },
-            onClose = { model.closeChoice(choice) },
-        )
-    }
     model.pairing?.let { flow ->
         BackHandler(onBack = model::pairingClosed)
         if (wristbandConnectionScreen != null) {

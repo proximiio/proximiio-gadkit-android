@@ -136,4 +136,21 @@ internal object GuidanceText {
 
     /** Floor chip label, e.g. "L1". Not localized. */
     internal fun floorLabel(level: Double): String = "L${level.roundedInt()}"
+
+    /**
+     * The card title while the next stop is on another floor: the route's first level change that
+     * leaves the visitor's floor, e.g. "Take the stairs to level 3". A route from level 1 to level 4
+     * can take the stairs to level 3 first (PM 2026-10-15). Without a level change on the route:
+     * `visit_go_to_level` "Go to level %d". The key and arguments of a change are those of
+     * [instruction], so the card can compare the two. Pure; covered by tests.
+     */
+    internal fun levelChangeTitle(markers: List<LevelChangeMarker>, visitorLevel: Double?, stopLevel: Int): UiText {
+        val pending = markers.filter { !it.isCompleted }
+        val fromHere = visitorLevel?.let { level -> pending.firstOrNull { it.fromLevel.roundedInt() == level.roundedInt() } }
+        val change = fromHere ?: pending.firstOrNull() ?: return UiText.Resource("visit_go_to_level", listOf(stopLevel))
+        return UiText.Resource("guidance_take_level_changer", listOf(levelChanger(change.featureType), change.toLevel.roundedInt()))
+    }
 }
+
+/** A level change of the drawn route (the map library's `RouteGeometry.Marker`). */
+internal data class LevelChangeMarker(val featureType: String, val fromLevel: Double, val toLevel: Double, val isCompleted: Boolean)

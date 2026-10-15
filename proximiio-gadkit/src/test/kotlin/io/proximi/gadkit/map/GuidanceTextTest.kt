@@ -68,4 +68,30 @@ class AmenityKindTest {
         assertEquals("Café B", AmenityKind.CAFE.nearest(places, Coordinate(0.0, 0.0), 1.0)?.title)
         assertEquals("Café A", AmenityKind.CAFE.nearest(places, Coordinate(0.0, 0.0), 2.0)?.title)
     }
+
+    // ProximiioGADKit `GuidanceTextTests` (0.11.0): the card names the route's next level change.
+    private val stairsThenLift = listOf(
+        LevelChangeMarker("staircase", fromLevel = 1.0, toLevel = 3.0, isCompleted = false),
+        LevelChangeMarker("elevator", fromLevel = 3.0, toLevel = 4.0, isCompleted = false),
+    )
+
+    private fun take(changer: String, level: Int) =
+        UiText.Resource("guidance_take_level_changer", listOf(UiText.Resource("guidance_level_changer_$changer"), level))
+
+    @Test
+    fun levelChangeTitleNamesTheRoutesFirstChangeFromTheVisitorsFloor() {
+        assertEquals(take("stairs", 3), GuidanceText.levelChangeTitle(stairsThenLift, visitorLevel = 1.0, stopLevel = 4))
+        assertEquals(take("lift", 4), GuidanceText.levelChangeTitle(stairsThenLift, visitorLevel = 3.0, stopLevel = 4))
+    }
+
+    @Test
+    fun levelChangeTitleSkipsCompletedChanges() {
+        val markers = listOf(stairsThenLift[0].copy(isCompleted = true), stairsThenLift[1])
+        assertEquals(take("lift", 4), GuidanceText.levelChangeTitle(markers, visitorLevel = null, stopLevel = 4))
+    }
+
+    @Test
+    fun levelChangeTitleWithoutARouteNamesTheStopsFloor() {
+        assertEquals(UiText.Resource("visit_go_to_level", listOf(4)), GuidanceText.levelChangeTitle(emptyList(), visitorLevel = 1.0, stopLevel = 4))
+    }
 }

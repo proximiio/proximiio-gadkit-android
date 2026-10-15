@@ -19,7 +19,6 @@ import io.proximi.gadkit.visit.GalleryFirst
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyStop
 import io.proximi.gadkit.visit.LocationAmbiguity
-import io.proximi.gadkit.visit.LocationChoice
 import io.proximi.gadkit.visit.StopKind
 import io.proximi.gadkit.visit.StopState
 import io.proximi.gadkit.visit.VisitActivity
@@ -191,10 +190,6 @@ internal class VisitViewModel(
     /** The amenity whose detour waits for "Change your route?". */
     var amenityToConfirm by mutableStateOf<VenuePlace?>(null)
 
-    /** EC04a–c: the full-screen "Where are you?" choice. */
-    var locationChoice by mutableStateOf<LocationChoice?>(null)
-        private set
-
     /** EC04d: the soft prompt for an uncertain position near the active stop. */
     var lowConfidenceStop by mutableStateOf<JourneyStop?>(null)
         private set
@@ -209,7 +204,7 @@ internal class VisitViewModel(
 
     /**
      * The time of the visitor's last answer per prompt kind. A kind is not shown again for
-     * `LocationChoice.QUIET_PERIOD`.
+     * [GadSettings.locationQuestionQuietPeriod].
      */
     private val answeredAmbiguity = mutableMapOf<String, Instant>()
     private var isClosed = false
@@ -528,7 +523,12 @@ internal class VisitViewModel(
         selectedAmenity = null
     }
 
-    /** "Go here" in "Change your route?": the amenity becomes a detour. */
+    /** "Close" on the "Change your route?" card. */
+    fun cancelAmenity() {
+        amenityToConfirm = null
+    }
+
+    /** "Go here" on the "Change your route?" card: the amenity becomes a detour. */
     fun goToAmenity() {
         val place = amenityToConfirm ?: return
         amenityToConfirm = null
@@ -582,7 +582,7 @@ internal class VisitViewModel(
     // Ambiguous location (EC04)
 
     private val isPresentingSomething: Boolean
-        get() = locationChoice != null || lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
+        get() = lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
             controller.isOffRoute.value || amenityToConfirm != null || isShowingWrapUp || isPairing ||
             wristband.bindingState.value is BindingState.Ended
 
@@ -595,42 +595,13 @@ internal class VisitViewModel(
             level = fix.level,
             horizontalAccuracy = maxOf(0.0, fix.accuracy),
             activeStop = if (navigator.hasArrived) null else progress.activeStop,
-            galleries = LocationAmbiguity.galleries(places),
-            currentGallery = currentGallery,
         )
         val ambiguity = LocationAmbiguity.evaluate(input, settings.uncertainAccuracyMeters) ?: return
-        if (LocationChoice.isQuiet(ambiguity.kind, answeredAmbiguity, Instant.now(), settings.locationQuestionQuietPeriod.toJavaDuration())) return
+        if (LocationAmbiguity.isQuiet(ambiguity.kind, answeredAmbiguity, Instant.now(), settings.locationQuestionQuietPeriod.toJavaDuration())) return
         FieldLog.log("ambiguous location: ${ambiguity.kind}")
         when (ambiguity) {
             is LocationAmbiguity.LowConfidence -> lowConfidenceStop = ambiguity.stop
-            else -> locationChoice = LocationChoice.of(ambiguity)
         }
-    }
-
-    /** EC04c, after the sheet that asked has gone. */
-    fun openManualChoice() {
-        scope.launch {
-            delay(SHEET_SWAP_DELAY_MILLIS)
-            locationChoice = LocationChoice.manual(progress.journey)
-        }
-    }
-
-    fun pick(option: LocationChoice.Option, choice: LocationChoice) {
-        answeredAmbiguity[choice.kind] = Instant.now()
-        locationChoice = null
-        when (val action = option.action) {
-            is LocationChoice.Action.ActivateStop -> {
-                scope.launch { controller.activate(action.stopId) }
-                mode = VisitMode.MAP
-            }
-            is LocationChoice.Action.InGallery -> currentGallery = action.name
-            LocationChoice.Action.SomewhereElse -> Unit
-        }
-    }
-
-    fun closeChoice(choice: LocationChoice) {
-        answeredAmbiguity[choice.kind] = Instant.now()
-        locationChoice = null
     }
 
     /** EC04d "That's right". */
@@ -639,11 +610,10 @@ internal class VisitViewModel(
         lowConfidenceStop = null
     }
 
-    /** EC04d "Not here": the manual choice. */
+    /** EC04d "Not here": the answer is recorded and the prompt closes. */
     fun rejectLowConfidence() {
         answeredAmbiguity["low"] = Instant.now()
         lowConfidenceStop = null
-        openManualChoice()
     }
 
     // Tracking alerts

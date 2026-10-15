@@ -35,10 +35,16 @@ class VisitCardTextTest {
     @Test
     fun titleGuidanceAndAction() {
         val level = VisitCardState.NextStopOnOtherLevel("Gallery 304", 3)
-        assertEquals(UiText.Resource("visit_take_the_lift_to_level", listOf(3)), VisitCardText.title(level))
+        assertEquals(UiText.Resource("visit_go_to_level", listOf(3)), VisitCardText.title(level))
         assertEquals(UiText.Verbatim("A"), VisitCardText.title(VisitCardState.AtStop("A")))
-        assertEquals(UiText.Resource("visit_go_to_the_lift"), VisitCardText.instructionWithoutGuidance(level))
-        assertNull(VisitCardText.instructionWithoutGuidance(VisitCardState.Walking("A")))
+        // No guidance on another floor: no instruction (no "Go to the lift" since ProximiioGADKit 0.11.0).
+        assertNull(VisitCardText.instruction(level, guidance = null, title = VisitCardText.title(level)))
+        // At the level change the instruction repeats the title and is left out.
+        val take = UiText.Resource("guidance_take_level_changer", listOf(UiText.Resource("guidance_level_changer_stairs"), 3))
+        assertNull(VisitCardText.instruction(level, guidance = take, title = take))
+        val turn = UiText.Resource("guidance_turn_left", listOf(5))
+        assertEquals(turn, VisitCardText.instruction(level, guidance = turn, title = take))
+        assertEquals(turn, VisitCardText.instruction(VisitCardState.Walking("A"), guidance = turn, title = UiText.Verbatim("A")))
         assertTrue(VisitCardText.showsGuidance(level))
         assertFalse(VisitCardText.showsGuidance(VisitCardState.AtStop("A")))
     }
@@ -65,41 +71,13 @@ class VisitCardTextTest {
     }
 }
 
-/** The "Where are you?" choices of iOS `VisitView` (EC04b, EC04c). */
-class LocationChoiceTest {
-    private val stops = listOf(
-        JourneyStop("a", "Mirror", Coordinate(0.0, 0.0), 1.0, "a", StopState.DONE),
-        JourneyStop("b", "Room", Coordinate(0.0, 0.0), 2.0, "b", StopState.ACTIVE),
-        JourneyStop("c", "Wall", Coordinate(0.0, 0.0), null, "c"),
-    )
-
-    @Test
-    fun lowConfidenceIsASheetNotAChoice() {
-        assertNull(LocationChoice.of(LocationAmbiguity.LowConfidence(stops[1])))
-    }
-
-    @Test
-    fun betweenGalleriesNamesTheGallery() {
-        val gallery = VenuePlace(id = "g", title = "Gallery 2", coordinate = Coordinate(0.0, 0.0), level = 1.0)
-        val choice = LocationChoice.of(LocationAmbiguity.BetweenGalleries(listOf(gallery)))!!
-        assertEquals(LocationChoice.Action.InGallery("Gallery 2"), choice.options.first().action)
-        assertNull(choice.caption)
-    }
-
-    @Test
-    fun manualListsOpenStopsWithTheirLevel() {
-        val choice = LocationChoice.manual(Journey(stops))
-        assertEquals(LocationChoice.MANUAL, choice.kind)
-        assertEquals(listOf("b", "c", "somewhere-else"), choice.options.map { it.id })
-        assertEquals(UiText.Resource("visit_level_n", listOf(2)), choice.options[0].subtitle)
-        assertNull(choice.options[1].subtitle)
-    }
-
+/** The quiet period of an answered location question ("Probably at …"). */
+class LocationQuestionTest {
     @Test
     fun answeredKindsStayQuietForTwoMinutes() {
         val answered = mapOf("low" to Instant.ofEpochSecond(1_000))
-        assertTrue(LocationChoice.isQuiet("low", answered, Instant.ofEpochSecond(1_119)))
-        assertFalse(LocationChoice.isQuiet("low", answered, Instant.ofEpochSecond(1_120)))
-        assertFalse(LocationChoice.isQuiet("multiple", answered, Instant.ofEpochSecond(1_001)))
+        assertTrue(LocationAmbiguity.isQuiet("low", answered, Instant.ofEpochSecond(1_119)))
+        assertFalse(LocationAmbiguity.isQuiet("low", answered, Instant.ofEpochSecond(1_120)))
+        assertFalse(LocationAmbiguity.isQuiet("multiple", answered, Instant.ofEpochSecond(1_001)))
     }
 }

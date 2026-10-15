@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.GuidanceText
 import io.proximi.gadkit.UiText
 
 /**
@@ -30,16 +31,28 @@ internal object VisitCardText {
         }
 
     /**
-     * The title: the stop, `visit_your_journey` "Your journey", `visit_take_the_lift_to_level`
-     * "Take the lift to level %d", `visit_walked_your_route` "You've walked your route". While
-     * walking, [galleryAhead] replaces the stop.
+     * The title: the stop, `visit_your_journey` "Your journey", the route's next level change
+     * ([GuidanceText.levelChangeTitle], else `visit_go_to_level` "Go to level %d"),
+     * `visit_walked_your_route` "You've walked your route". While walking, [galleryAhead] replaces
+     * the stop.
      */
-    internal fun title(state: VisitCardState, galleryAhead: String? = null): UiText = when (state) {
+    internal fun title(state: VisitCardState, galleryAhead: String? = null, levelChangeTitle: UiText? = null): UiText = when (state) {
         VisitCardState.Starting -> UiText.Resource("visit_your_journey")
         is VisitCardState.Walking -> UiText.Verbatim(galleryAhead ?: state.stop)
         is VisitCardState.AtStop -> UiText.Verbatim(state.stop)
-        is VisitCardState.NextStopOnOtherLevel -> UiText.Resource("visit_take_the_lift_to_level", listOf(state.level))
+        is VisitCardState.NextStopOnOtherLevel -> levelChangeTitle ?: UiText.Resource("visit_go_to_level", listOf(state.level))
         VisitCardState.Finished -> UiText.Resource("visit_walked_your_route")
+    }
+
+    /**
+     * The guidance instruction under the title. While the next stop is on another floor the
+     * instruction is left out when it repeats the title: at the level change both say "Take the
+     * stairs to level 3".
+     */
+    internal fun instruction(state: VisitCardState, guidance: UiText?, title: UiText): UiText? = when (state) {
+        is VisitCardState.Walking -> guidance
+        is VisitCardState.NextStopOnOtherLevel -> guidance?.takeUnless { it == title }
+        else -> null
     }
 
     /** Whether the icon shows the stop number: inside the stop's gallery only (R2), and always at the stop. */
@@ -50,7 +63,4 @@ internal object VisitCardText {
     internal fun showsGuidance(state: VisitCardState): Boolean =
         state is VisitCardState.Walking || state is VisitCardState.NextStopOnOtherLevel
 
-    /** The instruction while there is no guidance: `visit_go_to_the_lift` "Go to the lift" for a stop on another floor. */
-    internal fun instructionWithoutGuidance(state: VisitCardState): UiText? =
-        if (state is VisitCardState.NextStopOnOtherLevel) UiText.Resource("visit_go_to_the_lift") else null
 }

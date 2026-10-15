@@ -170,27 +170,6 @@ internal fun JourneyCompleteScreen(venue: VenueService, onClose: () -> Unit) {
 }
 
 /**
- * "Change your route?" bottom sheet before an amenity becomes a detour (PM review 2026-10-12).
- * [nextStop] is the gallery of the next artwork, or the artwork.
- */
-@Composable
-internal fun ChangeRouteConfirmation(place: String, nextStop: String?, onGo: () -> Unit, onClose: () -> Unit) {
-    OverlaySheet(onDismiss = onClose) {
-        SheetTitle(stringResource(R.string.change_your_route))
-        SheetBody(
-            if (nextStop != null) {
-                stringResource(R.string.navigating_to_x_adds_a_stop_to, place, nextStop)
-            } else {
-                stringResource(R.string.navigating_to_x_adds_a_stop_to_2, place)
-            },
-            Modifier.padding(bottom = 20.dp),
-        )
-        PrimaryButton(stringResource(R.string.go_here), onGo)
-        TextActionButton(stringResource(R.string.close), onClose)
-    }
-}
-
-/**
  * "You've left your route" bottom sheet. The route is not redrawn while the visitor walks
  * elsewhere (PM review 2026-10-12); "Show the route from here" redraws it.
  */

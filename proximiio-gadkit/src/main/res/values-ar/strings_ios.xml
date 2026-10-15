@@ -32,6 +32,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="centre_on_me">توسيط الخريطة على موقعي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="change_your_route">هل تريد تغيير مسارك؟</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="close">إغلاق</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="closes_the_level_change">يغلق تغيير الطابق</string>
@@ -80,10 +82,10 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="go_here">اذهب إلى هنا</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="go_to_level_n">اذهب إلى الطابق %d</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="go_to_museum">اذهب إلى المتحف</string>
     <string name="go_to_settings">الانتقال إلى الإعدادات</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="go_to_the_lift">اذهب إلى المصعد</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="going_to_level_n">متجه إلى الطابق %d</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -156,6 +158,10 @@
         <item quantity="other">%d محطة</item>
     </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="navigating_to_x_adds_a_stop_to">الانتقال إلى %1$s يضيف محطة إلى مسارك نحو %2$s. يتم الاحتفاظ بتقدم رحلتك.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="navigating_to_x_adds_a_stop_to_2">الانتقال إلى %s يضيف محطة إلى مسارك. يتم الاحتفاظ بتقدم رحلتك.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="new_route_from_here">مسار جديد من هنا</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="next_stop">المحطة التالية</string>
@@ -179,10 +185,6 @@
     <string name="paired">مقترن</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="permission_denied">الكاميرا</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="pick_my_stop_manually">اختيار محطتي يدويًا</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="pick_the_artwork_you_are_at">اختر العمل الفني الذي أنت عنده</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="plan_your_visit">خطّط لزيارتك</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -208,6 +210,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="search_the_museum">ابحث في المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="show_the_route_from_here">عرض المسار من هنا</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="single_artist_gallery">قاعة فنان واحد</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="skip">تخطي</string>
@@ -217,8 +221,6 @@
     <string name="skip_for_now">تخطي في الوقت الحالي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="skip_this_artwork">هل تريد تخطي هذا العمل الفني؟</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="somewhere_else">مكان آخر</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="stairs">الدرج</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -233,8 +235,6 @@
     <string name="swap_it_at_the_welcome_desk">استبدله في مكتب الاستقبال</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="swipe_left_to_skip_an_artwork">اسحب لليسار لتخطي عمل فني</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="take_the_lift_to_level_n">استقل المصعد إلى المستوى %d</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="take_the_x_to_level_n">استقل %1$s إلى الطابق %2$d</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -253,6 +253,8 @@
     <string name="the_museum_s_server_failed_try_again">حدث خلل في خادم المتحف. حاول مجددًا بعد قليل.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="the_next_stop_of_your_journey_is">المحطة التالية في رحلتك على بعد أقل من %d م.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="the_route_stays_as_it_is_until">يبقى المسار كما هو حتى تعود إليه.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="the_staff_released_this_wristband">ألغى الموظفون ربط هذا السوار.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -315,10 +317,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="we_ve_lost_your_place_in_the">فقدنا موقعك في القاعة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="where_are_you">أين أنت؟</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="which_one_are_you_in">في أيّها أنت؟</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="women_s_restroom">دورة مياه النساء</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="wristband">تم ربط</string>
@@ -337,7 +335,7 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="you_left_this_area">لقد غادرت هذه المنطقة.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="you_re_between_galleries">أنت بين قاعتين.</string>
+    <string name="you_ve_left_your_route">لقد خرجت عن مسارك</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="you_ve_visited_n_of_n_stops">زرت %1$d من %2$d محطات. تم حفظ رحلتك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
