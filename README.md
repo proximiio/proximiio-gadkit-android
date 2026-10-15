@@ -536,8 +536,10 @@ The behaviour of the iOS package 0.14.0.
   the lift or stairs view shows, then the map of that floor with the rest of the route, on the
   journey map and the museum map. In stage 1 that is GAD level 0. No change in the host app; set
   `GadSettings.levelsWithoutPositioning` to change the floors.
-- `GadSettings.levelsWithoutPositioning` ([0]), `levelChangerReachedMeters` (5 m),
-  `levelChangeViewDuration` (5 s) and `floorWithoutPositioningMaximum` (1800 s).
+- **BREAKING:** `GadSettings.levelsWithoutPositioning` ([0]), `levelChangerReachedMeters` (5 m),
+  `levelChangeViewDuration` (5 s) and `floorWithoutPositioningMaximum` (1800 s). The four parameters
+  follow `liftExitFixes`, so a positional call of the constructor gets other values. Pass the
+  arguments of `GadSettings` by name.
 - **BREAKING:** `VisitEvent.FloorWithoutPositioningEntered(level)` and
   `FloorWithoutPositioningLeft(level)`. A `when` over `VisitEvent` without `else` needs the cases.
 - **BREAKING:** `VisitEvent.TrackingChanged(health)` with the public enum `TrackingHealth`
