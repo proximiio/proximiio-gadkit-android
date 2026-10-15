@@ -2,6 +2,7 @@ package io.proximi.gadkit
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import io.proximi.map.live.VenueStyleLoader
 import io.proximi.sdk.Proximiio
 import io.proximi.sdk.ProximiioConfiguration
 import io.proximi.sdk.attachPositionProvider
@@ -17,8 +18,10 @@ import io.proximi.sdk.positioning.engine.CustomPositionProviding
 import io.proximi.sdk.refreshPermissions
 import io.proximi.sdk.service.ProximiioServiceOptions
 import io.proximi.sdk.syncEvents
+import java.io.File
 import java.net.URI
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -118,6 +121,24 @@ public class VenueService private constructor(
         attachedProvider = null
     }
 
+    /**
+     * Fetches the organisation's map style in the background. The map library writes it to
+     * [caches], and a map screen opened later starts on it instead of an empty style. Without it,
+     * the first map screen after an install fetches the style while it is on screen.
+     */
+    private fun cacheMapStyle(caches: File) {
+        scope.launch {
+            try {
+                VenueStyleLoader.load(sdk, caches)
+                FieldLog.log("map style cached")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                FieldLog.log("map style not cached: ${e.message}")
+            }
+        }
+    }
+
     /** Field log: the visitor id and the SDK's sync events. */
     private suspend fun logReporting(configuration: GadConfiguration) {
         // The visitor id finds this phone's visitor, positions and events on the backend.
@@ -165,7 +186,8 @@ public class VenueService private constructor(
         /**
          * Reads the permissions, authenticates, starts positioning, loads the route network and
          * attaches the binding's position provider. The order matters; see
-         * proximiio-blueiot-minimal-android `Venue.start`.
+         * proximiio-blueiot-minimal-android `Venue.start`. Then fetches the map style in the
+         * background, so call it at launch, before the first map screen.
          */
         public suspend fun start(context: Context, configuration: GadConfiguration, binding: BlueiotWristbandBinding): VenueService {
             val sdk = Proximiio(context.applicationContext, configuration(context, configuration))
@@ -176,6 +198,8 @@ public class VenueService private constructor(
             val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
             val venue = VenueService(sdk, binding, isDebugBuild)
             venue.attachBinding()
+            // The map session's default cache directory, so the session finds the style.
+            venue.cacheMapStyle(context.applicationContext.cacheDir)
             if (FieldLog.isEnabled) venue.logReporting(configuration)
             return venue
         }
