@@ -24,6 +24,10 @@ internal data class VenueGeofence(
     val name: String?,
     val polygon: List<List<Double>>?,
     val floorId: String?,
+    /** `remote_id`: the gallery's id, which an artwork names in `metadata.gallery_id`. */
+    val remoteId: String? = null,
+    /** `metadata.geofence_type`: `gallery` or `artwork`. */
+    val geofenceType: String? = null,
 )
 
 /** A JSON number as a double, or `null`. */

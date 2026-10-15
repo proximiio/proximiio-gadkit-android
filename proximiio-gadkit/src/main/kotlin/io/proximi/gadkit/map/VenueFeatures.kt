@@ -57,6 +57,13 @@ public suspend fun VenueService.galleries(language: String?): List<Gallery> {
     return Gallery.all(geofences, levels)
 }
 
+/** Gallery names by the gallery's `remote_id`, for the journey list's headers ([Gallery.names]). */
+internal suspend fun VenueService.galleryNames(): Map<String, String> = Gallery.names(
+    sdk.geofences().map {
+        VenueGeofence(it.id, it.name, it.polygon, it.floorId, it.remoteId, it.metadata?.get("geofence_type")?.stringValue)
+    },
+)
+
 /**
  * `metadata.geofence_type` is `gallery` or `artwork`, as iOS `Gallery.swift`. Artwork geofences
  * (circles) lie inside the gallery geofences.

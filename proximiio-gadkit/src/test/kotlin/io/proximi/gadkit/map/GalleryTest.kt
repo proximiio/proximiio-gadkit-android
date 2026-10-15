@@ -45,13 +45,41 @@ class GalleryTest {
     }
 
     @Test
-    fun consecutiveStopsInOneGalleryFormAGroup() {
-        val places = listOf("a", "b", "c", "d").map { VenuePlace(id = it, title = it, coordinate = Coordinate(24.5, 54.4), level = 1.0) }
-        val stops = VisitPlan.journey(listOf("a", "b", "c", "d"), places).stops
-        val gallery = mapOf("a" to "G1", "b" to "G1", "c" to "G2", "d" to "G1")
-        val groups = VisitPlan.galleryGroups(stops) { gallery[it.id] }
-        assertEquals(listOf("G1", "G2", "G1"), groups.map { it.gallery })
-        assertEquals(listOf(listOf("a", "b"), listOf("c"), listOf("d")), groups.map { group -> group.stops.map { it.id } })
+    fun aHeaderPrecedesEachRunOfStopsInOneSection() {
+        val places = listOf("a", "b", "c", "d", "e").map { VenuePlace(id = it, title = it, coordinate = Coordinate(24.5, 54.4), level = 1.0) }
+        val stops = VisitPlan.journey(listOf("a", "b", "c", "d", "e"), places).stops
+        val section = mapOf("a" to "G1", "b" to "G1", "c" to "G2", "d" to "G1")
+        val rows = VisitPlan.listRows(stops) { section[it.id] }
+        assertEquals(listOf("header-a", "a", "b", "header-c", "c", "header-d", "d", "e"), rows.map { it.id })
+        assertEquals(listOf("G1", "G2", "G1"), rows.filterIsInstance<VisitPlan.ListRow.Header>().map { it.title })
+    }
+
+    @Test
+    fun listRowIdsAreUnique() {
+        val places = listOf("a", "b", "c").map { VenuePlace(id = it, title = it, coordinate = Coordinate(24.5, 54.4), level = 1.0) }
+        val stops = VisitPlan.journey(listOf("a", "b", "c"), places).stops
+        val rows = VisitPlan.listRows(stops) { "G1" }
+        assertEquals(rows.size, rows.map { it.id }.toSet().size)
+    }
+}
+
+/** Port of ProximiioGADKit `GalleryNameTests` (0.12.0). */
+class GalleryNameTest {
+    private fun geofence(id: String, name: String?, remoteId: String?, type: String = "gallery") =
+        VenueGeofence(id, name, polygon = null, floorId = null, remoteId = remoteId, geofenceType = type)
+
+    /** GAD data 2026-10-15: the artworks of "Gallery 403" (level 4) name it in `metadata.gallery_id`. */
+    @Test
+    fun galleryGeofencesNameGalleriesByTheirRemoteId() {
+        val names = Gallery.names(
+            listOf(
+                geofence("a", "Gallery 403", "e07fe5d7"),
+                geofence("b", "Gallery 102", ""),
+                geofence("c", null, "x"),
+                geofence("d", "Untitled", "GAD.2010.00033", type = "artwork"),
+            ),
+        )
+        assertEquals(mapOf("e07fe5d7" to "Gallery 403"), names)
     }
 }
 

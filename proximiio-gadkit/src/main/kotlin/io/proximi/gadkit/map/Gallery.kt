@@ -71,6 +71,21 @@ public data class Gallery(
             return ring?.takeIf { it.size >= 3 }
         }
 
+        /**
+         * Gallery names by the gallery's id: the `remote_id` of a gallery geofence, which an
+         * artwork names in `metadata.gallery_id` ([VenuePlace.galleryId]). On 2026-10-15 the GAD
+         * data names galleries on every floor this way; gallery outlines with a gallery POI exist
+         * on level 3 only. Pure; covered by tests.
+         */
+        internal fun names(geofences: List<VenueGeofence>): Map<String, String> = buildMap {
+            for (geofence in geofences) {
+                if (geofence.geofenceType != "gallery") continue
+                val id = geofence.remoteId?.takeIf { it.isNotEmpty() } ?: continue
+                val name = geofence.name?.takeIf { it.isNotEmpty() } ?: continue
+                putIfAbsent(id, name)
+            }
+        }
+
         internal fun containing(coordinate: Coordinate, level: Double?, galleries: List<Gallery>): Gallery? =
             galleries.firstOrNull { it.contains(coordinate, level) }
 

@@ -23,6 +23,11 @@ class ArtworkMetadataTest {
     )
 
     @Test
+    fun readsTheGalleryId() {
+        assertEquals("e07fe5d7", place(mapOf("artwork_id" to "x", "gallery_id" to "e07fe5d7")).galleryId)
+    }
+
+    @Test
     fun readsArtistAndBadges() {
         val place = place(mapOf("artist_name" to "Lucas Samaras", "has_ar" to true, "has_audio" to "true"))
         assertEquals("Lucas Samaras", place.artist)

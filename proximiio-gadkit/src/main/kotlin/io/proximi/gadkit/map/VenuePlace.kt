@@ -40,6 +40,11 @@ public data class VenuePlace(
     val hasAR: Boolean = false,
     /** `metadata.has_audio`: the journey list shows a note. */
     val hasAudio: Boolean = false,
+    /**
+     * `metadata.gallery_id`: the gallery of an artwork. The gallery's geofence holds the same value
+     * in `remote_id`.
+     */
+    val galleryId: String? = null,
 ) {
     public companion object {
         /**
@@ -77,6 +82,7 @@ public data class VenuePlace(
                 artist = metadata?.let { localized(it["artist_name"], language) ?: text(it["artist_name"]) },
                 hasAR = flag(metadata?.get("has_ar")),
                 hasAudio = flag(metadata?.get("has_audio")),
+                galleryId = text(metadata?.get("gallery_id")),
             )
         }
 

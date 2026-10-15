@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -68,23 +69,33 @@ import androidx.compose.ui.semantics.contentDescription
 
 /**
  * The journey as a list (Figma "Personalized Journey list"), as iOS `VisitStopList`. Stops are
- * numbered in visit order and grouped under the gallery they lie in; visited stops are dimmed;
- * swiping towards the start edge offers Skip; a skipped stop is hidden and the list renumbers.
- * "Undo skip" restores the last skipped stop.
+ * numbered in visit order and grouped under their gallery; visited stops are dimmed; swiping
+ * towards the start edge offers Skip; a skipped stop is hidden and the list renumbers. "Undo skip"
+ * restores the last skipped stop. A curated tour has no gallery headers and no skip.
+ *
+ * The gallery of a stop is the artwork's `metadata.gallery_id` named by the gallery geofence, else
+ * the gallery outline it lies in. A stop with neither is under its level ("Level 4"), so it does
+ * not appear to belong to the gallery above it (PM 2026-10-15).
  */
 @Composable
 internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier) {
     val journey = model.progress.journey
     val lastSkipped by model.controller.lastSkippedStopId.collectAsStateWithLifecycle()
     val numbers = VisitPlan.numbers(journey)
-    // A curated tour lists no galleries and has no skip.
-    val galleries = if (model.kind.listsGalleries) model.galleries else emptyList()
     val allowsSkip = model.kind.allowsSkip
-    // Places by id, for the artist and the badges of a stop.
+    // Places by id, for the artist, the badges and the gallery id of a stop.
     val places = remember(model.places) { model.places.associateBy { it.id } }
-    val groups = VisitPlan.galleryGroups(VisitPlan.artworks(journey).filter { it.state != StopState.SKIPPED }) { stop ->
-        Gallery.containing(stop.coordinate, stop.level, galleries)?.name
+    val resources = LocalResources.current
+
+    /** The section header of a stop: its gallery, else its level. A curated tour has none. */
+    fun section(stop: JourneyStop): String? {
+        if (!model.kind.listsGalleries) return null
+        places[stop.poiId ?: stop.id]?.galleryId?.let { id -> model.galleryNames[id] }?.let { return it }
+        Gallery.containing(stop.coordinate, stop.level, model.galleries)?.let { return it.name }
+        return stop.level?.let { resources.getString(R.string.level_n, it.roundToInt()) }
     }
+    // One flat list: rows keep their identity when the journey is ordered again.
+    val rows = VisitPlan.listRows(VisitPlan.artworks(journey).filter { it.state != StopState.SKIPPED }, ::section)
     // The row whose skip action is revealed. One row at a time.
     var revealedStopId by remember { mutableStateOf<String?>(null) }
 
@@ -94,28 +105,27 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        groups.forEach { group ->
-            group.gallery?.let { name ->
-                item(key = "gallery-${group.id}") {
-                    Text(
-                        name,
-                        Modifier.fillMaxWidth().padding(top = 10.dp).semantics { heading() },
-                        style = GadTextStyle.LargeBodyBold.textStyle,
-                        color = Palette.ink,
-                    )
-                }
-            }
-            items(group.stops, key = { "${group.id}-${it.id}" }) { stop ->
-                SwipeToSkipRow(
-                    isRevealed = revealedStopId == stop.id,
-                    onRevealChange = { revealedStopId = if (it) stop.id else null },
-                    isEnabled = allowsSkip && (stop.state == StopState.PENDING || stop.state == StopState.ACTIVE),
-                    onSkip = {
-                        revealedStopId = null
-                        model.requestSkip(stop)
-                    },
-                ) {
-                    StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id])
+        items(rows, key = { it.id }) { row ->
+            when (row) {
+                is VisitPlan.ListRow.Header -> Text(
+                    row.title,
+                    Modifier.fillMaxWidth().padding(top = 10.dp).testTag("journeyListHeader").semantics { heading() },
+                    style = GadTextStyle.LargeBodyBold.textStyle,
+                    color = Palette.ink,
+                )
+                is VisitPlan.ListRow.Stop -> {
+                    val stop = row.stop
+                    SwipeToSkipRow(
+                        isRevealed = revealedStopId == stop.id,
+                        onRevealChange = { revealedStopId = if (it) stop.id else null },
+                        isEnabled = allowsSkip && (stop.state == StopState.PENDING || stop.state == StopState.ACTIVE),
+                        onSkip = {
+                            revealedStopId = null
+                            model.requestSkip(stop)
+                        },
+                    ) {
+                        StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id])
+                    }
                 }
             }
         }

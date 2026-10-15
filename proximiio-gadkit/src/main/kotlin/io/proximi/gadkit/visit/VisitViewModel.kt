@@ -35,6 +35,7 @@ import io.proximi.gadkit.map.toCore
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.map.artworkAreas
 import io.proximi.gadkit.map.galleries
+import io.proximi.gadkit.map.galleryNames
 import io.proximi.gadkit.map.isArtwork
 import io.proximi.gadkit.map.isGallery
 import io.proximi.gadkit.map.places
@@ -159,6 +160,10 @@ internal class VisitViewModel(
     var places by mutableStateOf(emptyList<VenuePlace>())
         private set
     var galleries by mutableStateOf(emptyList<Gallery>())
+        private set
+
+    /** Gallery names by gallery id, for the list's headers ([Gallery.names]). */
+    var galleryNames by mutableStateOf(emptyMap<String, String>())
         private set
 
     /** Name of the geofence (gallery) the visitor is in, from `geofenceEvents()`. */
@@ -356,7 +361,10 @@ internal class VisitViewModel(
         // and level changers stay (PM review 2026-10-12).
         session.hiddenFeatureIds = places.filter { it.isArtwork }.map { it.id }.toSet()
         galleries = venue.galleries(language)
-        if (FieldLog.isEnabled) FieldLog.log("galleries: " + galleries.joinToString { "${it.name} L${it.level.toInt()}" })
+        galleryNames = venue.galleryNames()
+        if (FieldLog.isEnabled) {
+            FieldLog.log("galleries: " + galleries.joinToString { "${it.name} L${it.level.toInt()}" } + " · ${galleryNames.size} named by id")
+        }
     }
 
     /** `recentre` with a field-log line naming the caller, as iOS `VisitView.recentre(withHeading:reason:)`. */

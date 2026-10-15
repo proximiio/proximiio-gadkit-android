@@ -37,24 +37,34 @@ public object VisitPlan {
         return Journey(journey.stops.toMutableList().apply { this[index] = this[index].copy(state = state) })
     }
 
-    internal data class GalleryGroup(val id: String, val gallery: String?, val stops: List<JourneyStop>)
+    /** A row of the journey list: a section header or a stop. */
+    internal sealed interface ListRow {
+        val id: String
+
+        data class Header(override val id: String, val title: String) : ListRow
+
+        data class Stop(val stop: JourneyStop) : ListRow {
+            override val id: String get() = stop.id
+        }
+    }
 
     /**
-     * Consecutive stops in the same gallery form one group. A gallery visited twice yields two
-     * groups, so the list keeps the visit order.
+     * The journey list in visit order, one flat list: a header before each run of consecutive
+     * stops with the same section, for example a gallery. A gallery visited twice gets two
+     * headers, so the list keeps the visit order. A run without a section has no header. A
+     * header's id follows the first stop of its run, so rows keep their identity when the order
+     * changes (PM 2026-10-15: the list showed rows of an older order). Pure; covered by tests.
      */
-    internal fun galleryGroups(stops: List<JourneyStop>, galleryOf: (JourneyStop) -> String?): List<GalleryGroup> {
-        val groups = mutableListOf<GalleryGroup>()
-        for (stop in stops) {
-            val gallery = galleryOf(stop)
-            val last = groups.lastOrNull()
-            if (last != null && last.gallery == gallery) {
-                groups[groups.lastIndex] = last.copy(stops = last.stops + stop)
-            } else {
-                groups += GalleryGroup("${groups.size}-${gallery ?: ""}", gallery, listOf(stop))
-            }
+    internal fun listRows(stops: List<JourneyStop>, sectionOf: (JourneyStop) -> String?): List<ListRow> {
+        val rows = mutableListOf<ListRow>()
+        var current: String? = null
+        stops.forEachIndexed { index, stop ->
+            val section = sectionOf(stop)
+            if (section != null && (index == 0 || section != current)) rows += ListRow.Header("header-${stop.id}", section)
+            current = section
+            rows += ListRow.Stop(stop)
         }
-        return groups
+        return rows
     }
 
     /** True when [stop] is the last artwork still to visit (Figma 04.01 "approaching end of tour"). */
