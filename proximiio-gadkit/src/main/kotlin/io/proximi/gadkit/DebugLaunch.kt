@@ -2,6 +2,7 @@ package io.proximi.gadkit
 
 import android.app.Activity
 import android.content.pm.ApplicationInfo
+import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.sdk.journeys
 import kotlinx.coroutines.CancellationException
@@ -27,6 +28,9 @@ import kotlinx.coroutines.CancellationException
  * - `gad.visitList`: opens the journey screen in List mode (iOS `-visitList`).
  * - `gad.visitAutoAdvance`: a reached detour ends 5 m after the visitor leaves it, without
  *   "Resume your Journey" (iOS `-visitAutoAdvance`). It applies to every visit of the process.
+ * - `gad.routeAvoid`: `stairs,escalators,revolvingDoors,inaccessiblePaths` sets
+ *   [Options.routeAccessibility] (iOS `-routeAvoid`). The host app passes it to
+ *   `LocalRouteAccessibility`.
  *
  * `gad.journeyPlayback` is accepted for `gad.journey`, as iOS names it `-journeyPlayback`. The
  * playback starts with the Hub, so a visit gets positions without opening the museum map.
@@ -44,6 +48,8 @@ public object DebugLaunch {
         public val visitStops: List<String> = emptyList(),
         public val visitList: Boolean = false,
         public val visitAutoAdvance: Boolean = false,
+        /** `gad.routeAvoid`: the accessibility needs the host app passes to `LocalRouteAccessibility`. */
+        public val routeAccessibility: RouteAccessibility = RouteAccessibility.NONE,
     )
 
     /** Playback starts once per process; the map screen can open many times. */
@@ -66,6 +72,21 @@ public object DebugLaunch {
             visitStops = value("gad.visit")?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty(),
             visitList = value("gad.visitList").toBoolean(),
             visitAutoAdvance = value("gad.visitAutoAdvance").toBoolean(),
+            routeAccessibility = routeAvoid(value("gad.routeAvoid")),
+        )
+    }
+
+    /**
+     * The needs of `gad.routeAvoid`: comma-separated `stairs`, `escalators`, `revolvingDoors`,
+     * `inaccessiblePaths`. Unknown words are ignored. Pure; covered by tests.
+     */
+    internal fun routeAvoid(text: String?): RouteAccessibility {
+        val words = text?.split(',')?.map { it.trim() }?.toSet().orEmpty()
+        return RouteAccessibility(
+            avoidsStairs = "stairs" in words,
+            avoidsEscalators = "escalators" in words,
+            avoidsRevolvingDoors = "revolvingDoors" in words,
+            avoidsInaccessiblePaths = "inaccessiblePaths" in words,
         )
     }
 

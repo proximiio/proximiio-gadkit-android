@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.proximi.gadkit.DebugLaunch
+import io.proximi.gadkit.map.LocalRouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.wristband.WristbandSession
@@ -121,6 +122,7 @@ public fun VisitScreen(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val holder: VisitHolder = viewModel(key = VisitHolder.KEY)
+    val accessibility = LocalRouteAccessibility.current
     SideEffect {
         holder.onClose = onClose
         holder.onVisitEvent = onVisitEvent
@@ -133,6 +135,7 @@ public fun VisitScreen(
             journey,
             scope,
             DebugLaunch.read(activity),
+            accessibility,
             onClose = { holder.onClose() },
             onEvent = { holder.onVisitEvent(it) },
         )
@@ -141,6 +144,7 @@ public fun VisitScreen(
         // A recreated activity (a language change) shows the same visit again.
         onDispose { if (activity?.isChangingConfigurations != true) holder.close(model) }
     }
+    LaunchedEffect(model, accessibility) { model.setAccessibility(accessibility) }
     VisitContent(model, wristbandConnectionScreen)
 }
 
@@ -337,13 +341,15 @@ private fun VisitCard(model: VisitViewModel) {
     val guidance = model.guidance
     val isLast = progress.activeStop?.let { VisitPlan.isLastOpenStop(it, progress.journey) } ?: false
     val showsGuidance = VisitCardText.showsGuidance(state)
-    val instruction = if (showsGuidance) {
+    val instruction = if (model.hasNoAccessibleRoute) {
+        stringResource(R.string.no_route_to_this_stop_with_your)
+    } else if (showsGuidance) {
         (guidance?.let { GuidanceText.instruction(it.toCore()) } ?: VisitCardText.instructionWithoutGuidance(state))?.mapText()
     } else {
         null
     }
     val remaining = guidance
-        ?.takeIf { showsGuidance && !it.isOffRoute && !it.hasArrived }
+        ?.takeIf { showsGuidance && !model.hasNoAccessibleRoute && !it.isOffRoute && !it.hasArrived }
         ?.let { remainingText(it.remainingMeters, resources) }
     val number = model.activeStopNumber
     val galleryAhead = model.galleryAhead?.name

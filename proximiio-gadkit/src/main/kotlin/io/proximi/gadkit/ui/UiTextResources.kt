@@ -44,6 +44,7 @@ private val strings: Map<String, Int> = mapOf(
     "geofence_entered" to R.string.you_entered_this_area,
     "geofence_exited" to R.string.you_left_this_area,
     "visit_next_stop_nearby" to R.string.the_next_stop_of_your_journey_is,
+    "visit_no_accessible_route" to R.string.no_route_to_this_stop_with_your,
     // VisitCardText, VisitActivity
     "visit_your_journey" to R.string.your_journey_2,
     "visit_stop_n_of_n" to R.string.stop_n_of_n,

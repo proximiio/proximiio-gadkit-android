@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.Coordinate
@@ -69,8 +70,8 @@ internal class VisitController(
     journey: CoreJourney,
     private val store: VisitStore,
     private val scope: CoroutineScope,
-    /** Every leg uses the visitor's route preference ([io.proximi.gadkit.map.RoutePreferences]). */
-    private val routeOptions: RouteOptions = RouteOptions(),
+    /** The visitor's accessibility needs for every leg ([io.proximi.gadkit.map.RouteAccessibility]). */
+    accessibility: RouteAccessibility = RouteAccessibility.NONE,
     /** The drawable resource name of the app's glyph for an amenity, for the detour marker. */
     private val amenityIconName: (VenuePlace) -> String? = { null },
     autoAdvance: Boolean = false,
@@ -89,6 +90,17 @@ internal class VisitController(
     )
 
     val navigator = JourneyNavigator(session, journey.toMap(), rules, artworkGuidanceRules)
+
+    private var routeOptions: RouteOptions = accessibility.routeOptions
+
+    /**
+     * New accessibility needs: the navigator routes the current leg again. The same needs change
+     * nothing.
+     */
+    suspend fun setAccessibility(accessibility: RouteAccessibility) {
+        routeOptions = accessibility.routeOptions
+        navigator.setRouteOptions(routeOptions)
+    }
 
     init {
         session.routeSnapping = routeSnapping

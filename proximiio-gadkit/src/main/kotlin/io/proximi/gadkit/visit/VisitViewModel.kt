@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.UiText
 import io.proximi.gadkit.map.VenueLevel
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -28,7 +29,7 @@ import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.DebugLaunch
 import io.proximi.gadkit.map.JourneyMapLayers
 import io.proximi.gadkit.map.MapStyle
-import io.proximi.gadkit.map.RoutePreferences
+import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.gadIcon
 import io.proximi.gadkit.map.toCore
 import io.proximi.gadkit.VenueService
@@ -42,6 +43,7 @@ import io.proximi.gadkit.wristband.WristbandPairingFlow
 import io.proximi.gadkit.wristband.WristbandSession
 import io.proximi.gadkit.map.LocalNotices
 import io.proximi.map.core.RouteGuidance
+import io.proximi.sdk.wayfinding.NoRouteReason
 import io.proximi.map.core.VenuePosition
 import io.proximi.map.core.JourneyStop as MapJourneyStop
 import io.proximi.map.live.ProximiioMapSession
@@ -77,6 +79,8 @@ internal class VisitViewModel(
     journey: Journey,
     parentScope: CoroutineScope,
     private val debug: DebugLaunch.Options?,
+    /** The accessibility needs when the screen opens; [setAccessibility] changes them. */
+    accessibility: RouteAccessibility,
     private val onClose: () -> Unit,
     /** The host app's `onVisitEvent` of `VisitScreen`. Called on the main thread. */
     private val onEvent: (VisitEvent) -> Unit = {},
@@ -100,7 +104,7 @@ internal class VisitViewModel(
         journey,
         store,
         scope,
-        RoutePreferences.options(application),
+        accessibility,
         amenityIconName = { place ->
             AmenityKind.entries.firstOrNull { it.matches(place) }?.let { application.resources.getResourceEntryName(it.gadIcon.glyph) }
         },
@@ -117,6 +121,16 @@ internal class VisitViewModel(
         private set
     var guidance by mutableStateOf<RouteGuidance?>(null)
         private set
+
+    /** Why the navigator has no route to a stop, by stop id. */
+    private var noRouteReasons by mutableStateOf<Map<String, NoRouteReason>>(emptyMap())
+
+    /**
+     * `true` when no route with the visitor's accessibility needs reaches the active stop. The
+     * stop keeps its place without a route line; in a personalised journey the visitor can skip it.
+     */
+    val hasNoAccessibleRoute: Boolean
+        get() = progress.activeStop?.let { noRouteReasons[it.id] is NoRouteReason.NoAccessibleRoute } ?: false
 
     /** Floor level of the visitor's last position. */
     var visitorLevel by mutableStateOf<Double?>(null)
@@ -210,6 +224,12 @@ internal class VisitViewModel(
             onEvent(if (isActiveStop) VisitEvent.ArtworkReached(stop.toCore()) else VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))
         }
         scope.launch { controller.navigator.events.collect { onEvent(VisitEvent.Journey(it)) } }
+        scope.launch {
+            controller.navigator.noRouteReasons.collect {
+                noRouteReasons = it
+                updateNotification()
+            }
+        }
         monitor.start()
         scope.launch {
             loadVenue()
@@ -287,6 +307,11 @@ internal class VisitViewModel(
 
     private fun reportStopNearby(position: VenuePosition?, stop: MapJourneyStop?, guidance: RouteGuidance?) {
         stopNearby.update(position, stop, guidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
+    }
+
+    /** The host app changed the accessibility needs: the leg on screen is routed again. */
+    fun setAccessibility(accessibility: RouteAccessibility) {
+        scope.launch { controller.setAccessibility(accessibility) }
     }
 
     /** The app language changed: map labels and place titles follow it. */
@@ -414,7 +439,7 @@ internal class VisitViewModel(
 
     private fun updateNotification() {
         if (isClosed) return
-        val instruction = guidance?.let { GuidanceText.instruction(it.toCore()) }
+        val instruction = if (hasNoAccessibleRoute) UiText.Resource("visit_no_accessible_route") else guidance?.let { GuidanceText.instruction(it.toCore()) }
         notification.update(VisitActivity.contentState(cardState, progress.journey, progress.activeStop?.id, instruction))
     }
 

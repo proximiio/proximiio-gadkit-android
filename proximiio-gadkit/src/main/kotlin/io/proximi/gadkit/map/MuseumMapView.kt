@@ -109,6 +109,9 @@ internal fun MuseumMapView(
     var selectedAmenity by remember { mutableStateOf<AmenityKind?>(null) }
     var detailPlace by remember { mutableStateOf<VenuePlace?>(null) }
 
+    val accessibility = LocalRouteAccessibility.current
+    val currentAccessibility by rememberUpdatedState(accessibility)
+
     val activity = LocalActivity.current
     val debug = remember { DebugLaunch.read(activity) }
     val layers = remember { if (debug?.galleryFills == true) JourneyMapLayers() else null }
@@ -130,20 +133,24 @@ internal fun MuseumMapView(
                     fromLevel = fromLevel,
                     to = ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude),
                     toLevel = place.level,
-                    options = RoutePreferences.options(context),
+                    options = currentAccessibility.routeOptions,
                 )
             }
             session.setRoute(route)
             routeError = null
-            DebugLaunch.log("route to ${place.title}: ${route.distanceMeters.roundToInt()} m")
+            if (debug != null) {
+                val via = route.levelChanges.joinToString { "${it.featureType} L${it.fromLevel.roundToInt()}→L${it.toLevel.roundToInt()}" }
+                val avoiding = currentAccessibility.routeOptions.effectiveAvoidances.map { it.name }.sorted().joinToString()
+                DebugLaunch.log("route to ${place.title}: ${route.distanceMeters.roundToInt()} m via [$via] avoiding [$avoiding]")
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             DebugLaunch.log("route to ${place.title} failed from level $fromLevel: $e")
             session.clearRoute()
-            // A route that exists only with stairs (step-free preference).
-            val isStepFreeRefusal = (e as? WayfindingRoutingError)?.reason is NoRouteReason.NoAccessibleRoute
-            routeError = if (isStepFreeRefusal) R.string.no_step_free_route_from_here else R.string.no_route_from_here
+            // A route that exists only through what the accessibility needs avoid.
+            val isAccessibilityRefusal = (e as? WayfindingRoutingError)?.reason is NoRouteReason.NoAccessibleRoute
+            routeError = if (isAccessibilityRefusal) R.string.no_route_from_here_with_your_accessibility else R.string.no_route_from_here
         }
     }
 
@@ -163,6 +170,9 @@ internal fun MuseumMapView(
     }
 
     LaunchedEffect(session) { session.guidanceRules = RouteFollowRules.VENUE_WALK }
+
+    // A change of the accessibility needs re-routes to the destination on screen.
+    LaunchedEffect(accessibility) { destination?.let { route(it) } }
 
     val currentPlaces by rememberUpdatedState(places)
     DisposableEffect(session) {

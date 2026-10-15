@@ -91,7 +91,8 @@
     <string name="next_stop">NEXT STOP</string>
     <string name="next_stop_is_x">NEXT STOP IS %s</string>
     <string name="no_route_from_here">No route from here.</string>
-    <string name="no_step_free_route_from_here">No step-free route from here.</string>
+    <string name="no_route_from_here_with_your_accessibility">No route from here with your accessibility settings.</string>
+    <string name="no_route_to_this_stop_with_your">No route to this stop with your accessibility settings.</string>
     <string name="not_here">Not here</string>
     <string name="other">Other</string>
     <string name="paired">Paired</string>

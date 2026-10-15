@@ -156,7 +156,9 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="no_route_from_here">لا يوجد مسار من هنا.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="no_step_free_route_from_here">لا يوجد مسار بدون درج من هنا.</string>
+    <string name="no_route_from_here_with_your_accessibility">لا يوجد مسار من هنا يناسب إعدادات إمكانية الوصول لديك.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="no_route_to_this_stop_with_your">لا يوجد مسار إلى هذه المحطة يناسب إعدادات إمكانية الوصول لديك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="not_here">لست هنا</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
