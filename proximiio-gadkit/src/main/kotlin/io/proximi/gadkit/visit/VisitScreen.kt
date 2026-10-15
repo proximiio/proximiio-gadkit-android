@@ -446,7 +446,7 @@ private fun VisitSheets(model: VisitViewModel, wristbandConnectionScreen: (@Comp
         wristband = model.wristband,
         places = model.places,
         activeStopNumber = model.activeStopNumber,
-        isBlocked = model.isPairing || model.stopToSkip != null || model.amenityToConfirm != null,
+        isBlocked = model.isPairing || model.isLeaving || model.stopToSkip != null || model.amenityToConfirm != null,
         onSearchAgain = model::searchAgain,
         onRouteToDesk = model::routeToDesk,
         onConnect = model::connectWristband,

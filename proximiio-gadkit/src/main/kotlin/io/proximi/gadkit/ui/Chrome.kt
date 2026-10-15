@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -43,9 +44,16 @@ public fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun OverlaySheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    OverlaySheet(onDismiss, rememberModalBottomSheetState(skipPartiallyExpanded = true), content)
+}
+
+/** [OverlaySheet] with its [sheetState], so the caller can hide it before an action. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun OverlaySheet(onDismiss: () -> Unit, sheetState: SheetState, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 50.dp, topEnd = 50.dp),
         containerColor = Palette.white,
         contentColor = Palette.ink,

@@ -1,5 +1,14 @@
 package io.proximi.gadkit.map
 
+import kotlin.math.roundToInt
+import org.maplibre.android.style.layers.SymbolLayer
+import io.proximi.gadkit.designsystem.GadIcon
+import androidx.core.content.ContextCompat
+import android.graphics.Paint
+import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Bitmap
+import android.content.Context
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryFill
@@ -28,6 +37,8 @@ import org.maplibre.geojson.Polygon
  * - the destination gallery filled with the level colour; visited galleries with its tint.
  * - a connector from the visitor to the start of the route ahead: `#3F69FF`, 6 dp, round cap, under
  *   the route. `VisitViewModel` draws none while `SHOWS_CONNECTOR` is false.
+ * - the lift or stairs of the route's next level change on the shown floor: a 30 dp red marker with
+ *   a white ring and the design's glyph, above the route ([updateLevelChanger]).
  *
  * The layers are added after each style load and show the selected floor only. The gallery fills
  * go over the venue's
@@ -44,6 +55,13 @@ internal class JourneyMapLayers {
     private var fills: List<GalleryFill> = emptyList()
     private var level: Double = 0.0
     private var connector: List<Coordinate> = emptyList()
+    private var levelChanger: LevelChanger? = null
+
+    /** The level changer of the route's next level change: its anchor, the floor it leaves and its type. */
+    data class LevelChanger(val coordinate: Coordinate, val level: Double, val featureType: String) {
+        /** The style image of the marker. Stairs and escalators share the stairs glyph. */
+        val imageName: String get() = "$LEVEL_CHANGER_IMAGE-$featureType"
+    }
 
     /** Installs the layers on every style [canvas] loads, the loaded one included. */
     fun attach(canvas: ProximiioMapCanvas) {
@@ -75,9 +93,29 @@ internal class JourneyMapLayers {
         canvas?.style?.let(::applyConnector)
     }
 
+    /** Marks [changer] in red on its floor; `null` removes the marker. Does nothing when nothing changed. */
+    fun updateLevelChanger(changer: LevelChanger?) {
+        if (changer == levelChanger) return
+        levelChanger = changer
+        canvas?.style?.let(::applyLevelChanger)
+    }
+
     // Style
 
     private fun install(canvas: ProximiioMapCanvas, style: Style) {
+        for (type in LEVEL_CHANGER_TYPES) {
+            val name = LevelChanger(Coordinate(0.0, 0.0), 0.0, type).imageName
+            if (style.getImage(name) == null) levelChangerImage(canvas.context, type)?.let { style.addImage(name, it) }
+        }
+        if (style.getSource(LEVEL_CHANGER_SOURCE) == null) {
+            style.addSource(GeoJsonSource(LEVEL_CHANGER_SOURCE))
+            val layer = SymbolLayer(LEVEL_CHANGER_LAYER, LEVEL_CHANGER_SOURCE).withProperties(
+                PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
+                PropertyFactory.iconAllowOverlap(true),
+                PropertyFactory.iconIgnorePlacement(true),
+            )
+            canvas.addLayer(layer, MapCanvasLayerAnchor.Above(ProximiioMapLayer.ROUTE))
+        }
         if (style.getSource(GALLERY_SOURCE) == null) {
             style.addSource(GeoJsonSource(GALLERY_SOURCE))
             // Each layer added at AboveVenueFills goes directly over the venue fills, so the
@@ -100,6 +138,41 @@ internal class JourneyMapLayers {
         }
         apply(style)
         applyConnector(style)
+        applyLevelChanger(style)
+    }
+
+    private fun applyLevelChanger(style: Style) {
+        val source = style.getSource(LEVEL_CHANGER_SOURCE) as? GeoJsonSource ?: return
+        val changer = levelChanger?.takeIf { VenueLevel.same(it.level, level) }
+        val point = changer?.let {
+            Feature.fromGeometry(Point.fromLngLat(it.coordinate.longitude, it.coordinate.latitude)).apply {
+                addStringProperty(IMAGE_PROPERTY, it.imageName)
+            }
+        }
+        source.setGeoJson(FeatureCollection.fromFeatures(listOfNotNull(point)))
+    }
+
+    /** 30 dp: a red circle with a white 2 dp ring and the white glyph in its middle 18 dp. */
+    private fun levelChangerImage(context: Context, featureType: String): Bitmap? {
+        val glyph = if (featureType == "elevator") GadIcon.Elevator.glyph else GadIcon.Stairs.glyph
+        val drawable = ContextCompat.getDrawable(context, glyph)?.mutate() ?: return null
+        val density = context.resources.displayMetrics.density
+        val size = (MARKER_DP * density).roundToInt()
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val radius = size / 2f - density
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = MARKER_COLOR
+        canvas.drawCircle(size / 2f, size / 2f, radius, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2 * density
+        paint.color = Color.WHITE
+        canvas.drawCircle(size / 2f, size / 2f, radius - density, paint)
+        val inset = (6 * density).roundToInt()
+        drawable.setBounds(inset, inset, size - inset, size - inset)
+        drawable.setTint(Color.WHITE)
+        drawable.draw(canvas)
+        return bitmap
     }
 
     private fun applyConnector(style: Style) {
@@ -129,7 +202,7 @@ internal class JourneyMapLayers {
         )
     }
 
-    private companion object {
+    internal companion object {
         const val GALLERY_SOURCE = "gad-journey-galleries"
         const val DESTINATION_LAYER = "gad-gallery-destination"
         const val VISITED_LAYER = "gad-gallery-visited"
@@ -138,5 +211,12 @@ internal class JourneyMapLayers {
         const val DESTINATION_PROPERTY = "destination"
         const val CONNECTOR_COLOR = 0xFF3F69FF.toInt()
         const val CONNECTOR_WIDTH_DP = 6f
+        const val LEVEL_CHANGER_SOURCE = "gad-level-changer"
+        const val LEVEL_CHANGER_LAYER = "gad-level-changer"
+        const val LEVEL_CHANGER_IMAGE = "gad-level-changer"
+        const val IMAGE_PROPERTY = "image"
+        val LEVEL_CHANGER_TYPES = listOf("elevator", "staircase", "escalator")
+        const val MARKER_DP = 30
+        const val MARKER_COLOR = 0xFFED3731.toInt()
     }
 }

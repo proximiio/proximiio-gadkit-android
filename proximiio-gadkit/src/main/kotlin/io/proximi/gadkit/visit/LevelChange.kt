@@ -57,6 +57,17 @@ internal class LevelChangeDetector(private val confirmations: Int = 1) {
 internal class LiftArea(private val outline: Gallery) {
     internal fun contains(coordinate: Coordinate): Boolean = outline.contains(coordinate, level = null)
 
+    /**
+     * The floor a ride in this lift goes to: the target of the route's next level change when it
+     * leaves [from] by this lift ([featureType] `elevator` at [coordinate] inside the outline). A
+     * level change by stairs or by another lift is not this ride (PM 2026-10-15: a visitor in a
+     * lift saw "Level 3", the target of the route's stairs). Pure; covered by tests.
+     */
+    internal fun rideTarget(featureType: String, fromLevel: Double, toLevel: Double, coordinate: Coordinate, from: Int): Int? {
+        if (featureType != "elevator" || fromLevel.roundedInt() != from || !contains(coordinate)) return null
+        return toLevel.roundedInt()
+    }
+
     internal companion object {
         internal fun all(features: List<VenueFeature>): List<LiftArea> = features.mapNotNull { feature ->
             if (feature.type != "elevator") return@mapNotNull null
@@ -107,15 +118,4 @@ internal data class LevelChangeCard(
     val to: Int?,
 ) {
     internal enum class Phase { RIDING, ARRIVED }
-
-    internal companion object {
-        /**
-         * The target floor of the route's next manoeuvre when it is a level change from [from]:
-         * [changeFrom] and [changeTo] are its levels, `null` when the manoeuvre is no level change.
-         */
-        internal fun routeTarget(from: Int, changeFrom: Double?, changeTo: Double?): Int? {
-            if (changeFrom == null || changeTo == null || changeFrom.roundedInt() != from) return null
-            return changeTo.roundedInt()
-        }
-    }
 }

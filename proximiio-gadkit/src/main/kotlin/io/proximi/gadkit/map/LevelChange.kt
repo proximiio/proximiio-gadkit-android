@@ -92,6 +92,8 @@ internal fun LevelChangeAnimation(session: ProximiioMapSession, venue: VenueServ
         LiftDetector(settings.liftRideDwell.inWholeMilliseconds, settings.liftExitFixes)
     }
     var lifts by remember { mutableStateOf(emptyList<LiftArea>()) }
+    // The lift the last fix was in.
+    var currentLift by remember { mutableStateOf<LiftArea?>(null) }
     var card by remember { mutableStateOf<LevelChangeCard?>(null) }
     var shown by remember { mutableStateOf<LevelChangeCard?>(null) }
     LaunchedEffect(venue) { lifts = venue.lifts() }
@@ -99,7 +101,9 @@ internal fun LevelChangeAnimation(session: ProximiioMapSession, venue: VenueServ
         session.position.collect { position ->
             if (position == null) return@collect
             val coordinate = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
-            val event = lift.update(lifts.any { it.contains(coordinate) }, SystemClock.elapsedRealtime())
+            val area = lifts.firstOrNull { it.contains(coordinate) }
+            if (area != null) currentLift = area
+            val event = lift.update(area != null, SystemClock.elapsedRealtime())
             val change = floors.update(position.floor?.level)
             if (change != null) {
                 if (FieldLog.isEnabled) FieldLog.log("level change: L${change.from} → L${change.to}")
@@ -110,8 +114,11 @@ internal fun LevelChangeAnimation(session: ProximiioMapSession, venue: VenueServ
             when (event) {
                 LiftDetector.Event.BOARDED -> {
                     val from = floors.level ?: return@collect
+                    // The route's next level change, when it leaves this floor by the lift the visitor is in.
                     val levelChange = (session.guidance.value?.manoeuvre?.kind as? RouteManoeuvre.Kind.LevelChange)?.change
-                    val to = LevelChangeCard.routeTarget(from, levelChange?.fromLevel, levelChange?.toLevel)
+                    val to = levelChange?.let {
+                        currentLift?.rideTarget(it.featureType, it.fromLevel, it.toLevel, Coordinate(it.coordinate.latitude, it.coordinate.longitude), from)
+                    }
                     if (FieldLog.isEnabled) FieldLog.log("lift boarded on L$from, target ${to?.let { "L$it" } ?: "unknown"}")
                     card = LevelChangeCard(LevelChangeCard.Phase.RIDING, from, to).also { shown = it }
                 }

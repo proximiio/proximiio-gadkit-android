@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.Geometry
 import io.proximi.gadkit.map.VenueFeature
@@ -107,10 +108,29 @@ class LevelChangeTest {
         assertFalse(lifts[0].contains(Coordinate(2.0, 0.5)))
     }
 
+    // ProximiioGADKit `LevelChangeTests` (0.11.0): the ride target comes from this lift only.
+    private val lift = LiftArea(
+        Gallery("lift", "", 0.0, listOf(Coordinate(24.0, 54.0), Coordinate(24.0, 54.001), Coordinate(24.001, 54.001), Coordinate(24.001, 54.0))),
+    )
+    private val inside = Coordinate(24.0005, 54.0005)
+    private val outside = Coordinate(24.01, 54.01)
+
     @Test
-    fun routeTargetIsALevelChangeFromTheCurrentFloor() {
-        assertEquals(2, LevelChangeCard.routeTarget(1, 1.0, 2.0))
-        assertNull(LevelChangeCard.routeTarget(3, 1.0, 2.0))
-        assertNull(LevelChangeCard.routeTarget(1, null, null))
+    fun rideTargetIsTheRoutesLevelChangeByThisLift() {
+        assertEquals(4, lift.rideTarget("elevator", 1.0, 4.0, inside, from = 1))
+    }
+
+    @Test
+    fun rideTargetIgnoresStairsAnotherLiftAndAnotherFloor() {
+        assertNull(lift.rideTarget("staircase", 1.0, 3.0, inside, from = 1))
+        assertNull(lift.rideTarget("elevator", 1.0, 3.0, outside, from = 1))
+        assertNull(lift.rideTarget("elevator", 3.0, 4.0, inside, from = 1))
+    }
+
+    @Test
+    fun liftDetectorTakesTheSettings() {
+        val detector = LiftDetector(dwellMillis = 1_000, exitFixes = 2)
+        assertNull(detector.update(inLift = true, atMillis = 0))
+        assertEquals(LiftDetector.Event.BOARDED, detector.update(inLift = true, atMillis = 1_000))
     }
 }

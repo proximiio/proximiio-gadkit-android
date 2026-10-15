@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -47,6 +48,9 @@ import io.proximi.gadkit.ui.BackButton
 import io.proximi.gadkit.ui.OverlaySheet
 import io.proximi.gadkit.ui.asHeading
 import io.proximi.gadkit.VenueService
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 // Journey lifecycle screens from the Figma file, as iOS `JourneyScreens.swift`:
 // Journey ready (02.10A, node 6902:55705), exit confirmation (03.10, node 6902:45589), Journey
@@ -104,12 +108,16 @@ public fun JourneyReadyScreen(meta: VisitMeta, isAtMuseum: Boolean, onStart: () 
 }
 
 /** "Leave the tour here" (03.10): progress is saved; the visitor can carry on. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ExitConfirmationSheet(visited: Int, total: Int, onLeave: () -> Unit, onCarryOn: () -> Unit) {
-    OverlaySheet(onDismiss = onCarryOn) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    OverlaySheet(onDismiss = onCarryOn, sheetState = sheetState) {
         SheetTitle(stringResource(R.string.leave_the_tour_here))
         SheetBody(stringResource(R.string.you_ve_visited_n_of_n_stops, visited, total), Modifier.padding(bottom = 20.dp))
-        PrimaryButton(stringResource(R.string.leave_the_tour), onLeave)
+        // The visit closes once the sheet has gone (iOS 0.11.0, Monday "UI gets stuck").
+        PrimaryButton(stringResource(R.string.leave_the_tour), onClick = { scope.launch { sheetState.hide() }.invokeOnCompletion { onLeave() } })
         TextActionButton(stringResource(R.string.carry_on), onCarryOn)
     }
 }

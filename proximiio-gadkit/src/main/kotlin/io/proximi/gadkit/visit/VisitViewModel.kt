@@ -269,6 +269,7 @@ internal class VisitViewModel(
                 controller.save()
                 refreshMapLayers()
                 refreshConnector()
+                refreshLevelChanger()
                 updateNotification()
                 reportStopNearby(session.position.value, navigator.activeStop, guidance)
             }
@@ -289,6 +290,7 @@ internal class VisitViewModel(
             session.selectedFloor.collect {
                 refreshMapLayers()
                 refreshConnector()
+                refreshLevelChanger()
             }
         }
         scope.launch {
@@ -455,6 +457,16 @@ internal class VisitViewModel(
         )
     }
 
+    /** Marks the lift or stairs of the route's next level change on the shown floor in red. */
+    private fun refreshLevelChanger() {
+        if (isClosed) return
+        val level = session.selectedFloor.value.level
+        val next = session.routeRenderer?.geometry?.markers?.firstOrNull { !it.isCompleted && VenueLevel.same(it.from.level, level) }
+        layers.updateLevelChanger(
+            next?.let { JourneyMapLayers.LevelChanger(Coordinate(it.coordinate.latitude, it.coordinate.longitude), level, it.featureType) },
+        )
+    }
+
     // Notification (iOS Live Activity)
 
     private fun updateNotification() {
@@ -557,8 +569,13 @@ internal class VisitViewModel(
         }
     }
 
-    /** "Leave". */
+    /** `true` once the visit closes: no tracking alert shows while it goes. */
+    var isLeaving by mutableStateOf(false)
+        private set
+
+    /** "Leave", once the exit sheet has gone. */
     fun leave() {
+        isLeaving = true
         isConfirmingExit = false
         onEvent(VisitEvent.ExitConfirmed)
         onClose()
@@ -572,12 +589,16 @@ internal class VisitViewModel(
 
     /** Journey Complete closed: the visit is over. */
     fun finishVisit() {
+        isLeaving = true
         isShowingWrapUp = false
         controller.end()
         onClose()
     }
 
-    fun backToHub() = onClose()
+    fun backToHub() {
+        isLeaving = true
+        onClose()
+    }
 
     // Ambiguous location (EC04)
 
