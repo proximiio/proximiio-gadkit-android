@@ -48,7 +48,7 @@ internal sealed interface LocationAmbiguity {
         /** Galleries whose centre lies within this distance count as candidates (metres). */
         internal const val NEARBY_GALLERY_RADIUS: Double = 20.0
 
-        internal fun evaluate(input: Input): LocationAmbiguity? {
+        internal fun evaluate(input: Input, uncertainAccuracyMeters: Double = UNCERTAIN_ACCURACY): LocationAmbiguity? {
             val here = input.coordinate
 
             fun sameLevel(level: Double?): Boolean {
@@ -68,7 +68,7 @@ internal sealed interface LocationAmbiguity {
             }
 
             val active = input.activeStop
-            if (input.horizontalAccuracy > UNCERTAIN_ACCURACY && active != null &&
+            if (input.horizontalAccuracy > uncertainAccuracyMeters && active != null &&
                 sameLevel(active.level) &&
                 here.distanceTo(active.coordinate) <= input.horizontalAccuracy
             ) {

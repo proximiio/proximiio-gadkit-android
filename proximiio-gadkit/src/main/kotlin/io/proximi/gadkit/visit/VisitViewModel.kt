@@ -61,6 +61,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.toJavaDuration
 
 /**
  * State and actions of the journey screen, as the `@State` of iOS `VisitView`. Owned by
@@ -100,7 +101,10 @@ internal class VisitViewModel(
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]))
     private var language = MapLanguage.forAppLanguage(application.resources.configuration.locales[0]?.language)
 
-    val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false))
+    /** The host app's times and distances, read once when the screen opens. */
+    private val settings = venue.settings
+
+    val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false, followZoom = settings.followZoom))
         .also { MapStyle.useAmenityIcons(it, application) }
     private val store = VisitStore.of(application)
     val controller = VisitController(
@@ -114,13 +118,16 @@ internal class VisitViewModel(
         },
         autoAdvance = debug?.visitAutoAdvance == true,
         keepsOrder = kind.keepsOrder,
+        settings = settings,
     )
-    val monitor = TrackingMonitor(venue.sdk, scope)
+    val monitor = TrackingMonitor(venue.sdk, scope, settings)
     val layers = JourneyMapLayers()
-    private val notification = VisitNotification(application)
+    private val notification = VisitNotification(application, settings.journeyNotificationMinimumInterval.inWholeMilliseconds / 1000.0)
 
     /** "The next stop of your journey is less than 5 m away", once per stop in this visit. */
-    private val stopNearby = StopNearbyNotifier { notice -> LocalNotices.post(application, notice, StopNearbyNotifier.NOTIFICATION_ID) }
+    private val stopNearby = StopNearbyNotifier(settings.stopNearbyMeters) { notice ->
+        LocalNotices.post(application, notice, StopNearbyNotifier.NOTIFICATION_ID)
+    }
 
     var progress by mutableStateOf(readProgress())
         private set
@@ -591,8 +598,8 @@ internal class VisitViewModel(
             galleries = LocationAmbiguity.galleries(places),
             currentGallery = currentGallery,
         )
-        val ambiguity = LocationAmbiguity.evaluate(input) ?: return
-        if (LocationChoice.isQuiet(ambiguity.kind, answeredAmbiguity, Instant.now())) return
+        val ambiguity = LocationAmbiguity.evaluate(input, settings.uncertainAccuracyMeters) ?: return
+        if (LocationChoice.isQuiet(ambiguity.kind, answeredAmbiguity, Instant.now(), settings.locationQuestionQuietPeriod.toJavaDuration())) return
         FieldLog.log("ambiguous location: ${ambiguity.kind}")
         when (ambiguity) {
             is LocationAmbiguity.LowConfidence -> lowConfidenceStop = ambiguity.stop

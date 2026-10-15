@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.FieldLog
@@ -47,9 +48,10 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * - Artwork legs have no arrival by distance ([artworkGuidanceRules]). An artwork the visitor walks
  *   past without entering its geofence stays unvisited until it is skipped.
  * - Out of order: a visitor inside the geofence of another open artwork for
- *   [OUT_OF_ORDER_DWELL_MILLIS] (0 while testing) marks it visited (PM review 2026-10-12).
+ *   [GadSettings.outOfOrderDwell] (0 while testing) marks it visited (PM review 2026-10-12).
  * - After an out-of-order visit, the stops still ahead are ordered again from the visitor.
- * - An amenity has no geofence. A detour is reached within 5–10 m for 5 s ([detourGuidanceRules]).
+ * - An amenity has no geofence. A detour is reached within 5–10 m for 5 s ([detourGuidanceRules],
+ *   [GadSettings]).
  * - After a reached detour, the journey continues only after "Resume your Journey" ([rules]).
  *
  * A new personalised journey is ordered floor by floor and gallery by gallery
@@ -81,6 +83,8 @@ internal class VisitController(
      * a detour or after an artwork visited out of order ([JourneyKind.keepsOrder]).
      */
     private val keepsOrder: Boolean = false,
+    /** Times and distances: arrival, out-of-order dwell, off route, route snap, journey order. */
+    private val settings: GadSettings = GadSettings.STANDARD,
 ) {
     /**
      * A reached detour waits for "Resume your Journey" (PM review 2026-10-12). Artworks are never
@@ -97,6 +101,23 @@ internal class VisitController(
 
     val navigator = JourneyNavigator(session, journey.toMap(), rules, artworkGuidanceRules)
 
+    /**
+     * Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, within
+     * [GadSettings.amenityArrivalMinimumMeters] and [GadSettings.amenityArrivalMaximumMeters], for
+     * [GadSettings.amenityArrivalDwell]. The SDK default (at least 3 m, 2 s) missed visitors who
+     * walked past a stop with relay fixes.
+     */
+    private val detourGuidanceRules = RouteFollowRules(
+        arrival = RouteFollowRules.ArrivalRadius.FromAccuracy(
+            multiplier = JourneyConstants.ARRIVAL_ACCURACY_MULTIPLIER,
+            minimumMeters = settings.amenityArrivalMinimumMeters,
+            maximumMeters = settings.amenityArrivalMaximumMeters,
+        ),
+        arrivalDwellSeconds = settings.amenityArrivalDwell.inWholeMilliseconds / 1000.0,
+    )
+
+    private val outOfOrderDwellMillis = settings.outOfOrderDwell.inWholeMilliseconds
+
     private var routeOptions: RouteOptions = accessibility.routeOptions
 
     /**
@@ -109,7 +130,14 @@ internal class VisitController(
     }
 
     init {
-        session.routeSnapping = routeSnapping
+        // The dot is drawn on the route within this distance. Display only: guidance and arrival
+        // use the real position (PM review 2026-10-12).
+        session.routeSnapping = RouteSnapRules(maximumOffsetMeters = settings.routeSnapMeters)
+        // "You've left your route": this far from the route, or off it this long.
+        navigator.deviationRules = navigator.deviationRules.copy(
+            farFromRouteMeters = settings.offRouteMeters,
+            offRouteTooLongSeconds = settings.offRouteAfter.inWholeMilliseconds / 1000.0,
+        )
     }
 
     /** `remote_id` of each artwork POI, by POI id. Set once the venue's features are loaded. */
@@ -159,7 +187,7 @@ internal class VisitController(
         navigator.setRouteOptions(routeOptions)
         var isOrderedWithoutFix = false
         if (!keepsOrder && navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING }) {
-            waitForFix(FIX_WAIT_MILLIS)
+            waitForFix(settings.firstFixWait.inWholeMilliseconds)
             isOrderedWithoutFix = session.position.value == null
             proposedOrder()?.takeIf { it.isImprovement }?.let { apply(it) }
         }
@@ -174,7 +202,7 @@ internal class VisitController(
 
     /** Orders the journey from the first fix while no stop is reached, done or skipped. */
     private suspend fun orderOnFirstFix() {
-        waitForFix(LATE_ORDER_WINDOW_MILLIS)
+        waitForFix(settings.lateOrderWindow.inWholeMilliseconds)
         if (session.position.value == null || navigator.hasArrived) return
         if (!navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING || it.state == JourneyStop.State.ACTIVE }) return
         val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY) ?: return
@@ -225,12 +253,12 @@ internal class VisitController(
      * Checks the fix against the geofences of the open artworks on the visitor's floor. Inside the
      * active artwork's geofence: the arrival, which also covers a leg that starts inside it, where
      * the SDK sends no enter event. Inside another open artwork's geofence for
-     * [OUT_OF_ORDER_DWELL_MILLIS]: that artwork is visited out of order. During a detour to an
+     * [GadSettings.outOfOrderDwell]: that artwork is visited out of order. During a detour to an
      * amenity no artwork counts (PM review 2026-10-12).
      */
     fun checkArtworkGeofences() {
         if (navigator.detourStop != null) {
-            outOfOrderDwell.update(emptySet(), System.currentTimeMillis(), OUT_OF_ORDER_DWELL_MILLIS)
+            outOfOrderDwell.update(emptySet(), System.currentTimeMillis(), outOfOrderDwellMillis)
             return
         }
         val position = session.position.value ?: return
@@ -248,7 +276,7 @@ internal class VisitController(
             if (!area.contains(point)) continue
             if (stop.id == activeId) artworkGeofenceEntered(remoteId) else inside += stop.id
         }
-        for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), OUT_OF_ORDER_DWELL_MILLIS)) markOutOfOrder(id)
+        for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) markOutOfOrder(id)
     }
 
     /** Marks a pending artwork visited out of order and orders the stops still ahead again from the visitor. */
@@ -281,7 +309,7 @@ internal class VisitController(
         if (!scheduledDone.add(stopId)) return
         doneJobs += scope.launch {
             try {
-                delay(JourneyConstants.AUTO_ADVANCE_DELAY_MILLIS)
+                delay(settings.artworkAdvanceDelay)
             } finally {
                 scheduledDone.remove(stopId)
             }
@@ -372,42 +400,10 @@ internal class VisitController(
 
     companion object {
         /**
-         * The dot is drawn on the route when the position is within 0.5 m of it. Display only:
-         * guidance and arrival use the real position (PM review 2026-10-12).
-         */
-        val routeSnapping = RouteSnapRules(maximumOffsetMeters = 0.5)
-
-        /**
-         * Time inside the geofence of an artwork that is not the active stop before it counts as
-         * visited. 0 while testing (PM review 2026-10-12); a longer time keeps a visitor who
-         * crosses the geofence on the way elsewhere from marking it.
-         */
-        const val OUT_OF_ORDER_DWELL_MILLIS = 0L
-
-        /** How long [start] waits for a fix before it orders the journey without one. */
-        const val FIX_WAIT_MILLIS = 5_000L
-
-        /** How long a journey ordered without a fix waits for the first fix to order it again. */
-        const val LATE_ORDER_WINDOW_MILLIS = 60_000L
-
-        /**
          * Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance
          * off; the artwork geofence is the only arrival.
          */
         val artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds = Double.POSITIVE_INFINITY)
 
-        /**
-         * Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, at least
-         * 5 m and at most 10 m, for 5 s. The SDK default (at least 3 m, 2 s) missed visitors who
-         * walked past a stop with relay fixes.
-         */
-        val detourGuidanceRules = RouteFollowRules(
-            arrival = RouteFollowRules.ArrivalRadius.FromAccuracy(
-                multiplier = JourneyConstants.ARRIVAL_ACCURACY_MULTIPLIER,
-                minimumMeters = JourneyConstants.ARRIVAL_MIN_METERS,
-                maximumMeters = JourneyConstants.ARRIVAL_MAX_METERS,
-            ),
-            arrivalDwellSeconds = JourneyConstants.ARRIVAL_DWELL_SECONDS,
-        )
     }
 }

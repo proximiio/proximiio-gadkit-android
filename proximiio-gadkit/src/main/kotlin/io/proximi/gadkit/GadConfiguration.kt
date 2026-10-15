@@ -19,6 +19,8 @@ public data class GadConfiguration(
     public val relayApiBaseUrl: String,
     /** relay-api app token of the site. The SDK sends it on `GET /v1/meta` and `POST /v1/bindings`. */
     public val relayApiAppToken: String,
+    /** Times and distances of the screens. [VenueService.start] copies them to [VenueService.settings]. */
+    public val settings: GadSettings = GadSettings.STANDARD,
 ) {
     init {
         require(BlueiotCloudRelayEndpoint.fromText(relayApiBaseUrl) != null) { "relayApiBaseUrl is not a relay-api URL: $relayApiBaseUrl" }

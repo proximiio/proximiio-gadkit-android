@@ -82,7 +82,7 @@ internal object MapStyle {
      * `fallbackStyleUrl` is `null`. With the default, a failed style load makes the map fetch
      * demotiles.maplibre.org, which a production build must not contact.
      */
-    fun options(language: String, routeMarkers: Boolean = true, walkedTrail: Boolean = false): MapOptions {
+    fun options(language: String, routeMarkers: Boolean = true, walkedTrail: Boolean = false, followZoom: Double = RECENTRE_ZOOM): MapOptions {
         val venue = PositionStyle.VENUE
         val position = venue.copy(
             dot = venue.dot.copy(color = location, radiusDp = 15.0),
@@ -113,7 +113,7 @@ internal object MapStyle {
             chrome = MapCanvasChrome(showsAttribution = false, allowsTilting = false),
             routeLineStyle = if (walkedTrail) routeAhead else route,
             language = language,
-            recentreZoom = RECENTRE_ZOOM,
+            recentreZoom = followZoom,
         )
     }
 

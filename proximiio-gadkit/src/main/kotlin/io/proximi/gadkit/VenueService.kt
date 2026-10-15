@@ -43,7 +43,15 @@ public class VenueService private constructor(
     private val binding: BlueiotWristbandBinding,
     /** True in a debuggable host build, as iOS `#if DEBUG`: journey playback and [DebugLaunch]. */
     internal val isDebugBuild: Boolean,
+    settings: GadSettings,
 ) {
+    /**
+     * Times and distances of the screens, from [GadConfiguration.settings]. A screen reads them
+     * when it opens, so a change applies to the next one.
+     */
+    @Volatile
+    public var settings: GadSettings = settings
+
     /** Name of the attached position provider. Providers are detached by name. */
     private var attachedProvider: String? = null
 
@@ -196,7 +204,7 @@ public class VenueService private constructor(
             sdk.start()
             sdk.loadRouteNetwork()
             val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            val venue = VenueService(sdk, binding, isDebugBuild)
+            val venue = VenueService(sdk, binding, isDebugBuild, configuration.settings)
             venue.attachBinding()
             // The map session's default cache directory, so the session finds the style.
             venue.cacheMapStyle(context.applicationContext.cacheDir)

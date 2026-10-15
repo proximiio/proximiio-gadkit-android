@@ -78,10 +78,10 @@ internal data class LocationChoice(
                 } + somewhereElse,
         )
 
-        /** True when the visitor answered a prompt of [kind] less than [QUIET_PERIOD] (120 s) ago. */
-        internal fun isQuiet(kind: String, answered: Map<String, Instant>, now: Instant): Boolean {
+        /** True when the visitor answered a prompt of [kind] less than [quietPeriod] (120 s) ago. */
+        internal fun isQuiet(kind: String, answered: Map<String, Instant>, now: Instant, quietPeriod: Duration = QUIET_PERIOD): Boolean {
             val time = answered[kind] ?: return false
-            return Duration.between(time, now) < QUIET_PERIOD
+            return Duration.between(time, now) < quietPeriod
         }
     }
 }

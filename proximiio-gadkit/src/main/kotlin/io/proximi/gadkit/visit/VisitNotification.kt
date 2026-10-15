@@ -29,7 +29,12 @@ import io.proximi.gadkit.map.mapText
  * [VisitActivity.shouldSend]; [end] removes the notification. Without the notification permission
  * nothing is shown, as iOS shows nothing with Live Activities turned off.
  */
-internal class VisitNotification(context: Context, private val clock: () -> Long = SystemClock::elapsedRealtime) {
+internal class VisitNotification(
+    context: Context,
+    /** [io.proximi.gadkit.GadSettings.journeyNotificationMinimumInterval], in seconds. */
+    private val minimumIntervalSeconds: Double = VisitActivity.MINIMUM_UPDATE_INTERVAL_SECONDS,
+    private val clock: () -> Long = SystemClock::elapsedRealtime,
+) {
     private val context = context.applicationContext
     private val manager = NotificationManagerCompat.from(this.context)
     private var lastState: VisitActivityState? = null
@@ -39,7 +44,7 @@ internal class VisitNotification(context: Context, private val clock: () -> Long
     fun update(state: VisitActivityState) {
         val now = clock()
         val seconds = (now - lastUpdate) / 1000.0
-        if (!VisitActivity.shouldSend(state, lastState, if (lastState == null) Double.MAX_VALUE else seconds)) return
+        if (!VisitActivity.shouldSend(state, lastState, if (lastState == null) Double.MAX_VALUE else seconds, minimumIntervalSeconds)) return
         if (!isAllowed()) {
             if (lastState == null) FieldLog.log("visit notification: not allowed")
             return

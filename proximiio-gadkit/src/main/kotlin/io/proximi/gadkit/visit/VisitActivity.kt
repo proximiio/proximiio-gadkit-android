@@ -50,9 +50,14 @@ internal object VisitActivity {
      * changes wait [MINIMUM_UPDATE_INTERVAL_SECONDS] after the last update. An unchanged state is
      * not sent.
      */
-    internal fun shouldSend(state: VisitActivityState, last: VisitActivityState?, secondsSinceLast: Double): Boolean {
+    internal fun shouldSend(
+        state: VisitActivityState,
+        last: VisitActivityState?,
+        secondsSinceLast: Double,
+        minimumIntervalSeconds: Double = MINIMUM_UPDATE_INTERVAL_SECONDS,
+    ): Boolean {
         if (state == last) return false
         val isStepChange = last == null || state.title != last.title || state.level != last.level || state.isFinished
-        return isStepChange || secondsSinceLast >= MINIMUM_UPDATE_INTERVAL_SECONDS
+        return isStepChange || secondsSinceLast >= minimumIntervalSeconds
     }
 }

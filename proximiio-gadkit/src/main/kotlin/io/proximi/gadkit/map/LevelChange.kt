@@ -87,7 +87,10 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun LevelChangeAnimation(session: ProximiioMapSession, venue: VenueService) {
     val floors = remember(session) { LevelChangeDetector() }
-    val lift = remember(session) { LiftDetector() }
+    val lift = remember(session) {
+        val settings = venue.settings
+        LiftDetector(settings.liftRideDwell.inWholeMilliseconds, settings.liftExitFixes)
+    }
     var lifts by remember { mutableStateOf(emptyList<LiftArea>()) }
     var card by remember { mutableStateOf<LevelChangeCard?>(null) }
     var shown by remember { mutableStateOf<LevelChangeCard?>(null) }

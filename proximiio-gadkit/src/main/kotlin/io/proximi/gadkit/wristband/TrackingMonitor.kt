@@ -20,6 +20,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import io.proximi.gadkit.GadSettings
 
 /**
  * Reports when the wristband stops delivering positions during a visit (Figma "Wristband", edge
@@ -27,14 +28,19 @@ import java.util.Locale
  *
  * The signal is the SDK's `positioningAvailabilityChanges()`: it turns `false` about 10 s after the
  * last fix from the relay provider, whether the socket failed or the tag stopped sending positions. Core's
- * [TrackingHealth] turns it into "lost your place" and, after [TrackingHealth.STOPPED_AFTER],
+ * [TrackingHealth] turns it into "lost your place" and, after [GadSettings.trackingStoppedAfter],
  * "stopped responding"; the monitor re-evaluates every [TrackingHealth.REEVALUATE_INTERVAL] so the
  * second follows while nothing else changes. The position stream only feeds "Last Seen".
  *
  * [start] it when the visit screen appears and [stop] it when it goes, as iOS `onAppear` /
  * `onDisappear`; [scope] is the screen's (a ViewModel's) scope.
  */
-internal class TrackingMonitor(private val sdk: Proximiio, private val scope: CoroutineScope, private val now: () -> Instant = Instant::now) {
+internal class TrackingMonitor(
+    private val sdk: Proximiio,
+    private val scope: CoroutineScope,
+    private val settings: GadSettings = GadSettings.STANDARD,
+    private val now: () -> Instant = Instant::now,
+) {
     /** The last position, for "Last Seen". [time] is the fix time. */
     data class LastFix(val time: Instant, val coordinate: Coordinate, val level: Double?, val accuracy: Double)
 
@@ -102,7 +108,7 @@ internal class TrackingMonitor(private val sdk: Proximiio, private val scope: Co
     }
 
     private fun reevaluate() {
-        val health = TrackingHealth.evaluate(wasEverAvailable, unavailableSince, now())
+        val health = TrackingHealth.evaluate(wasEverAvailable, unavailableSince, now(), settings)
         if (health == mutableHealth.value) return
         FieldLog.log("tracking health: $health")
         mutableHealth.value = health
