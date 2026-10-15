@@ -65,7 +65,8 @@ public fun JourneyReadyScreen(meta: VisitMeta, isAtMuseum: Boolean, onStart: () 
         Column(Modifier.fillMaxSize().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.weight(1f))
             Column(Modifier.width(322.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                Text(stringResource(R.string.your_personalised_journey), style = GadTextStyle.Caption.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
+                val caption = if (meta.kind == JourneyKind.CURATED) R.string.curated_2 else R.string.your_personalised_journey
+                Text(stringResource(caption), style = GadTextStyle.Caption.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
                 Text(
                     meta.title,
                     Modifier.asHeading(),

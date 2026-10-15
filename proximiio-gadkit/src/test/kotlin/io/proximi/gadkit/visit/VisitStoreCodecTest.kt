@@ -50,7 +50,7 @@ class VisitStoreCodecTest {
     fun metaRoundTripsWithAndWithoutSummary() {
         val meta = VisitMeta("Your journey", "2 stops")
         assertEquals(meta, VisitStoreCodec.decodeMeta(VisitStoreCodec.encodeMeta(meta)))
-        assertEquals("""{"title":"Your journey"}""", VisitStoreCodec.encodeMeta(VisitMeta("Your journey", null)))
+        assertEquals("""{"title":"Your journey","kind":"personalised"}""", VisitStoreCodec.encodeMeta(VisitMeta("Your journey", null)))
         assertEquals(VisitMeta("T", null), VisitStoreCodec.decodeMeta("""{"title":"T","extra":true}"""))
         assertNull(VisitStoreCodec.decodeMeta("{}"))
     }

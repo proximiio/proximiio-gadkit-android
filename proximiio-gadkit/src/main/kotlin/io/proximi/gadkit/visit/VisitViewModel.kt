@@ -81,6 +81,8 @@ internal class VisitViewModel(
     private val debug: DebugLaunch.Options?,
     /** The accessibility needs when the screen opens; [setAccessibility] changes them. */
     accessibility: RouteAccessibility,
+    /** Personalised or curated: the stop card, the list and skip follow it. */
+    val kind: JourneyKind = JourneyKind.PERSONALISED,
     private val onClose: () -> Unit,
     /** The host app's `onVisitEvent` of `VisitScreen`. Called on the main thread. */
     private val onEvent: (VisitEvent) -> Unit = {},
@@ -210,9 +212,16 @@ internal class VisitViewModel(
     private val stopGallery: Gallery?
         get() = progress.activeStop?.let { Gallery.containing(it.coordinate, it.level, galleries) }
 
-    /** The gallery the card names instead of the artwork (DAILY-CALL R2). */
+    /**
+     * The gallery the card names instead of the artwork (DAILY-CALL R2). A curated tour names the
+     * artwork at once.
+     */
     val galleryAhead: Gallery?
-        get() = GalleryFirst.galleryAhead(progress.activeStop?.id, stopGallery, reachedStopId)
+        get() = if (kind.guidesToGalleryFirst) GalleryFirst.galleryAhead(progress.activeStop?.id, stopGallery, reachedStopId) else null
+
+    /** The visitor's gallery for the card's caption; a curated tour names none. */
+    val cardVisitorGallery: Gallery?
+        get() = visitorGallery.takeIf { kind.guidesToGalleryFirst }
 
     /** Display number of the active stop. */
     val activeStopNumber: Int?

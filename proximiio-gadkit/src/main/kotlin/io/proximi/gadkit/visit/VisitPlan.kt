@@ -148,5 +148,34 @@ internal sealed interface VisitCardState {
 /**
  * Title and summary of a visit, shown on Journey ready (02.10A) and the Hub card.
  * iOS `VisitMeta.standard(stopCount:)` ("Your journey", "%d stops") is localized text; the app builds it.
+ * [kind] is [JourneyKind.PERSONALISED] for a stored visit from before the kind existed.
  */
-public data class VisitMeta(public val title: String, public val summary: String?)
+public data class VisitMeta(
+    public val title: String,
+    public val summary: String? = null,
+    public val kind: JourneyKind = JourneyKind.PERSONALISED,
+)
+
+/**
+ * A journey the visitor built with the guide, or a tour by the museum's curators, as iOS
+ * `JourneyKind` (Figma "Personalised" and "Guided").
+ */
+public enum class JourneyKind(public val rawValue: String) {
+    PERSONALISED("personalised"),
+    CURATED("curated"),
+    ;
+
+    /** Whether the stop card names the gallery of the next stop first. Pure; covered by tests. */
+    public val guidesToGalleryFirst: Boolean get() = this == PERSONALISED
+
+    /** Whether the list shows gallery names. Pure; covered by tests. */
+    public val listsGalleries: Boolean get() = this == PERSONALISED
+
+    /** Whether the visitor can skip an artwork. Pure; covered by tests. */
+    public val allowsSkip: Boolean get() = this == PERSONALISED
+
+    public companion object {
+        /** The kind of [rawValue]; [PERSONALISED] for `null` or an unknown value. */
+        public fun of(rawValue: String?): JourneyKind = entries.firstOrNull { it.rawValue == rawValue } ?: PERSONALISED
+    }
+}

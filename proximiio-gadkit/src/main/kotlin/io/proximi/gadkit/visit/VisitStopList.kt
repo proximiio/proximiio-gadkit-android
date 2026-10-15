@@ -73,7 +73,9 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
     val journey = model.progress.journey
     val lastSkipped by model.controller.lastSkippedStopId.collectAsStateWithLifecycle()
     val numbers = VisitPlan.numbers(journey)
-    val galleries = model.galleries
+    // A curated tour lists no galleries and has no skip.
+    val galleries = if (model.kind.listsGalleries) model.galleries else emptyList()
+    val allowsSkip = model.kind.allowsSkip
     val groups = VisitPlan.galleryGroups(VisitPlan.artworks(journey).filter { it.state != StopState.SKIPPED }) { stop ->
         Gallery.containing(stop.coordinate, stop.level, galleries)?.name
     }
@@ -101,7 +103,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                 SwipeToSkipRow(
                     isRevealed = revealedStopId == stop.id,
                     onRevealChange = { revealedStopId = if (it) stop.id else null },
-                    isEnabled = stop.state == StopState.PENDING || stop.state == StopState.ACTIVE,
+                    isEnabled = allowsSkip && (stop.state == StopState.PENDING || stop.state == StopState.ACTIVE),
                     onSkip = {
                         revealedStopId = null
                         model.requestSkip(stop)
@@ -111,16 +113,18 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                 }
             }
         }
-        if (lastSkipped != null) {
+        if (allowsSkip && lastSkipped != null) {
             item(key = "undo") { SmallButton(stringResource(R.string.undo_skip), model::undoSkip, Modifier.padding(top = 6.dp)) }
         }
-        item(key = "hint") {
-            Text(
-                stringResource(R.string.swipe_left_to_skip_an_artwork),
-                Modifier.padding(top = 10.dp),
-                style = GadTextStyle.BodyExtraSmall.textStyle,
-                color = Palette.ink,
-            )
+        if (allowsSkip) {
+            item(key = "hint") {
+                Text(
+                    stringResource(R.string.swipe_left_to_skip_an_artwork),
+                    Modifier.padding(top = 10.dp),
+                    style = GadTextStyle.BodyExtraSmall.textStyle,
+                    color = Palette.ink,
+                )
+            }
         }
     }
 }

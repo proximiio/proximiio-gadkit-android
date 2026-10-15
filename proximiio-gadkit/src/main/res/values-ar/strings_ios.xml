@@ -42,6 +42,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="craft_a_new_journey">صمّم رحلة جديدة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="curated_2">منسقة</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="current_artwork">العمل الفني الحالي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="delete_journey">حذف الرحلة</string>

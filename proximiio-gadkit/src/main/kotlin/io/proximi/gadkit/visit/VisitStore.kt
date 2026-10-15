@@ -32,7 +32,7 @@ private val Context.visitDataStore: DataStore<Preferences> by preferencesDataSto
  *
  * The values are the iOS JSON under the iOS keys: the journey as the map library writes it
  * ([JourneyCodec], the same wire format as iOS `Journey: Codable`), the meta as
- * `{"title": …, "summary": …}`.
+ * `{"title": …, "summary": …, "kind": …}`.
  *
  * Reads are synchronous from memory; the stored values are read once, by the first [of]. Call it off
  * the main thread the first time. Writes update memory at once and reach the disk in order.
@@ -107,12 +107,17 @@ internal object VisitStoreCodec {
         val fields = buildMap {
             put("title", JsonPrimitive(meta.title))
             meta.summary?.let { put("summary", JsonPrimitive(it)) }
+            put("kind", JsonPrimitive(meta.kind.rawValue))
         }
         return JsonObject(fields).toString()
     }
 
     fun decodeMeta(text: String): VisitMeta? = runCatching {
         val fields = JourneyCodec.json.parseToJsonElement(text).jsonObject
-        VisitMeta(fields.getValue("title").jsonPrimitive.content, fields["summary"]?.jsonPrimitive?.contentOrNull)
+        VisitMeta(
+            title = fields.getValue("title").jsonPrimitive.content,
+            summary = fields["summary"]?.jsonPrimitive?.contentOrNull,
+            kind = JourneyKind.of(fields["kind"]?.jsonPrimitive?.contentOrNull),
+        )
     }.getOrNull()
 }

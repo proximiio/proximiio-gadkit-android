@@ -251,8 +251,17 @@ internal class VisitController(
             try {
                 if (navigator.journey.value.stops.firstOrNull { it.id == stopId }?.state != JourneyStop.State.PENDING) return@launch
                 FieldLog.log("artwork visited out of order: $stopId")
+                val activeStopId = navigator.activeStop?.id
                 if (navigator.markDone(stopId)) doneStop(stopId)?.let { onArtworkDone?.invoke(it, false) }
                 orderRemaining()
+                // The navigator draws a new leg only when the active stop changes. Without a change
+                // the old leg, from where the visitor was, would stay (PM "Route drawing when going
+                // through artworks in wrong order").
+                if (activeStopId != null && navigator.activeStop?.id == activeStopId) {
+                    FieldLog.log("leg to $activeStopId drawn again from the visitor")
+                    mutableOffRoute.value = false
+                    navigator.resumeJourney()
+                }
                 save()
             } finally {
                 markingOutOfOrder.remove(stopId)

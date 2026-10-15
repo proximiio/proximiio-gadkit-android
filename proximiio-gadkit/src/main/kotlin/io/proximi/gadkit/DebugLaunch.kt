@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.pm.ApplicationInfo
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenuePlace
+import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.sdk.journeys
 import kotlinx.coroutines.CancellationException
 
@@ -31,6 +32,8 @@ import kotlinx.coroutines.CancellationException
  * - `gad.routeAvoid`: `stairs,escalators,revolvingDoors,inaccessiblePaths` sets
  *   [Options.routeAccessibility] (iOS `-routeAvoid`). The host app passes it to
  *   `LocalRouteAccessibility`.
+ * - `gad.visitKind`: `personalised` (default) or `curated` sets [Options.visitKind] (iOS
+ *   `-visitKind`). The host app passes it to `VisitScreen`.
  *
  * `gad.journeyPlayback` is accepted for `gad.journey`, as iOS names it `-journeyPlayback`. The
  * playback starts with the Hub, so a visit gets positions without opening the museum map.
@@ -50,6 +53,8 @@ public object DebugLaunch {
         public val visitAutoAdvance: Boolean = false,
         /** `gad.routeAvoid`: the accessibility needs the host app passes to `LocalRouteAccessibility`. */
         public val routeAccessibility: RouteAccessibility = RouteAccessibility.NONE,
+        /** `gad.visitKind`: `personalised` or `curated`, for the host app's `VisitScreen`. */
+        public val visitKind: JourneyKind = JourneyKind.PERSONALISED,
     )
 
     /** Playback starts once per process; the map screen can open many times. */
@@ -73,6 +78,7 @@ public object DebugLaunch {
             visitList = value("gad.visitList").toBoolean(),
             visitAutoAdvance = value("gad.visitAutoAdvance").toBoolean(),
             routeAccessibility = routeAvoid(value("gad.routeAvoid")),
+            visitKind = JourneyKind.of(value("gad.visitKind")),
         )
     }
 

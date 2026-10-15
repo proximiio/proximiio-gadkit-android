@@ -103,6 +103,9 @@ import kotlin.math.roundToInt
  * it leaves the composition for good.
  *
  * @param onClose called after the visitor confirmed leaving, or after the journey is complete.
+ * @param kind [JourneyKind.PERSONALISED] names the gallery of the next stop first, lists the stops
+ *   under gallery names and lets the visitor skip an artwork. [JourneyKind.CURATED] names the
+ *   artwork, lists no galleries and has no skip.
  * @param onVisitEvent receives a [VisitEvent] for each visitor action and each journey change, on
  *   the main thread.
  * @param wristbandConnectionScreen the host app's screen for "Connect a wristband" after the
@@ -116,6 +119,7 @@ public fun VisitScreen(
     wristband: WristbandSession,
     journey: Journey,
     onClose: () -> Unit,
+    kind: JourneyKind = JourneyKind.PERSONALISED,
     onVisitEvent: (VisitEvent) -> Unit = {},
     wristbandConnectionScreen: (@Composable (close: () -> Unit) -> Unit)? = null,
 ) {
@@ -136,6 +140,7 @@ public fun VisitScreen(
             scope,
             DebugLaunch.read(activity),
             accessibility,
+            kind,
             onClose = { holder.onClose() },
             onEvent = { holder.onVisitEvent(it) },
         )
@@ -354,7 +359,7 @@ private fun VisitCard(model: VisitViewModel) {
     val number = model.activeStopNumber
     val galleryAhead = model.galleryAhead?.name
     StopInfoCard(
-        caption = VisitCardText.caption(state, isLast, model.visitorGallery?.name, galleryAhead).mapText(),
+        caption = VisitCardText.caption(state, isLast, model.cardVisitorGallery?.name, galleryAhead).mapText(),
         title = VisitCardText.title(state, galleryAhead).mapText(),
         instruction = instruction,
         remaining = remaining,
