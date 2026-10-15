@@ -44,11 +44,13 @@ internal enum class AmenityKind(
     MUSEUM_SHOP("amenity_museum_shop", "shop", listOf("shop", "store")),
     ;
 
-    internal fun matches(place: VenuePlace): Boolean {
-        val text = "${place.amenityId ?: ""} ${place.title}".lowercase()
+    internal fun matches(place: VenuePlace): Boolean = matches("${place.amenityId ?: ""} ${place.title}".lowercase())
+
+    /** [text] is the lower-case amenity id and title. */
+    private fun matches(text: String): Boolean {
         val hit = keywords.any { text.contains(it) }
         // "women's restroom" contains "men's"; exclude it.
-        return if (this == MENS_RESTROOM) hit && !WOMENS_RESTROOM.matches(place) else hit
+        return if (this == MENS_RESTROOM) hit && !WOMENS_RESTROOM.matches(text) else hit
     }
 
     /**
@@ -63,6 +65,16 @@ internal enum class AmenityKind(
     }
 
     internal companion object {
+        /**
+         * The kind an amenity's id and title name, or `null`. The data's variants for a visited stop
+         * or a destination ("Womens restroom visited") are left out. Pure; covered by tests.
+         */
+        fun kind(forAmenityId: String, title: String?): AmenityKind? {
+            val text = "$forAmenityId ${title ?: ""}".lowercase()
+            if (listOf("visited", "destination", "distination").any { text.contains(it) }) return null
+            return entries.firstOrNull { it.matches(text) }
+        }
+
         /** Shortcuts shown as chips on the map. Stairs and Elevator are legend entries only. */
         internal val SHORTCUTS: List<AmenityKind> = listOf(WOMENS_RESTROOM, MENS_RESTROOM, CAFE, HELP_DESK, PRAYER_ROOM, MUSEUM_SHOP)
     }

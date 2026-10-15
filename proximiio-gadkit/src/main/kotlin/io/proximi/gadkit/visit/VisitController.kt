@@ -52,11 +52,12 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * - An amenity has no geofence. A detour is reached within 5–10 m for 5 s ([detourGuidanceRules]).
  * - After a reached detour, the journey continues only after "Resume your Journey" ([rules]).
  *
- * A new journey is ordered floor by floor and gallery by gallery
+ * A new personalised journey is ordered floor by floor and gallery by gallery
  * (`JourneyOrderStrategy.FLOOR_THEN_GALLERY`): the stop nearest the visitor first, then the rest of
  * its gallery, then the rest of its floor. Without a fix the first stop stays first, and the first
  * fix within 60 s orders the journey again while no stop is reached. A restored journey keeps its
- * order. After a detour the stops still ahead are ordered again from the visitor.
+ * order. After a detour the stops still ahead are ordered again from the visitor. A curated tour
+ * keeps the curators' order ([keepsOrder]).
  *
  * Leaving the route does not re-route the leg (`JourneyDeviationPolicy.ASK_APP`). The visitor gets a
  * warning ([isOffRoute]) after the navigator reports `FarFromRoute` or `OffRouteTooLong`. "Show the
@@ -75,6 +76,11 @@ internal class VisitController(
     /** The drawable resource name of the app's glyph for an amenity, for the detour marker. */
     private val amenityIconName: (VenuePlace) -> String? = { null },
     autoAdvance: Boolean = false,
+    /**
+     * A curated tour keeps the curators' order: no ordering at the start, on the first fix, after
+     * a detour or after an artwork visited out of order ([JourneyKind.keepsOrder]).
+     */
+    private val keepsOrder: Boolean = false,
 ) {
     /**
      * A reached detour waits for "Resume your Journey" (PM review 2026-10-12). Artworks are never
@@ -152,7 +158,7 @@ internal class VisitController(
         navigator.deviationPolicy = JourneyDeviationPolicy.ASK_APP
         navigator.setRouteOptions(routeOptions)
         var isOrderedWithoutFix = false
-        if (navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING }) {
+        if (!keepsOrder && navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING }) {
             waitForFix(FIX_WAIT_MILLIS)
             isOrderedWithoutFix = session.position.value == null
             proposedOrder()?.takeIf { it.isImprovement }?.let { apply(it) }
@@ -182,6 +188,7 @@ internal class VisitController(
 
     /** Orders the stops still ahead from the visitor, floor by floor and gallery by gallery. */
     private suspend fun orderRemaining() {
+        if (keepsOrder) return
         val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY) ?: return
         if (proposal.isImprovement) apply(proposal)
     }

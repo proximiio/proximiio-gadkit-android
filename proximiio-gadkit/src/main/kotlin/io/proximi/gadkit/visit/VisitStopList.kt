@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import androidx.compose.ui.platform.testTag
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -210,9 +211,13 @@ private fun SwipeToSkipRow(
     val skipLabel = stringResource(R.string.skip)
 
     Box(
-        Modifier.fillMaxWidth().semantics {
-            if (isEnabled) customActions = listOf(CustomAccessibilityAction(skipLabel) { onSkip(); true })
-        },
+        Modifier
+            .fillMaxWidth()
+            // The UI tests find the rows by these tags, as the iOS accessibility identifiers.
+            .testTag(if (showsAction) "journeyStopRow.skipShown" else "journeyStopRow")
+            .semantics {
+                if (isEnabled) customActions = listOf(CustomAccessibilityAction(skipLabel) { onSkip(); true })
+            },
         contentAlignment = Alignment.CenterEnd,
     ) {
         if (isEnabled) {

@@ -1,5 +1,13 @@
 package io.proximi.gadkit.map
 
+import kotlin.math.roundToInt
+import io.proximi.sdk.core.model.ProximiioAmenity
+import io.proximi.map.live.ProximiioMapSession
+import io.proximi.map.live.AmenityIcon
+import androidx.core.graphics.drawable.toBitmap
+import androidx.core.content.ContextCompat
+import android.graphics.Bitmap
+import android.content.Context
 import io.proximi.map.core.JourneyStopMarkerStyle
 import io.proximi.map.core.MapColor
 import io.proximi.map.core.PositionHeadingStyle
@@ -23,6 +31,30 @@ import io.proximi.map.live.MapOptions
  * The gradient runs per floor: on the floor after a lift, it starts at the lift.
  */
 internal object MapStyle {
+    /** The size of the design's amenity markers, the stop markers and the position arrow. */
+    private const val AMENITY_MARKER_DP = 30
+
+    /** Draws amenities with the design's icons ([amenityImage]). Set it before the session loads the venue. */
+    fun useAmenityIcons(session: ProximiioMapSession, context: Context) {
+        val appContext = context.applicationContext
+        session.amenityImageDecoder = { amenityImage(it, appContext) }
+    }
+
+    /**
+     * The map icon of an amenity. A kind the design draws ([AmenityKind]) gets its 30 dp marker,
+     * the size of the stop markers and the position arrow (PM 2026-10-14, "Amenity icons larger"):
+     * the data's icons are 30 px, which the map library draws at about 10 dp. Other amenities, such
+     * as artworks and gallery labels, keep their icon.
+     */
+    fun amenityImage(amenity: ProximiioAmenity, context: Context): Bitmap? {
+        val marker = AmenityKind.kind(amenity.id, amenity.title)?.gadIcon?.marker
+        if (marker != null) {
+            val size = (AMENITY_MARKER_DP * context.resources.displayMetrics.density).roundToInt()
+            ContextCompat.getDrawable(context, marker)?.let { return it.toBitmap(size, size) }
+        }
+        return amenity.icon?.let(AmenityIcon::rasterImage)
+    }
+
     val location: MapColor = MapColor.hex(0x3F69FF)
     val marker: MapColor = MapColor.hex(0xED3731)
     val markerStroke: MapColor = MapColor.hex(0xEEEDED)

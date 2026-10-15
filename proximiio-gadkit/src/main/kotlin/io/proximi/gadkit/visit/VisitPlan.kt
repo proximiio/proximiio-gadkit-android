@@ -174,6 +174,12 @@ public enum class JourneyKind(public val rawValue: String) {
     /** Whether the visitor can skip an artwork. Pure; covered by tests. */
     public val allowsSkip: Boolean get() = this == PERSONALISED
 
+    /**
+     * Whether the stops keep their order: no ordering from the visitor at the start, after a
+     * detour or after an artwork visited out of order. Pure; covered by tests.
+     */
+    public val keepsOrder: Boolean get() = this == CURATED
+
     public companion object {
         /** The kind of [rawValue]; [PERSONALISED] for `null` or an unknown value. */
         public fun of(rawValue: String?): JourneyKind = entries.firstOrNull { it.rawValue == rawValue } ?: PERSONALISED

@@ -101,6 +101,7 @@ internal class VisitViewModel(
     private var language = MapLanguage.forAppLanguage(application.resources.configuration.locales[0]?.language)
 
     val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false))
+        .also { MapStyle.useAmenityIcons(it, application) }
     private val store = VisitStore.of(application)
     val controller = VisitController(
         session,
@@ -112,6 +113,7 @@ internal class VisitViewModel(
             AmenityKind.entries.firstOrNull { it.matches(place) }?.let { application.resources.getResourceEntryName(it.gadIcon.glyph) }
         },
         autoAdvance = debug?.visitAutoAdvance == true,
+        keepsOrder = kind.keepsOrder,
     )
     val monitor = TrackingMonitor(venue.sdk, scope)
     val layers = JourneyMapLayers()

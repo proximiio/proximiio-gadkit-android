@@ -13,6 +13,7 @@ class JourneyKindTest {
         assertTrue(JourneyKind.PERSONALISED.guidesToGalleryFirst)
         assertTrue(JourneyKind.PERSONALISED.listsGalleries)
         assertTrue(JourneyKind.PERSONALISED.allowsSkip)
+        assertFalse(JourneyKind.PERSONALISED.keepsOrder)
     }
 
     @Test
@@ -20,6 +21,7 @@ class JourneyKindTest {
         assertFalse(JourneyKind.CURATED.guidesToGalleryFirst)
         assertFalse(JourneyKind.CURATED.listsGalleries)
         assertFalse(JourneyKind.CURATED.allowsSkip)
+        assertTrue(JourneyKind.CURATED.keepsOrder)
     }
 
     @Test
