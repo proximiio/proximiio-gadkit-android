@@ -24,7 +24,7 @@ Add this repository to the host app as a git submodule at a tag, for example at 
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 0.12.0
+git -C gadkit checkout 0.14.0
 ```
 
 In the host app's `settings.gradle.kts`, include the library's build and add the Proximi.io
@@ -511,6 +511,10 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+No changes yet.
+
+### [0.14.0] — 2026-10-15
 
 The behaviour of the iOS package 0.14.0.
 
