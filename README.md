@@ -56,6 +56,7 @@ dependencies {
 ```
 
 - The versions are the git tags of this repository. Before 1.0, a minor version can change the API.
+  The section "Changelog" lists every change and marks the breaking ones.
 - The library depends on SDK `6.0.0-beta.23` and Map `6.0.0-beta.21` and exposes them, with Compose,
   as `api` dependencies. A host app that also declares these artifacts must use the same versions.
 - The library ships its own R8 consumer rules. The host app needs no rule for it.
@@ -476,8 +477,44 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 
 The UI tests run in the Proximi GAD Android app (`app/src/androidTest`), against the sandbox.
 
-## Versions
+## Changelog
 
-| Version | Change |
-|---|---|
-| 0.12.0 | First Android tag, with the behaviour of iOS 0.12.0: the list's gallery headers by `metadata.gallery_id`, else the gallery outline, else the level; one flat journey list. It includes the iOS changes from 0.4.0 to 0.11.0: `VisitEvent`, `connect(code)` and `wristbandConnectionScreen`, the map style cache, `RouteAccessibility` and the accessible routes button, personalised and curated journeys, artwork details in the list, amenity markers at 30 dp, `GadSettings`, the route's next level change on the card and in red on the map, "Change your route?" as a card, no location choice. |
+The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/). Every change of
+the library adds an entry under `[Unreleased]` in the same commit. A release moves the entries
+under a heading with the version and the date. A tag `X.Y.0` has the behaviour of the iOS tag
+`X.Y.0`.
+
+- **BREAKING:** the host app has to change its code: a public API is renamed or removed, a
+  parameter is new and required, a type changes, or a default changes. The entry says what to change.
+- **Visible:** the screens or the behaviour change and the API stays the same. The entry says
+  whether the host app has to do something.
+
+### [Unreleased]
+
+#### Fixed
+
+- **Visible:** the map's amenity markers (restrooms, café, help desk, prayer room, shop, stairs,
+  elevator) are white circles with a dark icon, as in the iOS package. In 0.12.0 the circles were
+  black, and the icons were hard to see. No change in the host app.
+
+### [0.12.0] — 2026-10-15
+
+First release, with the behaviour of the iOS package 0.12.0. The section "Differences from the iOS
+package" lists what Android does differently.
+
+#### Added
+
+- `GadConfiguration`, `GadSettings` and `VenueService.start`: the SDK start, the map style cache,
+  and every time and distance of the screens.
+- `WristbandSession` with `connect(code)` for a host app with its own QR scanner, and
+  `VisitScreen(wristbandConnectionScreen = …)` for the host's connection screen.
+- `MuseumMapScreen` and `VisitScreen` (the journey map and list), and `VisitEvent` for analytics.
+- `JourneyKind`: personalised journeys and curated tours. A curated tour keeps the curators' order.
+- `RouteAccessibility` and the accessible routes button on both maps.
+- The journey list: gallery headers by `metadata.gallery_id`, else by the gallery outline, else by
+  the level; one flat list; artist and AR and audio badges.
+- Amenity markers at 30 dp.
+- The card names the route's next level change, and the map marks that lift or stairs in red.
+  "Change your route?" is a card on the map.
+- `GeofenceNotifier`, the "next stop nearby" notification and the ongoing journey notification.
+- `FieldLog` and `DebugLaunch` for debuggable builds.
