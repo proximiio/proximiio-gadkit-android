@@ -28,8 +28,17 @@ import io.proximi.gadkit.designsystem.TextActionButton
 import io.proximi.gadkit.designsystem.glassSurface
 import io.proximi.gadkit.ui.OverlaySheet
 import io.proximi.gadkit.ui.asHeading
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
-/** Manage journey (02.11): edit the stops, craft a new journey, or delete the current one. */
+/**
+ * Manage journey (02.11): edit the stops, craft a new journey, or delete the current one. Each
+ * action runs once the sheet has gone, so the next screen does not open under it (iOS: the Hub
+ * presents one sheet at a time).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun ManageJourneySheet(
     title: String,
@@ -40,7 +49,10 @@ public fun ManageJourneySheet(
     onClose: () -> Unit,
 ) {
     var isConfirmingDelete by remember { mutableStateOf(false) }
-    OverlaySheet(onDismiss = onClose) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    val afterHiding = { action: () -> Unit -> scope.launch { sheetState.hide() }.invokeOnCompletion { action() } }
+    OverlaySheet(onDismiss = onClose, sheetState = sheetState) {
         Text(title, Modifier.asHeading(), style = GadTextStyle.H1Bold.textStyle, textAlign = TextAlign.Center)
         summary?.let { Text(it, style = GadTextStyle.BodySmallRegular.textStyle, textAlign = TextAlign.Center) }
         Column(
@@ -48,18 +60,18 @@ public fun ManageJourneySheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            PrimaryButton(stringResource(R.string.edit_stops), onClick = onEdit)
-            PrimaryButton(stringResource(R.string.craft_a_new_journey), onClick = onCraftNew)
+            PrimaryButton(stringResource(R.string.edit_stops), onClick = { afterHiding(onEdit) })
+            PrimaryButton(stringResource(R.string.craft_a_new_journey), onClick = { afterHiding(onCraftNew) })
             AnimatedContent(isConfirmingDelete, label = "delete") { confirming ->
                 if (confirming) {
                     // PrimaryButton draws ink text; the destructive red label needs its own content.
-                    DestructiveButton(stringResource(R.string.delete_this_journey), onDelete)
+                    DestructiveButton(stringResource(R.string.delete_this_journey)) { afterHiding(onDelete) }
                 } else {
                     TextActionButton(stringResource(R.string.delete_journey), onClick = { isConfirmingDelete = true })
                 }
             }
         }
-        TextActionButton(stringResource(R.string.close), onClick = onClose)
+        TextActionButton(stringResource(R.string.close), onClick = { afterHiding(onClose) })
     }
 }
 

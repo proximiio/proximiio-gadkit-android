@@ -34,6 +34,7 @@ import kotlinx.coroutines.CancellationException
  *   `LocalRouteAccessibility`.
  * - `gad.visitKind`: `personalised` (default) or `curated` sets [Options.visitKind] (iOS
  *   `-visitKind`). The host app passes it to `VisitScreen`.
+ * - `gad.hubPage`: [Options.hubPage] for the host app, as iOS `-hubPage`. The library does not act on it.
  *
  * `gad.journeyPlayback` is accepted for `gad.journey`, as iOS names it `-journeyPlayback`. The
  * playback starts with the Hub, so a visit gets positions without opening the museum map.
@@ -55,6 +56,8 @@ public object DebugLaunch {
         public val routeAccessibility: RouteAccessibility = RouteAccessibility.NONE,
         /** `gad.visitKind`: `personalised` or `curated`, for the host app's `VisitScreen`. */
         public val visitKind: JourneyKind = JourneyKind.PERSONALISED,
+        /** `gad.hubPage`: `welcome` or `craft`. The library does not act on it; the host app can. */
+        public val hubPage: String? = null,
     )
 
     /** Playback starts once per process; the map screen can open many times. */
@@ -79,6 +82,7 @@ public object DebugLaunch {
             visitAutoAdvance = value("gad.visitAutoAdvance").toBoolean(),
             routeAccessibility = routeAvoid(value("gad.routeAvoid")),
             visitKind = JourneyKind.of(value("gad.visitKind")),
+            hubPage = value("gad.hubPage"),
         )
     }
 
