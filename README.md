@@ -165,6 +165,10 @@ val configuration = GadConfiguration(
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Time of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
+| `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
+| `levelChangerReachedMeters` | 5 m | Distance from the lift or stairs to a floor without positioning at which the lift or stairs view shows. |
+| `levelChangeViewDuration` | 5 s | How long the lift or stairs view shows before the map shows the floor without positioning. |
+| `floorWithoutPositioningMaximum` | 1800 s | After this time on a floor without positioning with the same destination, the map follows the visitor again. |
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `journeyNotificationMinimumInterval` | 5 s | The shortest gap between two updates of the instruction in the journey notification. |
@@ -276,6 +280,24 @@ The header of a stop is its gallery by `gallery_id`, named by the title of the P
 ("Level 4"). The GAD venue data on 2026-10-15 has `gallery_id` on artworks in 18 galleries; 14 of
 the 18 have a gallery POI.
 
+## Floors without positioning
+
+A floor in `GadSettings.levelsWithoutPositioning` has no positioning. In stage 1 that is the GAD
+level 0, with the café and the prayer room. A route there, on the journey map and the museum map:
+
+1. leads to the lift or stairs as usual;
+2. within `levelChangerReachedMeters` of the lift or stairs, shows the lift or stairs view ("Take the
+   stairs to level 0", "Your position is not shown on this level.") for `levelChangeViewDuration`; a
+   tap ends it;
+3. shows that floor with the rest of the route. The map does not follow the visitor there, no
+   off-route warning and no "Probably at …" shows, and the card says that the position is not shown.
+
+The map follows the visitor again when the destination changes ("Resume your Journey", another stop
+or route), on "Centre on me" or "Follow my floor", or after `floorWithoutPositioningMaximum`.
+`VisitScreen` reports `VisitEvent.FloorWithoutPositioningEntered(level)` and
+`FloorWithoutPositioningLeft(level)`. The view shows the lift or stairs icon until the animation
+from the design team exists. The view has the test tag `floorChangeView`.
+
 ## Accessibility
 
 The host app passes the visitor's accessibility needs to the map and journey screens. Every route
@@ -343,6 +365,8 @@ VisitScreen(venue, journey, onClose = onClose, onVisitEvent = { event ->
 | `StopNearby(JourneyStop)` | The active stop is less than 5 m away on the visitor's level. Once per stop per visit. |
 | `ArtworkReached(JourneyStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The stop is done 2 s later, when the event arrives, and the route leads to the next stop. |
 | `ArtworkVisitedOutOfOrder(JourneyStop)` | The visitor stayed at an artwork further down the journey. The stop is done and the stops ahead are ordered again. |
+| `FloorWithoutPositioningEntered(Int)` | The map shows a floor without positioning after the lift or stairs view. |
+| `FloorWithoutPositioningLeft(Int)` | The map follows the visitor again. |
 | `TrackingChanged(TrackingHealth)` | The wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`) or came back (`TRACKING`). `VisitScreen` shows no alert. |
 | `Journey(JourneyEvent)` | Every event of the journey navigator: `LegChanged`, `StopSkipped`, `Rerouted`, `DetourStarted`, `StopReached` (detours only), `JourneyFinished` and others. The navigator does not report artworks reached: use `ArtworkReached`. |
 
@@ -444,7 +468,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | iOS | Android | Note |
 |---|---|---|
 | `GADConfiguration(apiBaseURL: URL, …, relayAPI: BlueiotCloudRelayEndpoint, …)` | `GadConfiguration(apiBaseUrl: String, …, relayApiBaseUrl: String, …)` | URLs are strings; an invalid relay-api URL throws. |
-| `GADSettings` (`var`s, seconds as `TimeInterval`) | `GadSettings` (data class, `Duration`) | `offRouteSeconds` is `offRouteAfter`; `liveActivityMinimumInterval` is `journeyNotificationMinimumInterval`. |
+| `GADSettings` (`var`s, seconds as `TimeInterval`) | `GadSettings` (data class, `Duration`) | `offRouteSeconds` is `offRouteAfter`; `levelChangeViewSeconds` is `levelChangeViewDuration`; `floorWithoutPositioningMaximumSeconds` is `floorWithoutPositioningMaximum`; `liveActivityMinimumInterval` is `journeyNotificationMinimumInterval`. |
 | `WristbandSession(configuration:)` + `run()` | `WristbandSession(context, configuration, scope)` | It follows the binding state in `scope`; there is no `run()`. |
 | `VenueService.start` asks for location | The host app asks for location first | Android needs an activity for the dialog. |
 | `VisitView(venue:journey:kind:onClose:)` with the modifier `onVisitEvent` | `VisitScreen(venue, journey, onClose, kind, onVisitEvent)` | Compose takes lambdas as parameters. |
@@ -469,7 +493,10 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 ./gradlew :proximiio-gadkit:testDebugUnitTest
 ```
 
-The UI tests run in the Proximi GAD Android app (`app/src/androidTest`), against the sandbox.
+The JVM tests cover the rules without a map or an SDK: the card and instruction text, the ride
+merge, the floor without positioning, galleries, level changers, artwork geofences, journey order
+and the settings. The UI tests run in the Proximi GAD Android app (`app/src/androidTest`), against
+the sandbox.
 
 ## Changelog
 
@@ -485,7 +512,7 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-The behaviour of the iOS package 0.13.0.
+The behaviour of the iOS package 0.14.0.
 
 #### Removed
 
@@ -505,6 +532,14 @@ The behaviour of the iOS package 0.13.0.
 
 #### Added
 
+- **Visible:** floors without positioning (see the section): at the lift or stairs to such a floor
+  the lift or stairs view shows, then the map of that floor with the rest of the route, on the
+  journey map and the museum map. In stage 1 that is GAD level 0. No change in the host app; set
+  `GadSettings.levelsWithoutPositioning` to change the floors.
+- `GadSettings.levelsWithoutPositioning` ([0]), `levelChangerReachedMeters` (5 m),
+  `levelChangeViewDuration` (5 s) and `floorWithoutPositioningMaximum` (1800 s).
+- **BREAKING:** `VisitEvent.FloorWithoutPositioningEntered(level)` and
+  `FloorWithoutPositioningLeft(level)`. A `when` over `VisitEvent` without `else` needs the cases.
 - **BREAKING:** `VisitEvent.TrackingChanged(health)` with the public enum `TrackingHealth`
   (`WAITING`, `TRACKING`, `LOST_PLACE` after `GadSettings.trackingLostAfter`, `STOPPED_RESPONDING`
   after `trackingStoppedAfter`). A `when` over `VisitEvent` without `else` needs the case.
@@ -530,6 +565,10 @@ The behaviour of the iOS package 0.13.0.
 - **Visible:** the map's amenity markers (restrooms, café, help desk, prayer room, shop, stairs,
   elevator) are white circles with a dark icon, as in the iOS package. In 0.12.0 the circles were
   black, and the icons were hard to see. No change in the host app.
+- **Visible:** an amenity button picks the nearest place in the venue (`place_id`) of the nearest
+  one, then prefers the visitor's level. From level 1 of the Guggenheim the café button chose the
+  DCT office café, on level 1 but 11 km away, over the Guggenheim café on level 0. No change in the
+  host app.
 - **Visible:** an artwork with several geofences of the same `remote_id` is reached in any of them.
   Each DCT test artwork shares its `remote_id` with the Guggenheim artwork, and only the first
   geofence counted, so a visitor in the DCT geofence did not reach "DCT Mother/Earth", at the start

@@ -25,6 +25,7 @@ import io.proximi.gadkit.visit.VisitActivity
 import io.proximi.gadkit.visit.VisitCardState
 import io.proximi.gadkit.visit.VisitPlan
 import io.proximi.gadkit.DebugLaunch
+import io.proximi.gadkit.map.FloorWithoutPositioningGuide
 import io.proximi.gadkit.map.JourneyMapLayers
 import io.proximi.gadkit.map.LevelChangeMarker
 import io.proximi.gadkit.map.MapStyle
@@ -121,6 +122,9 @@ internal class VisitViewModel(
     )
     val monitor = TrackingMonitor(venue.sdk, scope, settings)
     val layers = JourneyMapLayers()
+
+    /** The lift or stairs view and the map of a floor without positioning. */
+    val floorGuide = FloorWithoutPositioningGuide(settings, scope)
     private val notification = VisitNotification(application, settings.journeyNotificationMinimumInterval.inWholeMilliseconds / 1000.0)
 
     /** "The next stop of your journey is less than 5 m away", once per stop in this visit. */
@@ -233,6 +237,17 @@ internal class VisitViewModel(
         controller.onArtworkDone = { stop, isActiveStop ->
             onEvent(if (isActiveStop) VisitEvent.ArtworkReached(stop.toCore()) else VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))
         }
+        floorGuide.onEnter = { change ->
+            // Under the Map / List toggle, beside the map buttons, above the stop card.
+            val density = application.resources.displayMetrics.density
+            FloorWithoutPositioningGuide.show(change, session, FloorWithoutPositioningGuide.insets(density, top = 100, left = 40, bottom = 220, right = 90))
+            onEvent(VisitEvent.FloorWithoutPositioningEntered(change.level))
+        }
+        floorGuide.onLeave = { change ->
+            session.followMyFloor()
+            recentre(withHeading = true, reason = "floor without positioning left")
+            onEvent(VisitEvent.FloorWithoutPositioningLeft(change.level))
+        }
         scope.launch { controller.navigator.events.collect { onEvent(VisitEvent.Journey(it)) } }
         scope.launch {
             controller.navigator.noRouteReasons.collect {
@@ -262,7 +277,15 @@ internal class VisitViewModel(
                 progress = readProgress()
                 markGalleryReached()
                 this@VisitViewModel.guidance = guidance
-                controller.checkArtworkGeofences()
+                val position = session.position.value
+                floorGuide.update(
+                    position?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) },
+                    position?.floor?.level,
+                    levelChangeMarkers,
+                    destinationId = navigator.detourStop?.id ?: navigator.activeStop?.id,
+                )
+                // On a floor without positioning the fixes come from the floor the visitor left.
+                if (!floorGuide.isActive) controller.checkArtworkGeofences()
                 if (progress.isFinished && !wasFinished) isShowingWrapUp = true
                 controller.save()
                 refreshMapLayers()
@@ -495,10 +518,18 @@ internal class VisitViewModel(
         scope.launch { controller.resumeJourney() }
     }
 
-    /** "Centre on me". */
+    /** "Centre on me": the map follows the visitor's floor again, also after a floor without positioning. */
     fun centreOnMe() {
+        floorGuide.leave()
+        session.followMyFloor()
         onEvent(VisitEvent.Recentred)
         recentre(reason = "Centre on me")
+    }
+
+    /** The floor button: the map follows the visitor's floor again, also after a floor without positioning. */
+    fun followMyFloor() {
+        floorGuide.leave()
+        session.followMyFloor()
     }
 
     fun dismissOffRoute() = controller.dismissOffRoute()
@@ -605,7 +636,7 @@ internal class VisitViewModel(
 
     private val isPresentingSomething: Boolean
         get() = lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
-            controller.isOffRoute.value || amenityToConfirm != null || isShowingWrapUp
+            controller.isOffRoute.value || amenityToConfirm != null || isShowingWrapUp || floorGuide.isActive
 
     private fun evaluateAmbiguity() {
         if (isPresentingSomething || monitor.health.value != TrackingHealth.TRACKING) return

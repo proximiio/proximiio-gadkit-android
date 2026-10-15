@@ -17,6 +17,10 @@ class GadSettingsTest {
         assertEquals(GadSettings.STANDARD, configuration.settings)
         assertEquals(110.seconds, GadSettings.STANDARD.trackingLostAfter)
         assertEquals(5.0, GadSettings.STANDARD.stopNearbyMeters)
+        assertEquals(setOf(0), GadSettings.STANDARD.levelsWithoutPositioning)
+        assertEquals(5.seconds, GadSettings.STANDARD.levelChangeViewDuration)
+        assertEquals(5.0, GadSettings.STANDARD.levelChangerReachedMeters)
+        assertEquals(1800.seconds, GadSettings.STANDARD.floorWithoutPositioningMaximum)
     }
 
     @Test

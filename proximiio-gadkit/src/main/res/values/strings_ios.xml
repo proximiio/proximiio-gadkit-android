@@ -170,6 +170,7 @@
     <string name="your_journey_2">Your journey</string>
     <string name="your_location_could_not_be_determined_in">Your location could not be determined in time. Try again, or ask at the reception desk.</string>
     <string name="your_personalised_journey">YOUR PERSONALISED JOURNEY</string>
+    <string name="your_position_is_not_shown_on_this">Your position is not shown on this level.</string>
     <string name="your_position_is_uncertain_here">Your position is uncertain here.</string>
     <string name="your_visit_has_ended">Your visit has ended.</string>
     <string name="your_visit_time_is_over">Your visit time is over.</string>

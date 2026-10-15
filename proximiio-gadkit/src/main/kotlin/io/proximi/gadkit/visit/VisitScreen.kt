@@ -79,6 +79,8 @@ import io.proximi.gadkit.map.BottomGlassBar
 import io.proximi.gadkit.map.GlassSquareButton
 import io.proximi.gadkit.map.PlaceInfoCard
 import io.proximi.gadkit.map.placeSubtitle
+import io.proximi.gadkit.map.FloorChangeOverlay
+import io.proximi.gadkit.map.FloorWithoutPositioningGuide
 import io.proximi.gadkit.map.FollowsVisitorFloor
 import io.proximi.gadkit.map.MapGlassFrame
 import io.proximi.gadkit.map.MapIcon
@@ -244,7 +246,9 @@ private fun VisitContent(model: VisitViewModel) {
                 )
             }
         }
-        FollowsVisitorFloor(model.session, model.venue)
+        val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
+        FollowsVisitorFloor(model.session, model.venue, isPaused = floorPhase != FloorWithoutPositioningGuide.Phase.Idle)
+        FloorChangeOverlay(model.floorGuide)
         VisitSheets(model)
     }
 }
@@ -293,16 +297,13 @@ private fun CardOverlay(model: VisitViewModel) {
                 Spacer(Modifier.weight(1f))
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     GlassSquareButton(
-                        onClick = {
-                            model.session.followMyFloor()
-                            model.centreOnMe()
-                        },
+                        onClick = model::centreOnMe,
                         contentDescription = stringResource(R.string.centre_on_me),
                     ) { MapIcon(GadIcon.Compass.glyph) }
                     val isAccessibleRoutesOn by AccessibleRoutes.isOn(LocalContext.current).collectAsStateWithLifecycle()
                     AccessibleRoutesButton(isAccessibleRoutesOn, model::setAccessibleRoutes)
                     val label = GuidanceText.floorLabel(selectedFloor.level)
-                    GlassSquareButton(onClick = model.session::followMyFloor, contentDescription = stringResource(R.string.floor_x, label)) {
+                    GlassSquareButton(onClick = model::followMyFloor, contentDescription = stringResource(R.string.floor_x, label)) {
                         Text(label, style = GadTextStyle.LargeBodyBold.textStyle, color = Palette.ink)
                     }
                 }
@@ -362,6 +363,10 @@ private fun VisitCard(model: VisitViewModel) {
     val progress = model.progress
     val state = model.cardState
     val guidance = model.guidance
+    // The map shows a floor without positioning: the card names the stop, with no instruction from
+    // fixes of another floor.
+    val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
+    val isOnFloorWithoutPositioning = floorPhase != FloorWithoutPositioningGuide.Phase.Idle
     val isLast = progress.activeStop?.let { VisitPlan.isLastOpenStop(it, progress.journey) } ?: false
     val showsGuidance = VisitCardText.showsGuidance(state)
     val galleryAhead = model.galleryAhead?.name
@@ -371,7 +376,9 @@ private fun VisitCard(model: VisitViewModel) {
         GuidanceText.levelChangeTitle(markers, model.session.position.value?.floor?.level, it.level)
     }
     val title = VisitCardText.title(state, galleryAhead, levelChangeTitle)
-    val instruction = if (model.hasNoAccessibleRoute) {
+    val instruction = if (isOnFloorWithoutPositioning) {
+        stringResource(R.string.your_position_is_not_shown_on_this)
+    } else if (model.hasNoAccessibleRoute) {
         // The navigator keeps a stop that no route with the visitor's accessibility needs
         // reaches, with no route line. In a personalised journey the visitor can skip it.
         stringResource(R.string.no_route_to_this_stop_with_your)
@@ -379,12 +386,16 @@ private fun VisitCard(model: VisitViewModel) {
         VisitCardText.instruction(state, guidance?.let { GuidanceText.instruction(it.toCore(), markers) }, title)?.mapText()
     }
     val remaining = guidance
-        ?.takeIf { showsGuidance && !model.hasNoAccessibleRoute && !it.isOffRoute && !it.hasArrived }
+        ?.takeIf { showsGuidance && !isOnFloorWithoutPositioning && !model.hasNoAccessibleRoute && !it.isOffRoute && !it.hasArrived }
         ?.let { remainingText(it.remainingMeters, resources) }
     val number = model.activeStopNumber
     StopInfoCard(
-        caption = VisitCardText.caption(state, isLast, model.cardVisitorGallery?.name, galleryAhead).mapText(),
-        title = title.mapText(),
+        caption = if (isOnFloorWithoutPositioning) {
+            stringResource(R.string.next_stop)
+        } else {
+            VisitCardText.caption(state, isLast, model.cardVisitorGallery?.name, galleryAhead).mapText()
+        },
+        title = progress.activeStop?.takeIf { isOnFloorWithoutPositioning }?.title ?: title.mapText(),
         instruction = instruction,
         remaining = remaining,
         icon = {
@@ -422,10 +433,13 @@ private fun VisitSheets(model: VisitViewModel) {
     model.stopToSkip?.let { stop ->
         SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = model::keepStop)
     }
-    // The off-route warning, unless another prompt is up. No tracking or wristband alerts: the
-    // host app handles the wristband states (PM 2026-10-15).
+    // The off-route warning, unless another prompt is up or the map shows a floor without
+    // positioning. No tracking or wristband alerts: the host app handles the wristband states
+    // (PM 2026-10-15).
     val isOffRoute by model.controller.isOffRoute.collectAsStateWithLifecycle()
-    if (isOffRoute && model.stopToSkip == null && model.amenityToConfirm == null) {
+    val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
+    val isOnFloorWithoutPositioning = floorPhase != FloorWithoutPositioningGuide.Phase.Idle
+    if (isOffRoute && !isOnFloorWithoutPositioning && model.stopToSkip == null && model.amenityToConfirm == null) {
         OffRouteWarning(onReroute = model::resumeJourney, onClose = model::dismissOffRoute)
     }
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)

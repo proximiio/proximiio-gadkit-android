@@ -44,8 +44,8 @@ class GuidanceTextTest {
 
 /** Port of guggenheim-ios `AmenityKindTests` (in GuidanceTextTests.swift). */
 class AmenityKindTest {
-    private fun place(title: String, amenity: String? = null, level: Double = 1.0, lat: Double = 0.0) =
-        VenuePlace(id = title, title = title, coordinate = Coordinate(lat, 0.0), level = level, amenityId = amenity)
+    private fun place(title: String, amenity: String? = null, level: Double = 1.0, lat: Double = 0.0, placeId: String? = null) =
+        VenuePlace(id = title, title = title, coordinate = Coordinate(lat, 0.0), level = level, amenityId = amenity, placeId = placeId)
 
     @Test
     fun restroomsAreNotConfused() {
@@ -67,6 +67,18 @@ class AmenityKindTest {
         val places = listOf(place("Café A", level = 3.0, lat = 0.0001), place("Café B", level = 1.0, lat = 0.01))
         assertEquals("Café B", AmenityKind.CAFE.nearest(places, Coordinate(0.0, 0.0), 1.0)?.title)
         assertEquals("Café A", AmenityKind.CAFE.nearest(places, Coordinate(0.0, 0.0), 2.0)?.title)
+    }
+
+    /**
+     * ProximiioGADKit 0.14.0, GAD data 2026-10-15: from level 1 of the Guggenheim the café chip chose
+     * the DCT office café, on level 1 but 11 km away, over the Guggenheim café on level 0.
+     */
+    @Test
+    fun nearestStaysInTheVenueOfTheNearestPlace() {
+        val guggenheim = place("Café", level = 0.0, lat = 0.0001, placeId = "guggenheim")
+        val dct = place("DCT Cafe", level = 1.0, lat = 0.1, placeId = "dct")
+        assertEquals("Café", AmenityKind.CAFE.nearest(listOf(dct, guggenheim), Coordinate(0.0, 0.0), 1.0)?.title)
+        assertEquals("DCT Cafe", AmenityKind.CAFE.nearest(listOf(dct, guggenheim), Coordinate(0.1, 0.0), 0.0)?.title)
     }
 
     // ProximiioGADKit `GuidanceTextTests` (0.11.0): the card names the route's next level change.

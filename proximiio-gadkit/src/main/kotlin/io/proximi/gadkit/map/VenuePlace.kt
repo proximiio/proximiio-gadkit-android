@@ -45,6 +45,11 @@ public data class VenuePlace(
      * `remote_id` ([Gallery.names]).
      */
     val galleryId: String? = null,
+    /**
+     * `place_id`: the venue (building) of the POI. The GAD organisation has the Guggenheim and the
+     * DCT office.
+     */
+    internal val placeId: String? = null,
 ) {
     public companion object {
         /**
@@ -83,6 +88,7 @@ public data class VenuePlace(
                 hasAR = flag(metadata?.get("has_ar")),
                 hasAudio = flag(metadata?.get("has_audio")),
                 galleryId = text(metadata?.get("gallery_id")),
+                placeId = text(properties?.get("place_id")),
             )
         }
 

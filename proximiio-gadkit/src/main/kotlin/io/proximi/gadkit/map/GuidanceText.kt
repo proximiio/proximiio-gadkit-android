@@ -95,12 +95,9 @@ internal object GuidanceText {
                 TurnDirection.RIGHT, TurnDirection.SHARP_RIGHT -> UiText.Resource("guidance_turn_right", listOf(metres))
                 TurnDirection.SLIGHT_RIGHT -> UiText.Resource("guidance_bear_right", listOf(metres))
             }
-            is Manoeuvre.LevelChange -> UiText.Resource(
-                "guidance_take_level_changer",
-                listOf(
-                    levelChanger(manoeuvre.featureType),
-                    rideEnd(manoeuvre.featureType, manoeuvre.coordinate, manoeuvre.fromLevel, manoeuvre.toLevel, markers),
-                ),
+            is Manoeuvre.LevelChange -> rideText(
+                manoeuvre.featureType,
+                rideEnd(manoeuvre.featureType, manoeuvre.coordinate, manoeuvre.fromLevel, manoeuvre.toLevel, markers),
             )
             Manoeuvre.Arrive -> UiText.Resource("guidance_arrive_in", listOf(metres))
             Manoeuvre.Straight, null -> UiText.Resource("guidance_head_straight", listOf(metres))
@@ -164,8 +161,12 @@ internal object GuidanceText {
         val fromHere = visitorLevel?.let { level -> pending.firstOrNull { it.fromLevel.roundedInt() == level.roundedInt() } }
         val change = fromHere ?: pending.firstOrNull() ?: return UiText.Resource("visit_go_to_level", listOf(stopLevel))
         val level = rideEnd(change.featureType, change.coordinate, change.fromLevel, change.toLevel, pending)
-        return UiText.Resource("guidance_take_level_changer", listOf(levelChanger(change.featureType), level))
+        return rideText(change.featureType, level)
     }
+
+    /** `guidance_take_level_changer` "Take the %1$s to level %2$d", e.g. "Take the stairs to level 4". */
+    internal fun rideText(featureType: String, level: Int): UiText =
+        UiText.Resource("guidance_take_level_changer", listOf(levelChanger(featureType), level))
 
     /**
      * The floor a ride in one staircase or lift ends on. The SDK router splits a ride into one level

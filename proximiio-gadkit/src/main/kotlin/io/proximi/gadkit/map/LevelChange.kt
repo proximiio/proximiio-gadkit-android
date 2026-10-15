@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.FieldLog
@@ -24,9 +25,12 @@ import io.proximi.map.live.ProximiioMapSession
  * A lift ride ([LiftDetector]): positions stay inside a lift outline for
  * [io.proximi.gadkit.GadSettings.liftRideDwell]. The field log records the ride and the route's
  * floor at that lift. Draws nothing.
+ *
+ * While [isPaused] the map keeps its floor (a floor without positioning, [FloorWithoutPositioningGuide]).
  */
 @Composable
-internal fun FollowsVisitorFloor(session: ProximiioMapSession, venue: VenueService) {
+internal fun FollowsVisitorFloor(session: ProximiioMapSession, venue: VenueService, isPaused: Boolean = false) {
+    val paused by rememberUpdatedState(isPaused)
     val floors = remember(session) { LevelChangeDetector() }
     val lift = remember(session) {
         val settings = venue.settings
@@ -45,8 +49,8 @@ internal fun FollowsVisitorFloor(session: ProximiioMapSession, venue: VenueServi
             val event = lift.update(area != null, SystemClock.elapsedRealtime())
             val change = floors.update(position.floor?.level)
             if (change != null) {
-                if (FieldLog.isEnabled) FieldLog.log("level change: L${change.from} → L${change.to}")
-                session.followMyFloor()
+                if (FieldLog.isEnabled) FieldLog.log("level change: L${change.from} → L${change.to}${if (paused) " (map keeps its floor)" else ""}")
+                if (!paused) session.followMyFloor()
                 return@collect
             }
             if (event == LiftDetector.Event.BOARDED && FieldLog.isEnabled) {

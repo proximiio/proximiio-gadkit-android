@@ -122,6 +122,10 @@ internal fun MuseumMapView(
     // `gad.mapGalleryFills` also the gallery fills.
     val layers = remember { JourneyMapLayers() }
     DisposableEffect(layers) { onDispose { layers.detach() } }
+    // The lift or stairs view and the map of a floor without positioning.
+    val floorGuide = remember { FloorWithoutPositioningGuide(settings, scope) }
+    val floorPhase by floorGuide.phase.collectAsStateWithLifecycle()
+    val isOnFloorWithoutPositioning = floorPhase != FloorWithoutPositioningGuide.Phase.Idle
 
     /** Computes a route from the current position to [place] with the SDK's on-device router. */
     suspend fun route(place: VenuePlace) {
@@ -177,6 +181,30 @@ internal fun MuseumMapView(
     }
 
     LaunchedEffect(session) { session.guidanceRules = RouteFollowRules.VENUE_WALK }
+
+    LaunchedEffect(floorGuide) {
+        floorGuide.onEnter = { change ->
+            // Under the search button, beside the map buttons, above the route card.
+            val density = resources.displayMetrics.density
+            FloorWithoutPositioningGuide.show(change, session, FloorWithoutPositioningGuide.insets(density, top = 90, left = 40, bottom = 230, right = 90))
+        }
+        floorGuide.onLeave = {
+            session.followMyFloor()
+            session.recentre()
+        }
+    }
+    val currentDestination by rememberUpdatedState(destination)
+    LaunchedEffect(session) {
+        session.guidance.collect {
+            val here = session.position.value
+            floorGuide.update(
+                here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) },
+                here?.floor?.level,
+                session.routeRenderer?.geometry?.markers.orEmpty().map { it.toCore() },
+                currentDestination?.id,
+            )
+        }
+    }
 
     // A change of the accessibility needs re-routes to the destination on screen.
     LaunchedEffect(accessibility) { destination?.let { route(it) } }
@@ -286,6 +314,7 @@ internal fun MuseumMapView(
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         GlassSquareButton(
                             onClick = {
+                                floorGuide.leave()
                                 session.followMyFloor()
                                 session.recentre()
                             },
@@ -293,7 +322,7 @@ internal fun MuseumMapView(
                             enabled = hasPosition,
                         ) { MapIcon(GadIcon.Compass.glyph) }
                         AccessibleRoutesButton(isAccessibleRoutesOn) { AccessibleRoutes.set(context, it) }
-                        FloorButton(session, hasPosition, floors, selectedFloor.level)
+                        FloorButton(session, hasPosition, floors, selectedFloor.level, onFollowMyFloor = floorGuide::leave)
                     }
                 }
                 val routed = destination
@@ -301,9 +330,16 @@ internal fun MuseumMapView(
                 if (routed != null) {
                     val coreGuidance = guidance?.toCore()
                     val markers = session.routeRenderer?.geometry?.markers.orEmpty().map { it.toCore() }
-                    val instruction = routeError?.let { stringResource(it) } ?: coreGuidance?.let { GuidanceText.instruction(it, markers).mapText() }
+                    // On a floor without positioning the guidance follows fixes from another floor, so
+                    // the card says that the position is not shown.
+                    val instruction = routeError?.let { stringResource(it) }
+                        ?: if (isOnFloorWithoutPositioning) {
+                            stringResource(R.string.your_position_is_not_shown_on_this)
+                        } else {
+                            coreGuidance?.let { GuidanceText.instruction(it, markers).mapText() }
+                        }
                     val remaining = guidance
-                        ?.takeIf { routeError == null && !it.isOffRoute && !it.hasArrived }
+                        ?.takeIf { routeError == null && !isOnFloorWithoutPositioning && !it.isOffRoute && !it.hasArrived }
                         ?.let { remainingText(it.remainingMeters, resources) }
                     StopInfoCard(
                         caption = stringResource(R.string.next_stop),
@@ -320,7 +356,7 @@ internal fun MuseumMapView(
                         },
                         trailing = { CardCloseButton(stringResource(R.string.end_route), ::endRoute) },
                     )
-                    if (guidance?.isOffRoute == true && guidance?.hasArrived == false) {
+                    if (guidance?.isOffRoute == true && guidance?.hasArrived == false && !isOnFloorWithoutPositioning) {
                         SmallButton(stringResource(R.string.new_route_from_here), onClick = { scope.launch { route(routed) } })
                     }
                 } else if (picked != null) {
@@ -337,7 +373,8 @@ internal fun MuseumMapView(
                 }
             }
         }
-        FollowsVisitorFloor(session, venue)
+        FollowsVisitorFloor(session, venue, isPaused = isOnFloorWithoutPositioning)
+        FloorChangeOverlay(floorGuide)
     }
 
     detailPlace?.let { place ->
@@ -368,7 +405,13 @@ internal fun MuseumMapView(
 
 /** Floor button ("L1", Bold 18). Lists the venue's floors; picking one pins the map to it. */
 @Composable
-private fun FloorButton(session: ProximiioMapSession, hasPosition: Boolean, floors: List<ProximiioMapSession.Floor>, level: Double) {
+private fun FloorButton(
+    session: ProximiioMapSession,
+    hasPosition: Boolean,
+    floors: List<ProximiioMapSession.Floor>,
+    level: Double,
+    onFollowMyFloor: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     val label = GuidanceText.floorLabel(level)
     Box {
@@ -380,6 +423,7 @@ private fun FloorButton(session: ProximiioMapSession, hasPosition: Boolean, floo
                 text = { Text(stringResource(R.string.follow_my_floor), style = GadTextStyle.BodyMedium.textStyle) },
                 onClick = {
                     expanded = false
+                    onFollowMyFloor()
                     session.followMyFloor()
                 },
                 enabled = hasPosition,

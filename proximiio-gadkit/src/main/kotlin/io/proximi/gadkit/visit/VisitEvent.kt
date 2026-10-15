@@ -78,6 +78,15 @@ public sealed interface VisitEvent {
     public data class TrackingChanged(val health: TrackingHealth) : VisitEvent
 
     /**
+     * The map shows a floor without positioning (`GadSettings.levelsWithoutPositioning`) after the
+     * lift or stairs view, and does not follow the visitor.
+     */
+    public data class FloorWithoutPositioningEntered(val level: Int) : VisitEvent
+
+    /** The map follows the visitor again after a floor without positioning. */
+    public data class FloorWithoutPositioningLeft(val level: Int) : VisitEvent
+
+    /**
      * An event of the journey navigator: `LegChanged`, `StopSkipped`, `Rerouted`, `DetourStarted`,
      * `StopReached` (detours only), `JourneyFinished` and others. For artworks use [ArtworkReached]:
      * the navigator does not report them reached.

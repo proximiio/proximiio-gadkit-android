@@ -323,6 +323,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_personalised_journey">رحلتك الشخصية</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="your_position_is_not_shown_on_this">لا يظهر موقعك في هذا الطابق.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_position_is_uncertain_here">موقعك غير مؤكد هنا.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_visit_has_ended">انتهت زيارتك.</string>

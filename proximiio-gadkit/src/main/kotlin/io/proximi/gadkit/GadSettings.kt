@@ -74,6 +74,24 @@ public data class GadSettings(
     /** Consecutive fixes outside the lift outline that end the ride. */
     val liftExitFixes: Int = 2,
 
+    // Floors without positioning
+
+    /**
+     * Floors without positioning. A route there leads to the lift or stairs, shows the lift or
+     * stairs view, then shows that floor with the rest of the route. In stage 1 the GAD level 0 has
+     * no positioning (PM 2026-10-14).
+     */
+    val levelsWithoutPositioning: Set<Int> = setOf(0),
+    /** Metres from the lift or stairs to a floor without positioning at which the visitor counts as there. */
+    val levelChangerReachedMeters: Double = 5.0,
+    /** Time of the lift or stairs view before the map shows the floor without positioning. iOS `levelChangeViewSeconds`. */
+    val levelChangeViewDuration: Duration = 5.seconds,
+    /**
+     * Time after which the map follows the visitor again when the destination on a floor without
+     * positioning did not change. iOS `floorWithoutPositioningMaximumSeconds`.
+     */
+    val floorWithoutPositioningMaximum: Duration = 1800.seconds,
+
     // "Probably at …"
 
     /** Positions less accurate than this (metres) near the next stop ask "Are you at …?". */

@@ -1,0 +1,273 @@
+package io.proximi.gadkit.map
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.proximi.gadkit.Coordinate
+import io.proximi.gadkit.FieldLog
+import io.proximi.gadkit.GadSettings
+import io.proximi.gadkit.R
+import io.proximi.gadkit.designsystem.GadIcon
+import io.proximi.gadkit.designsystem.GadTextStyle
+import io.proximi.gadkit.designsystem.Palette
+import io.proximi.map.core.FloorKey
+import io.proximi.map.core.MapCoordinate
+import io.proximi.map.core.MapGeometry
+import io.proximi.map.kit.MapContentInsets
+import io.proximi.map.live.ProximiioMapSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+/**
+ * Guidance to a floor without positioning, as iOS `FloorWithoutPositioningGuide` (PM 2026-10-15,
+ * Monday "POIs on floors with no positioning"). In stage 1 the GAD level 0 has no positioning; the
+ * café and the prayer room are there.
+ *
+ * 1. The route leads to the lift or stairs as usual.
+ * 2. Within [GadSettings.levelChangerReachedMeters] of the lift or stairs of a ride that ends on a
+ *    floor in [GadSettings.levelsWithoutPositioning], the screen shows the lift or stairs view for
+ *    [GadSettings.levelChangeViewDuration] ([FloorChangeView]; a tap ends it).
+ * 3. The map shows that floor with the rest of the route. It does not follow the visitor there.
+ *
+ * The phase on that floor ends when the destination changes ("Resume your Journey", another stop),
+ * on "Centre on me" or the floor button, or after [GadSettings.floorWithoutPositioningMaximum]. The
+ * same destination then gets no second view.
+ *
+ * [FloorChangeView] shows the lift or stairs icon until RPR's animation exists (Monday
+ * "Elevator/Staircase view"). Main thread only; [scope] runs the timers and calls [onEnter] and
+ * [onLeave].
+ */
+internal class FloorWithoutPositioningGuide(
+    private val settings: GadSettings,
+    private val scope: CoroutineScope,
+) {
+    /** The lift or stairs ride to a floor without positioning. */
+    data class Change(
+        /** The floor the ride ends on. */
+        val level: Int,
+        /** `elevator`, `staircase` or `escalator`. */
+        val featureType: String,
+        /** The lift or stairs. */
+        val coordinate: Coordinate,
+    )
+
+    sealed interface Phase {
+        data object Idle : Phase
+
+        /** The lift or stairs view. */
+        data class Changing(val change: Change) : Phase
+
+        /** The map shows the floor without positioning. */
+        data class OnFloor(val change: Change) : Phase
+    }
+
+    private val mutablePhase = MutableStateFlow<Phase>(Phase.Idle)
+    val phase: StateFlow<Phase> = mutablePhase.asStateFlow()
+
+    /** Called when the map should show the floor of [Change]. */
+    var onEnter: ((Change) -> Unit)? = null
+
+    /** Called when the map should follow the visitor again. */
+    var onLeave: ((Change) -> Unit)? = null
+
+    private var destinationId: String? = null
+
+    /** The destination whose phase ended; it gets no second view. */
+    private var finishedDestinationId: String? = null
+    private var timer: Job? = null
+
+    /** `true` from the lift or stairs view until the map follows the visitor again. */
+    val isActive: Boolean get() = phase.value != Phase.Idle
+
+    /** Feeds a fix. [markers]: the route's level changes; [destinationId]: the leg's destination. */
+    fun update(coordinate: Coordinate?, level: Double?, markers: List<LevelChangeMarker>, destinationId: String?) {
+        if (destinationId != this.destinationId) {
+            leave()
+            this.destinationId = destinationId
+            finishedDestinationId = null
+        }
+        if (phase.value != Phase.Idle || destinationId == null || destinationId == finishedDestinationId || coordinate == null) return
+        val change = reachedChange(coordinate, level, markers, settings) ?: return
+        FieldLog.log("floor without positioning: at the ${change.featureType} to L${change.level}")
+        mutablePhase.value = Phase.Changing(change)
+        val duration = settings.levelChangeViewDuration
+        timer = scope.launch {
+            delay(duration)
+            showFloor()
+        }
+    }
+
+    /** Ends the lift or stairs view: the map shows the floor without positioning. */
+    fun showFloor() {
+        val change = (phase.value as? Phase.Changing)?.change ?: return
+        timer?.cancel()
+        mutablePhase.value = Phase.OnFloor(change)
+        FieldLog.log("floor without positioning: showing L${change.level}")
+        onEnter?.invoke(change)
+        val maximum = settings.floorWithoutPositioningMaximum
+        timer = scope.launch {
+            delay(maximum)
+            leave()
+        }
+    }
+
+    /** The map follows the visitor again. The destination gets no second view. */
+    fun leave() {
+        timer?.cancel()
+        timer = null
+        val previous = phase.value
+        if (previous == Phase.Idle) return
+        mutablePhase.value = Phase.Idle
+        finishedDestinationId = destinationId
+        if (previous is Phase.OnFloor) {
+            FieldLog.log("floor without positioning: following the visitor again")
+            onLeave?.invoke(previous.change)
+        }
+    }
+
+    internal companion object {
+        /**
+         * The route's next level change from the visitor's floor when its ride ends on a floor
+         * without positioning and the visitor is within [GadSettings.levelChangerReachedMeters] of
+         * it. Pure; covered by tests.
+         */
+        fun reachedChange(coordinate: Coordinate, level: Double?, markers: List<LevelChangeMarker>, settings: GadSettings): Change? {
+            val pending = markers.filter { !it.isCompleted }
+            if (level == null) return null
+            val marker = pending.firstOrNull { VenueLevel.same(it.fromLevel, level) } ?: return null
+            val end = GuidanceText.rideEnd(marker.featureType, marker.coordinate, marker.fromLevel, marker.toLevel, pending)
+            if (end !in settings.levelsWithoutPositioning) return null
+            if (coordinate.distanceTo(marker.coordinate) > settings.levelChangerReachedMeters) return null
+            return Change(end, marker.featureType, marker.coordinate)
+        }
+
+        /**
+         * Shows the floor of [change] and frames the route on it inside [insets], the map area under
+         * the screen's controls and card.
+         */
+        fun show(change: Change, session: ProximiioMapSession, insets: MapContentInsets) {
+            val level = change.level.toDouble()
+            session.select(FloorKey(level))
+            val points = session.routeRenderer?.geometry?.legs.orEmpty()
+                .filter { VenueLevel.same(it.floor.level, level) }
+                .flatMap { it.points }
+            val bounds = MapGeometry.boundingBox(points + MapCoordinate(change.coordinate.latitude, change.coordinate.longitude)) ?: return
+            session.camera.fitBounds(bounds, insets, animated = true)
+        }
+
+        /** [MapContentInsets] from dp. */
+        fun insets(density: Float, top: Int, left: Int, bottom: Int, right: Int): MapContentInsets =
+            MapContentInsets(topPx = top * density.toDouble(), leftPx = left * density.toDouble(), bottomPx = bottom * density.toDouble(), rightPx = right * density.toDouble())
+    }
+}
+
+/** [FloorChangeView] while [guide] is in the lift or stairs view, faded in and out. */
+@Composable
+internal fun FloorChangeOverlay(guide: FloorWithoutPositioningGuide) {
+    val phase by guide.phase.collectAsStateWithLifecycle()
+    val changing = (phase as? FloorWithoutPositioningGuide.Phase.Changing)?.change
+    // The change stays while the view fades out.
+    var shown by remember { mutableStateOf(changing) }
+    if (changing != null) shown = changing
+    AnimatedVisibility(
+        visible = changing != null,
+        enter = fadeIn(tween(FADE_MILLIS, easing = FastOutSlowInEasing)),
+        exit = fadeOut(tween(FADE_MILLIS, easing = FastOutSlowInEasing)),
+    ) {
+        shown?.let { FloorChangeView(it, onTap = guide::showFloor) }
+    }
+}
+
+/**
+ * The lift or stairs view on the way to a floor without positioning: the icon, "Take the lift to
+ * level 0" and that the position is not shown there. A tap ends it.
+ */
+@Composable
+internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap: () -> Unit) {
+    val icon = if (change.featureType == "elevator") GadIcon.Elevator else GadIcon.Stairs
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Palette.white.copy(alpha = 0.92f))
+            .pointerInput(Unit) {
+                // The view takes the touches meant for the map under it.
+                awaitPointerEventScope {
+                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                }
+            }
+            .pointerInput(onTap) { detectTapGestures { onTap() } }
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                onClick {
+                    onTap()
+                    true
+                }
+            }
+            .testTag("floorChangeView"),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.padding(horizontal = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Box(
+                Modifier.size(140.dp).background(Palette.white, CircleShape).border(1.5.dp, Palette.badgeStroke, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(icon.glyph), contentDescription = null, modifier = Modifier.size(64.dp), tint = Palette.position)
+            }
+            Text(
+                GuidanceText.rideText(change.featureType, change.level).mapText(),
+                style = GadTextStyle.H1Bold.textStyle,
+                color = Palette.ink,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(R.string.your_position_is_not_shown_on_this),
+                style = GadTextStyle.BodySmallRegular.textStyle,
+                color = Palette.ink,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+private const val FADE_MILLIS = 200
