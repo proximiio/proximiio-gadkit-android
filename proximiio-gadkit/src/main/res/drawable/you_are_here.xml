@@ -5,10 +5,10 @@
     android:viewportHeight="40">
     <path
         android:fillColor="#FF3F69FF"
-        android:strokeColor="#FF000000"
+        android:strokeColor="#FFFFFFFF"
         android:strokeWidth="3"
         android:pathData="M20 1.5C30.22 1.5 38.5 9.78 38.5 20 38.5 30.22 30.22 38.5 20 38.5 9.78 38.5 1.5 30.22 1.5 20 1.5 9.78 9.78 1.5 20 1.5Z"/>
     <path
-        android:fillColor="#FF000000"
+        android:fillColor="#FFFFFFFF"
         android:pathData="M19.13 11.78C19.52 11.11 20.48 11.11 20.87 11.78L28.81 25.54C29.26 26.33 28.53 27.26 27.66 27L20.29 24.8C20.1 24.75 19.9 24.75 19.71 24.8L12.34 27C11.47 27.26 10.74 26.33 11.19 25.54L19.13 11.78Z"/>
 </vector>

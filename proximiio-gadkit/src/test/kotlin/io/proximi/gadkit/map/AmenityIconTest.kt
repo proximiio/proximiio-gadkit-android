@@ -1,7 +1,9 @@
 package io.proximi.gadkit.map
 
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Port of ProximiioGADKit `AmenityIconTests.gadAmenitiesMapToTheirKinds`. The marker size needs
@@ -26,5 +28,21 @@ class AmenityIconTest {
             "Escalator" to null,
         )
         for ((title, kind) in cases) assertEquals(kind, AmenityKind.kind("org:id", title), title)
+    }
+
+    /**
+     * The map markers of the iOS package (`Icon*Marker.svg`): a white circle with a #EEEDED edge
+     * and a #2B2B2B glyph. The SVG files name the circle colour `white`; a conversion to a vector
+     * drawable made it black (PM 2026-10-15).
+     */
+    @Test
+    fun amenityMarkersAreWhiteCirclesWithDarkGlyphs() {
+        val markers = File("src/main/res/drawable").listFiles { file -> file.name.endsWith("_marker.xml") }.orEmpty()
+        assertEquals(8, markers.size)
+        for (marker in markers) {
+            val fills = Regex("android:fillColor=\"([^\"]+)\"").findAll(marker.readText()).map { it.groupValues[1] }.toList()
+            assertEquals("#FFFFFFFF", fills.first(), marker.name)
+            assertTrue(fills.drop(1).all { it == "#FF2B2B2B" }, marker.name)
+        }
     }
 }
