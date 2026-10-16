@@ -10,12 +10,12 @@ import io.proximi.gadkit.roundedInt
  * The stops of a personalised journey come from Nagarro's guide as an ordered list of
  * Proximi.io POI ids. Debug builds can also pick stops by hand.
  */
-public object VisitPlan {
+internal object VisitPlan {
     /**
      * A journey from POI ids in visit order. Ids that match no place are dropped. Each stop's group
      * is the gallery of [galleries] that contains it.
      */
-    public fun journey(poiIds: List<String>, places: List<VenuePlace>, galleries: List<Gallery> = emptyList()): Journey {
+    fun journey(poiIds: List<String>, places: List<VenuePlace>, galleries: List<Gallery> = emptyList()): Journey {
         val byId = LinkedHashMap<String, VenuePlace>()
         for (place in places) byId.putIfAbsent(place.id, place)
         return Journey(poiIds.mapNotNull { byId[it] }.map { stop(it, galleries) })
@@ -72,7 +72,7 @@ public object VisitPlan {
         artworks(journey).filter { it.isOpen }.map { it.id } == listOf(stop.id)
 
     /** Artworks still to visit: pending, active or reached. A finished journey has none. */
-    public fun remainingStopCount(journey: Journey): Int = artworks(journey).count { it.isOpen }
+    fun remainingStopCount(journey: Journey): Int = artworks(journey).count { it.isOpen }
 
     /**
      * The journey's artworks: stops that are not detours. An amenity added as a detour has no
@@ -156,14 +156,15 @@ internal sealed interface VisitCardState {
 }
 
 /**
- * Title and summary of a visit, shown on Journey ready (02.10A) and the Hub card.
- * iOS `VisitMeta.standard(stopCount:)` ("Your journey", "%d stops") is localized text; the app builds it.
+ * Title and summary of a visit, shown on Journey ready (02.10A) and in `JourneySummary`.
+ * iOS `VisitMeta.standard(stopCount:)` ("Your journey", "%d stops") is localized text;
+ * `ProximiMap.standardMeta` builds it.
  * [kind] is [JourneyKind.PERSONALISED] for a stored visit from before the kind existed.
  */
-public data class VisitMeta(
-    public val title: String,
-    public val summary: String? = null,
-    public val kind: JourneyKind = JourneyKind.PERSONALISED,
+internal data class VisitMeta(
+    val title: String,
+    val summary: String? = null,
+    val kind: JourneyKind = JourneyKind.PERSONALISED,
 )
 
 /**
@@ -176,22 +177,22 @@ public enum class JourneyKind(public val rawValue: String) {
     ;
 
     /** Whether the stop card names the gallery of the next stop first. Pure; covered by tests. */
-    public val guidesToGalleryFirst: Boolean get() = this == PERSONALISED
+    internal val guidesToGalleryFirst: Boolean get() = this == PERSONALISED
 
     /** Whether the list shows gallery names. Pure; covered by tests. */
-    public val listsGalleries: Boolean get() = this == PERSONALISED
+    internal val listsGalleries: Boolean get() = this == PERSONALISED
 
     /** Whether the visitor can skip an artwork. Pure; covered by tests. */
-    public val allowsSkip: Boolean get() = this == PERSONALISED
+    internal val allowsSkip: Boolean get() = this == PERSONALISED
 
     /**
      * Whether the stops keep their order: no ordering from the visitor at the start, after a
      * detour or after an artwork visited out of order. Pure; covered by tests.
      */
-    public val keepsOrder: Boolean get() = this == CURATED
+    internal val keepsOrder: Boolean get() = this == CURATED
 
-    public companion object {
+    internal companion object {
         /** The kind of [rawValue]; [PERSONALISED] for `null` or an unknown value. */
-        public fun of(rawValue: String?): JourneyKind = entries.firstOrNull { it.rawValue == rawValue } ?: PERSONALISED
+        fun of(rawValue: String?): JourneyKind = entries.firstOrNull { it.rawValue == rawValue } ?: PERSONALISED
     }
 }

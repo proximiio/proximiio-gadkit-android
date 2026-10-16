@@ -11,7 +11,7 @@ import java.util.Locale
  * features. Same rules as proximiio-blueiot-minimal-ios `VenuePOI`. Title and description are
  * read from `title_i18n` and `description_i18n` for the app's language when the feature has them.
  */
-public data class VenuePlace(
+internal data class VenuePlace(
     val id: String,
     val title: String,
     /** Feature `description`, if set in Proximi.io Portal. */
@@ -51,7 +51,7 @@ public data class VenuePlace(
      */
     internal val placeId: String? = null,
 ) {
-    public companion object {
+    internal companion object {
         /**
          * The place of a point POI, or `null` for every feature that is not one.
          * [language] is the app's language tag, e.g. `ar` or `en-GB`.
@@ -100,7 +100,7 @@ public data class VenuePlace(
          * The place under a map tap. [identifiers] are the tapped feature ids, topmost first.
          * The first matching id is used.
          */
-        public fun placeUnder(identifiers: List<String>, places: List<VenuePlace>): VenuePlace? {
+        internal fun placeUnder(identifiers: List<String>, places: List<VenuePlace>): VenuePlace? {
             for (identifier in identifiers) {
                 places.firstOrNull { it.id == identifier }?.let { return it }
             }
@@ -108,7 +108,7 @@ public data class VenuePlace(
         }
 
         /** Case- and diacritic-insensitive substring match on the title. An empty query matches all. */
-        public fun matching(query: String, places: List<VenuePlace>): List<VenuePlace> {
+        internal fun matching(query: String, places: List<VenuePlace>): List<VenuePlace> {
             val needle = query.trim()
             if (needle.isEmpty()) return places
             val folded = fold(needle)
@@ -119,7 +119,7 @@ public data class VenuePlace(
          * The value for [language] from an i18n object such as `{"en": "Café", "ar": "المقهى"}`,
          * falling back to the base language. `null` when the object has no non-empty value for it.
          */
-        public fun localized(value: Any?, language: String?): String? {
+        internal fun localized(value: Any?, language: String?): String? {
             val translations = value as? Map<*, *> ?: return null
             if (language == null) return null
             val base = language.substringBefore('-')
@@ -127,7 +127,7 @@ public data class VenuePlace(
         }
 
         /** The nearest place on [level] (any level when `null`), by straight-line distance. iOS `TrackingMonitor.nearest`. */
-        public fun nearest(coordinate: Coordinate?, level: Double?, places: List<VenuePlace>): VenuePlace? {
+        internal fun nearest(coordinate: Coordinate?, level: Double?, places: List<VenuePlace>): VenuePlace? {
             if (coordinate == null) return null
             return places
                 .filter { VenueLevel.matches(it.level, level) }
@@ -135,7 +135,7 @@ public data class VenuePlace(
         }
 
         /** Mean coordinate of the venue's places. iOS `ArrivalDetector.centre(of:)`. */
-        public fun centre(places: List<VenuePlace>): Coordinate? {
+        internal fun centre(places: List<VenuePlace>): Coordinate? {
             if (places.isEmpty()) return null
             return Coordinate(places.sumOf { it.coordinate.latitude } / places.size, places.sumOf { it.coordinate.longitude } / places.size)
         }
@@ -143,10 +143,10 @@ public data class VenuePlace(
         private val COLLECTION_ID = Regex("""GAD\.\d{4}\.\d+""")
 
         /** The amenity of artwork POIs in the GAD organisation (PM, Monday 2026-10-12). */
-        public const val ARTWORK_AMENITY_ID: String = "7405e6e6-d9f6-4146-adda-de6adbf4a8a1:f2d78fac-23be-4f24-b5aa-571809e9e99d"
+        internal const val ARTWORK_AMENITY_ID: String = "7405e6e6-d9f6-4146-adda-de6adbf4a8a1:f2d78fac-23be-4f24-b5aa-571809e9e99d"
 
         /** See [VenuePlace.isArtwork]. */
-        public fun isArtwork(amenityId: String?, metadata: Any?, remoteId: String?): Boolean {
+        internal fun isArtwork(amenityId: String?, metadata: Any?, remoteId: String?): Boolean {
             if (amenityId == ARTWORK_AMENITY_ID) return true
             if (remoteId != null && COLLECTION_ID.matches(remoteId)) return true
             return (metadata as? Map<*, *>)?.get("artwork_id")?.let { it !is String || it.isNotEmpty() } == true
@@ -170,7 +170,7 @@ public data class VenuePlace(
 /**
  * Approximates Foundation's `localizedStandardCompare`: case-insensitive, digit runs compared as numbers.
  */
-public object StandardTitleOrder : Comparator<String> {
+internal object StandardTitleOrder : Comparator<String> {
     private val collator = Collator.getInstance(Locale.ROOT).apply { strength = Collator.SECONDARY }
     private val chunk = Regex("\\d+|\\D+")
 

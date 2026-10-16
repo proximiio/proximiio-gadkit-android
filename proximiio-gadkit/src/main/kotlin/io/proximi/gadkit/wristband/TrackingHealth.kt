@@ -7,8 +7,8 @@ import kotlin.time.toJavaDuration
 
 /**
  * Whether the wristband delivers positions during a visit, as iOS `TrackingHealth`.
- * `VisitScreen` reports it as `VisitEvent.TrackingChanged` and shows no alert: the host app handles
- * the wristband states (PM 2026-10-15).
+ * `ProximiMap` reports it as `ProximiMapEvent.TrackingChanged` during a journey and shows no alert:
+ * the host app handles the wristband states (PM 2026-10-15).
  *
  * The signal is the SDK's positioning availability: it turns unavailable about 10 s after the last
  * fix from the relay provider, whether the socket failed or the tag stopped sending positions. The

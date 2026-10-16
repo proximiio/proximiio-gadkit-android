@@ -1,5 +1,6 @@
 package io.proximi.gadkit.ui
 
+import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import io.proximi.gadkit.designsystem.SmallButton
 
 /** The glass back button of every pushed screen (iOS `chevron.backward` in `.iconGlass`). Mirrors in RTL. */
 @Composable
+@ProximiGadAppApi
 public fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     IconGlassButton(onClick, modifier) {
         Icon(painterResource(R.drawable.ic_chevron_backward), stringResource(R.string.back), Modifier.size(14.dp), tint = Palette.ink)
@@ -43,6 +45,7 @@ public fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@ProximiGadAppApi
 public fun OverlaySheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     OverlaySheet(onDismiss, rememberModalBottomSheetState(skipPartiallyExpanded = true), content)
 }
@@ -77,9 +80,10 @@ internal fun OverlaySheet(onDismiss: () -> Unit, sheetState: SheetState, content
  * extra border once `SmallButton` draws the outline last.
  */
 @Composable
-public fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun Chip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     SmallButton(text, onClick, modifier.semantics { this.selected = selected }, selected = selected)
 }
 
 /** Marks a title as a heading for TalkBack. [merge] reads a title of several texts as one. */
+@ProximiGadAppApi
 public fun Modifier.asHeading(merge: Boolean = false): Modifier = semantics(mergeDescendants = merge) { heading() }

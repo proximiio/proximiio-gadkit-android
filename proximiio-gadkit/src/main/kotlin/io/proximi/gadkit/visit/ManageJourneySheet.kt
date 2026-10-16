@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-public fun ManageJourneySheet(
+internal fun ManageJourneySheet(
     title: String,
     summary: String?,
     onEdit: () -> Unit,

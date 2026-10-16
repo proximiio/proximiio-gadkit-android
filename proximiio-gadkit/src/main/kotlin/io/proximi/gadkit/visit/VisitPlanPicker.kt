@@ -56,7 +56,7 @@ import io.proximi.gadkit.ui.listRowShape
  * inset grouped list ([SystemSearchField], white section with 26 dp corners).
  */
 @Composable
-public fun VisitPlanPicker(places: List<VenuePlace>, onStart: (List<String>) -> Unit, onCancel: () -> Unit) {
+internal fun VisitPlanPicker(places: List<VenuePlace>, onStart: (List<String>) -> Unit, onCancel: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var picked by rememberSaveable { mutableStateOf(listOf<String>()) }
     val matching = remember(query, places) { VenuePlace.matching(query, places) }

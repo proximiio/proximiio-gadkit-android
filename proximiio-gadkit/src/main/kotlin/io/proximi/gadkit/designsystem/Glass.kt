@@ -1,5 +1,6 @@
 package io.proximi.gadkit.designsystem
 
+import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
+@ProximiGadAppApi
 public enum class GlassStrength {
     /** Buttons, cards and bars over the coloured backgrounds. iOS 26: `Glass.regular`. */
     Regular,
@@ -49,25 +51,29 @@ public enum class GlassStrength {
  * [glassBackdrop] and provide the backdrop to the glass with [ProvideGlassBackdrop].
  */
 @Stable
+@ProximiGadAppApi
 public class GlassBackdrop internal constructor(internal val haze: HazeState)
 
 /** The backdrop of the glass surfaces inside [ProvideGlassBackdrop]; `null` draws the glass without blur. */
-public val LocalGlassBackdrop: ProvidableCompositionLocal<GlassBackdrop?> = staticCompositionLocalOf { null }
+internal val LocalGlassBackdrop: ProvidableCompositionLocal<GlassBackdrop?> = staticCompositionLocalOf { null }
 
 /**
  * Blur is enabled on every API level: RenderEffect on API 31 and later, RenderScript on API 26–30.
  * Haze draws a translucent scrim where neither is available.
  */
 @Composable
+@ProximiGadAppApi
 public fun rememberGlassBackdrop(): GlassBackdrop {
     val haze = rememberHazeState(blurEnabled = true)
     return remember(haze) { GlassBackdrop(haze) }
 }
 
 /** Marks this content as the backdrop the glass surfaces of [backdrop] blur. */
+@ProximiGadAppApi
 public fun Modifier.glassBackdrop(backdrop: GlassBackdrop): Modifier = hazeSource(backdrop.haze)
 
 @Composable
+@ProximiGadAppApi
 public fun ProvideGlassBackdrop(backdrop: GlassBackdrop?, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalGlassBackdrop provides backdrop, content = content)
 }
@@ -97,6 +103,7 @@ private val GlassStrength.look: GlassLook
  * a 1.5 dp white stroke and a shadow of x 0, y 3, blur 10, black 15 %. Under [ProvideGlassBackdrop]
  * the surface blurs the backdrop; without one it is translucent white.
  */
+@ProximiGadAppApi
 public fun Modifier.glassSurface(
     shape: Shape = RoundedCornerShape(12.dp),
     strength: GlassStrength = GlassStrength.Regular,
@@ -132,7 +139,7 @@ public fun Modifier.glassSurface(
  * surface does not show it through. Framework shadow layers need API 28 for shapes; API 26–27
  * draw no shadow.
  */
-public fun Modifier.glassShadow(shape: Shape, color: Color = Color.Black.copy(alpha = 0.15f), offsetY: Dp = 3.dp, blur: Dp = 10.dp): Modifier =
+internal fun Modifier.glassShadow(shape: Shape, color: Color = Color.Black.copy(alpha = 0.15f), offsetY: Dp = 3.dp, blur: Dp = 10.dp): Modifier =
     drawBehind {
         val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
         // Figma blur is twice the Gaussian sigma; a framework shadow radius r has sigma 0.57735 r + 0.5.

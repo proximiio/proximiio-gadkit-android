@@ -1,5 +1,6 @@
 package io.proximi.gadkit.wristband
 
+import io.proximi.gadkit.ProximiGadAppApi
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -83,6 +84,7 @@ import io.proximi.gadkit.ui.asString
  * flight, and otherwise leaves the flow through the caller's handler.
  */
 @Composable
+@ProximiGadAppApi
 public fun WristbandPairingScreen(flow: WristbandPairingFlow, onFinish: () -> Unit) {
     val pairing = flow.pairing
     val state by pairing.state.collectAsStateWithLifecycle()

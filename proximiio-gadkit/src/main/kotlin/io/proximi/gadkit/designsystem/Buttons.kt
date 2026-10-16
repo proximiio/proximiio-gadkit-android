@@ -1,5 +1,6 @@
 package io.proximi.gadkit.designsystem
 
+import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
@@ -55,6 +56,7 @@ private fun PressableBox(
 
 /** Figma "Button Large": full width, 60 dp, glass. */
 @Composable
+@ProximiGadAppApi
 public fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     PressableBox(onClick, enabled, 0.95f, 1f, modifier) { m ->
         Box(
@@ -69,6 +71,7 @@ public fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier =
 
 /** Outlined button, 40 dp. */
 @Composable
+@ProximiGadAppApi
 public fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     PressableBox(onClick, enabled, 1f, 0.6f, modifier) { m ->
         Box(
@@ -85,6 +88,7 @@ public fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = M
  * glass, [GlassStrength.Light] by default.
  */
 @Composable
+@ProximiGadAppApi
 public fun SmallButton(
     text: String,
     onClick: () -> Unit,
@@ -108,6 +112,7 @@ public fun SmallButton(
 
 /** 40 × 40 glass button for an icon. */
 @Composable
+@ProximiGadAppApi
 public fun IconGlassButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable () -> Unit) {
     PressableBox(onClick, enabled, 0.92f, 1f, modifier) { m ->
         Box(m.size(40.dp).glassSurface(ButtonShape, shadow = enabled), contentAlignment = Alignment.Center) { content() }
@@ -116,6 +121,7 @@ public fun IconGlassButton(onClick: () -> Unit, modifier: Modifier = Modifier, e
 
 /** Underlined text action, 44 dp touch height. */
 @Composable
+@ProximiGadAppApi
 public fun TextActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     PressableBox(onClick, true, 1f, 0.6f, modifier) { m ->
         Box(m.defaultMinSize(minHeight = 44.dp), contentAlignment = Alignment.Center) {

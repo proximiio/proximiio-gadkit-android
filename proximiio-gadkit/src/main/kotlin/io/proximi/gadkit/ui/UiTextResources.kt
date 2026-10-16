@@ -67,7 +67,7 @@ private val plurals: Map<String, Int> = mapOf(
 )
 
 /** The text for [this]. An unmapped key shows as is, so a missing entry is visible, not blank. */
-public fun UiText.resolve(resources: Resources): String = when (this) {
+internal fun UiText.resolve(resources: Resources): String = when (this) {
     is UiText.Verbatim -> text
     is UiText.Resource -> {
         val args = args.toTypedArray()
@@ -81,7 +81,7 @@ public fun UiText.resolve(resources: Resources): String = when (this) {
     }
 }
 
-public fun UiText.resolve(context: Context): String = resolve(context.resources)
+internal fun UiText.resolve(context: Context): String = resolve(context.resources)
 
 @Composable
-public fun UiText.asString(): String = resolve(LocalResources.current)
+internal fun UiText.asString(): String = resolve(LocalResources.current)

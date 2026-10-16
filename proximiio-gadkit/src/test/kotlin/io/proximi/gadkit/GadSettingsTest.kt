@@ -5,6 +5,7 @@ import io.proximi.gadkit.wristband.TrackingHealth
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -21,6 +22,14 @@ class GadSettingsTest {
         assertEquals(5.seconds, GadSettings.STANDARD.levelChangeViewDuration)
         assertEquals(5.0, GadSettings.STANDARD.levelChangerReachedMeters)
         assertEquals(1800.seconds, GadSettings.STANDARD.floorWithoutPositioningMaximum)
+        assertTrue(GadSettings.STANDARD.postsGeofenceNotifications)
+    }
+
+    @Test
+    fun theRelayApiCanBeAUrl() {
+        val configuration = GadConfiguration("https://api.example.com", "token", "https://relay.example.com", "relay")
+        assertEquals("relay.example.com", configuration.relayEndpoint.baseUrl.host)
+        assertFailsWith<IllegalArgumentException> { GadConfiguration("https://api.example.com", "token", "file:///tmp", "relay") }
     }
 
     @Test

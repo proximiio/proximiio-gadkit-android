@@ -4,22 +4,21 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * The times and distances of the map and journey screens, as iOS `GADSettings`. The host app sets
- * them in [GadConfiguration.settings], or later in [VenueService.settings]; a screen reads them
- * when it opens, so a change applies to the next screen. The defaults are the PM's values as of
- * 2026-10-14.
+ * The times and distances of the map and journey screens, and the geofence notifications, as iOS
+ * `GADSettings`. The host app sets them in [GadConfiguration.settings]. The defaults are the PM's
+ * values as of 2026-10-14. Pass the arguments by name: new settings can come in minor versions.
  */
 public data class GadSettings(
     // Wristband tracking
 
     /**
-     * Time without positioning before `VisitEvent.TrackingChanged(LOST_PLACE)`. The SDK reports
+     * Time without positioning before `ProximiMapEvent.TrackingChanged(LOST_PLACE)`. The SDK reports
      * positioning unavailable about 10 s after the last fix, so 110 s is about 2 min after it.
      */
     val trackingLostAfter: Duration = 110.seconds,
     /**
-     * Time without positioning before `VisitEvent.TrackingChanged(STOPPED_RESPONDING)`. Must be
-     * more than [trackingLostAfter]. 170 s is about 3 min after the last fix.
+     * Time without positioning before `ProximiMapEvent.TrackingChanged(STOPPED_RESPONDING)`. Must
+     * be more than [trackingLostAfter]. 170 s is about 3 min after the last fix.
      */
     val trackingStoppedAfter: Duration = 170.seconds,
 
@@ -113,6 +112,15 @@ public data class GadSettings(
      * (iOS `liveActivityMinimumInterval`, the Live Activity). A new step is sent at once.
      */
     val journeyNotificationMinimumInterval: Duration = 5.seconds,
+
+    // Notifications
+
+    /**
+     * Posts a notification for every enter and exit of a geofence with a name, and asks for the
+     * notification permission once a wristband is connected (`ProximiMapHost`). The "next stop"
+     * notification of the journey ([stopNearbyMeters]) does not depend on it.
+     */
+    val postsGeofenceNotifications: Boolean = true,
 ) {
     public companion object {
         /** The defaults. */

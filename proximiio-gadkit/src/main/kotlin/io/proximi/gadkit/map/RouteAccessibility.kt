@@ -5,13 +5,13 @@ import androidx.compose.runtime.compositionLocalOf
 import io.proximi.sdk.wayfinding.RouteOptions
 
 /**
- * The visitor's accessibility needs for routes, as iOS `RouteAccessibility`. The host app provides
- * them with [LocalRouteAccessibility], for example from its settings screen. `MuseumMapScreen` and
- * `VisitScreen` use them for every route they compute; a change re-routes the route on screen.
+ * The visitor's accessibility needs for routes, as iOS `RouteAccessibility`. The host app sets
+ * them in `ProximiMap.routeAccessibility`, for example from its settings screen. The museum map and
+ * the journey use them for every route they compute; a change re-routes the route on screen.
  *
  * The maps also have an accessible routes button (a wheelchair, PM 2026-10-14). While it is on,
- * routes avoid all four, whatever the host app set. Its state is kept in the shared preferences
- * file [PREFERENCES_FILE] under [ACCESSIBLE_ROUTES_KEY], for both maps and later launches.
+ * routes avoid all four, whatever the host app set. Its state is kept on the device, for both maps
+ * and later launches.
  *
  * Each need is an SDK avoidance (`RouteOptions.Avoidance`) and works only where the venue data
  * marks it:
@@ -28,7 +28,7 @@ public data class RouteAccessibility(
     val avoidsInaccessiblePaths: Boolean = false,
 ) {
     /** The SDK route options: the pedestrian profile with these avoidances. */
-    public val routeOptions: RouteOptions
+    internal val routeOptions: RouteOptions
         get() = RouteOptions(
             profile = RouteOptions.Profile.PEDESTRIAN,
             avoid = buildSet {
@@ -48,10 +48,10 @@ public data class RouteAccessibility(
             RouteAccessibility(avoidsStairs = true, avoidsEscalators = true, avoidsRevolvingDoors = true, avoidsInaccessiblePaths = true)
 
         /** The shared preferences file of the accessible routes button. */
-        public const val PREFERENCES_FILE: String = "proximiio_gadkit"
+        internal const val PREFERENCES_FILE: String = "proximiio_gadkit"
 
         /** The Boolean of the accessible routes button in [PREFERENCES_FILE]. */
-        public const val ACCESSIBLE_ROUTES_KEY: String = "ProximiioGADKit.accessibleRoutes"
+        internal const val ACCESSIBLE_ROUTES_KEY: String = "ProximiioGADKit.accessibleRoutes"
 
         /** [ACCESSIBLE] while the button is on, else the host app's needs. Pure; covered by tests. */
         internal fun effective(hostNeeds: RouteAccessibility, accessibleRoutes: Boolean): RouteAccessibility =
@@ -61,12 +61,7 @@ public data class RouteAccessibility(
 
 /**
  * The accessibility needs that `MuseumMapScreen` and `VisitScreen` use for routes, as the iOS
- * modifier `routeAccessibility(_:)`. Default [RouteAccessibility.NONE]:
- *
- * ```
- * CompositionLocalProvider(LocalRouteAccessibility provides RouteAccessibility(avoidsStairs = true)) {
- *     VisitScreen(venue, wristband, journey, onClose = onClose)
- * }
- * ```
+ * modifier `routeAccessibility(_:)`. `ProximiMapHost` provides `ProximiMap.routeAccessibility`.
+ * Default [RouteAccessibility.NONE].
  */
-public val LocalRouteAccessibility: ProvidableCompositionLocal<RouteAccessibility> = compositionLocalOf { RouteAccessibility.NONE }
+internal val LocalRouteAccessibility: ProvidableCompositionLocal<RouteAccessibility> = compositionLocalOf { RouteAccessibility.NONE }

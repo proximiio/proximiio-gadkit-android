@@ -15,18 +15,18 @@ import io.proximi.sdk.geofencing.GeofenceEvent
  * A notification replaces the earlier one of the same geofence and direction. Walking along a
  * geofence edge leaves one enter and one exit notification per geofence, not a stack.
  *
- * Android needs the `POST_NOTIFICATIONS` permission on API 33 and later. The host app requests it,
- * for example once a wristband session is active, because geofence events need positions from
- * the band. Without it nothing is shown.
+ * Android needs the `POST_NOTIFICATIONS` permission on API 33 and later. `ProximiMapHost` requests
+ * it once a wristband is connected, because geofence events need positions from the band. Without
+ * it nothing is shown. `ProximiMap` runs it while `GadSettings.postsGeofenceNotifications` is on.
  */
-public class GeofenceNotifier(context: Context) {
+internal class GeofenceNotifier(context: Context) {
     private val context = context.applicationContext
 
     /**
      * Posts a notification for every geofence enter and exit event of [sdk]. Returns when the
      * stream finishes; cancel the calling coroutine to stop it.
      */
-    public suspend fun run(sdk: Proximiio) {
+    internal suspend fun run(sdk: Proximiio) {
         sdk.geofenceEvents().collect { event ->
             val notice = notice(event) ?: return@collect
             FieldLog.log("notification: ${notice.tag} ${notice.title}")

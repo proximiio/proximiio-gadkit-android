@@ -4,8 +4,8 @@ import io.proximi.sdk.blueiot.cloudrelay.BlueiotCloudRelayEndpoint
 
 /**
  * The backend of the host app's build: the Proximi.io API and the relay-api, as iOS
- * `GADConfiguration`. The host app passes it to `WristbandSession` and [VenueService.start].
- * ProximiioGADKit sets no fallback host, so it contacts only these two hosts.
+ * `GADConfiguration`. The host app passes it to [ProximiMap]. ProximiioGADKit sets no fallback
+ * host, so it contacts only these two hosts.
  *
  * @throws IllegalArgumentException when [relayApiBaseUrl] has no host, or a scheme other than
  *   `http`, `https`, `ws` or `wss`.
@@ -19,7 +19,7 @@ public data class GadConfiguration(
     public val relayApiBaseUrl: String,
     /** relay-api app token of the site. The SDK sends it on `GET /v1/meta` and `POST /v1/bindings`. */
     public val relayApiAppToken: String,
-    /** Times and distances of the screens. [VenueService.start] copies them to [VenueService.settings]. */
+    /** Times and distances of the screens, and the geofence notifications. */
     public val settings: GadSettings = GadSettings.STANDARD,
 ) {
     init {

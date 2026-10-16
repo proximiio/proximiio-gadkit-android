@@ -11,7 +11,7 @@ import kotlin.math.ceil
  * The text is keyed on the SDK's error cases and end reasons, never on the relay-api's
  * English messages, which may change.
  */
-public object WristbandCopy {
+internal object WristbandCopy {
     /**
      * The message for a failed bind or end. Keys:
      * - `wristband_error_tag_already_bound` "This wristband is already in use. Please ask the staff."
@@ -28,7 +28,7 @@ public object WristbandCopy {
      * Configuration faults are not localized: a visitor never sees them in a configured build.
      * Other errors show their own message, as iOS shows `localizedDescription`.
      */
-    public fun message(error: Throwable): UiText = when (error) {
+    internal fun message(error: Throwable): UiText = when (error) {
         is BindingError.TagAlreadyBound -> res("wristband_error_tag_already_bound")
         is BindingError.NotInAuthorizedZone -> message(error.locationCause)
         is BindingError.TagNotAvailable -> res("wristband_error_tag_not_available")
@@ -60,7 +60,7 @@ public object WristbandCopy {
      * - `wristband_cause_simulated_location` "This phone reports a simulated location. Turn it off, or ask at the reception desk."
      * - `wristband_cause_rejected_by_relay` "To take over this wristband, be inside the museum with location enabled, or ask at the reception desk."
      */
-    public fun message(cause: LocationCause): UiText = when (cause) {
+    internal fun message(cause: LocationCause): UiText = when (cause) {
         LocationCause.PERMISSION_MISSING -> res("wristband_cause_permission_missing")
         LocationCause.APPROXIMATE_LOCATION -> res("wristband_cause_approximate_location")
         LocationCause.NO_FRESH_FIX -> res("wristband_cause_no_fresh_fix")
@@ -80,7 +80,7 @@ public object WristbandCopy {
      * - `wristband_notice_replaced` "This wristband session was replaced by a newer one."
      * - `wristband_notice_session_lost` "The connection to your wristband was lost. Connect it again."
      */
-    public fun notice(reason: BindingEndReason): UiText = when (reason) {
+    internal fun notice(reason: BindingEndReason): UiText = when (reason) {
         BindingEndReason.Superseded -> res("wristband_notice_superseded")
         BindingEndReason.UserEnded, is BindingEndReason.Unknown -> res("wristband_notice_visit_ended")
         BindingEndReason.Returned -> res("wristband_notice_returned")
@@ -93,7 +93,7 @@ public object WristbandCopy {
     }
 
     /** The state for the debug log. Holds no tag id. */
-    public fun logLine(state: BindingState): String = when (state) {
+    internal fun logLine(state: BindingState): String = when (state) {
         BindingState.Unbound -> "unbound"
         BindingState.Binding -> "binding"
         is BindingState.Active -> if (state.signalLost) "active, ${state.link.rawValue}, signal lost" else "active, ${state.link.rawValue}"

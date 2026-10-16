@@ -38,7 +38,7 @@ private val Context.visitDataStore: DataStore<Preferences> by preferencesDataSto
  * the main thread the first time. Writes update memory at once and reach the disk in order.
  * `VisitScreen` saves the journey on every change.
  */
-public class VisitStore private constructor(context: Context, private val scope: CoroutineScope) {
+internal class VisitStore private constructor(context: Context, private val scope: CoroutineScope) {
     private val dataStore = context.applicationContext.visitDataStore
 
     private val mutableJourney: MutableStateFlow<Journey?>
@@ -52,17 +52,17 @@ public class VisitStore private constructor(context: Context, private val scope:
     }
 
     /** The stored journey, `null` when there is none or it has no stops. */
-    public val journey: StateFlow<Journey?> = mutableJourney.asStateFlow()
+    internal val journey: StateFlow<Journey?> = mutableJourney.asStateFlow()
 
     /** The title and summary of the stored journey, for the host app's screens. */
-    public val meta: StateFlow<VisitMeta?> = mutableMeta.asStateFlow()
+    internal val meta: StateFlow<VisitMeta?> = mutableMeta.asStateFlow()
 
-    public fun load(): Journey? = journey.value
+    internal fun load(): Journey? = journey.value
 
-    public fun loadMeta(): VisitMeta? = meta.value
+    internal fun loadMeta(): VisitMeta? = meta.value
 
     /** `null` or an empty journey removes the stored visit. */
-    public fun save(journey: Journey?) {
+    internal fun save(journey: Journey?) {
         val kept = journey?.takeIf { it.stops.isNotEmpty() }
         if (kept == mutableJourney.value) return
         mutableJourney.value = kept
@@ -70,7 +70,7 @@ public class VisitStore private constructor(context: Context, private val scope:
         write { if (text == null) it.remove(JOURNEY_KEY) else it[JOURNEY_KEY] = text }
     }
 
-    public fun saveMeta(meta: VisitMeta?) {
+    internal fun saveMeta(meta: VisitMeta?) {
         if (meta == mutableMeta.value) return
         mutableMeta.value = meta
         val text = meta?.let(VisitStoreCodec::encodeMeta)
@@ -81,7 +81,7 @@ public class VisitStore private constructor(context: Context, private val scope:
         scope.launch { dataStore.edit(change) }
     }
 
-    public companion object {
+    internal companion object {
         private val JOURNEY_KEY = stringPreferencesKey("GuggenheimAbuDhabi.visit")
         private val META_KEY = stringPreferencesKey("GuggenheimAbuDhabi.visitMeta")
 
@@ -89,7 +89,7 @@ public class VisitStore private constructor(context: Context, private val scope:
         private var instance: VisitStore? = null
 
         /** The process's store. The first call reads the disk. */
-        public fun of(context: Context): VisitStore = instance ?: synchronized(this) {
+        internal fun of(context: Context): VisitStore = instance ?: synchronized(this) {
             instance ?: VisitStore(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)).also { instance = it }
         }
     }

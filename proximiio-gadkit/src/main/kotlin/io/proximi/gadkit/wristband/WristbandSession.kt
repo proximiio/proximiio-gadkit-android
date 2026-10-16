@@ -15,11 +15,8 @@ import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -31,30 +28,37 @@ import kotlinx.coroutines.launch
  * the other phone's session ends with `Superseded`. The SDK never asks for location. When the
  * relay-api needs the phone's location for a take-over, `locationReadiness()` returns the ask, and
  * [ask] shows the system dialog through [locationDialog] before the bind.
+ *
+ * Creating it starts nothing; [run] confirms the stored session and follows the binding state in
+ * [scope], as iOS `run()`.
  */
-public class WristbandSession(context: Context, configuration: GadConfiguration, scope: CoroutineScope) : WristbandConnecting {
+internal class WristbandSession(context: Context, configuration: GadConfiguration, private val scope: CoroutineScope) : WristbandConnecting {
     /** The binding client. One per process; `VenueService` attaches its position provider. */
-    public val binding: BlueiotWristbandBinding = BlueiotWristbandBinding(context.applicationContext, configuration(configuration))
+    internal val binding: BlueiotWristbandBinding = BlueiotWristbandBinding(context.applicationContext, configuration(configuration))
 
-    /** The location dialog [ask] shows. The pairing screen hosts it. */
+    /** The location dialog [ask] shows. `ProximiMapHost` and the pairing screen host it. */
     internal val locationDialog = LocationDialog()
 
     private val mutableState = MutableStateFlow(binding.state)
 
     /** The latest binding state. */
-    public val state: StateFlow<BlueiotBindingState> = mutableState.asStateFlow()
-
-    /** [state] as core's mirror. */
-    public val bindingState: StateFlow<BindingState> =
-        state.map { it.toCore() }.stateIn(scope, SharingStarted.Eagerly, binding.state.toCore())
+    internal val state: StateFlow<BlueiotBindingState> = mutableState.asStateFlow()
 
     /** `true` while a session is active. A bind in progress does not change it. */
-    public val isActive: Boolean get() = state.value.session != null
+    internal val isActive: Boolean get() = state.value.session != null
 
     /** The notice for an ended session (`WristbandCopy.notice`), or `null` while none has ended. */
-    public val endNotice: UiText? get() = (bindingState.value as? BindingState.Ended)?.let { WristbandCopy.notice(it.reason) }
+    internal val endNotice: UiText? get() = (state.value.toCore() as? BindingState.Ended)?.let { WristbandCopy.notice(it.reason) }
 
-    init {
+    private var isRunning = false
+
+    /**
+     * Confirms a session the SDK stored at the last launch with the relay-api, and follows the
+     * binding state for the life of [scope]. Later calls do nothing.
+     */
+    internal fun run() {
+        if (isRunning) return
+        isRunning = true
         scope.launch { binding.restore() }
         scope.launch {
             binding.stateChanges().collect {
@@ -112,7 +116,7 @@ public class WristbandSession(context: Context, configuration: GadConfiguration,
      * @throws io.proximi.gadkit.wristband.BindingError when the relay-api cannot be reached; the
      *   session is kept.
      */
-    public suspend fun end() {
+    internal suspend fun end() {
         try {
             binding.end()
         } catch (error: BlueiotBindingError) {
@@ -120,7 +124,7 @@ public class WristbandSession(context: Context, configuration: GadConfiguration,
         }
     }
 
-    public companion object {
+    internal companion object {
         private const val DIAGNOSTICS_INTERVAL_MILLIS = 10_000L
 
         /**

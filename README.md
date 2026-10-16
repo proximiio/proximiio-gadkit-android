@@ -1,15 +1,24 @@
 # ProximiioGADKit for Android
 
-ProximiioGADKit is an Android library with the museum map and the journey (map and list) screens of
-the Proximi GAD app (Guggenheim Abu Dhabi) and the wristband binding, built on the Proximi.io Android
-SDK and Map. It is the Android counterpart of `proximiio/proximiio-gadkit-ios`: an Android tag
-`X.Y.0` has the behaviour of the iOS tag `X.Y.0`. A host app with its own QR scanner passes the
-scanned wristband code to `WristbandSession.connect(code)`. The Proximi GAD Android app uses the
-library the same way a host app does.
+ProximiioGADKit is an Android library with the museum map, the journey (map and list), the stop
+picker and Manage journey of the Proximi GAD app (Guggenheim Abu Dhabi), and the wristband binding.
+It is built on the Proximi.io Android SDK and Map. It is the Android counterpart of
+`proximiio/proximiio-gadkit-ios`: an Android tag `X.Y.0` has the behaviour of the iOS tag `X.Y.0`.
+
+The host app uses one entry point, `ProximiMap`:
+
+- it creates one `ProximiMap` per process and starts it;
+- it composes `ProximiMapHost(map)` at the root of its UI;
+- it opens screens with `open(screen)`;
+- it receives every change as a `ProximiMapEvent`.
+
+`ProximiMap` owns the SDK, the wristband session, the stored journey, the notifications and every
+screen and sheet of the library. The host app scans the wristband's QR code itself and passes the
+code to `connectWristband(code)`. The Proximi GAD Android app uses the library the same way.
 
 | Artifact | Content |
 |---|---|
-| `io.proximi.gadkit:proximiio-gadkit` | Screens, design system, SDK start, wristband session, notifications, field log. |
+| `io.proximi.gadkit:proximiio-gadkit` | `ProximiMap`, `ProximiMapHost` and their types, `GadConfiguration`, `GadSettings`, `FieldLog`. |
 
 ## Requirements
 
@@ -24,7 +33,7 @@ Add this repository to the host app as a git submodule at a tag, for example at 
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 0.14.0
+git -C gadkit checkout 1.0.0
 ```
 
 In the host app's `settings.gradle.kts`, include the library's build and add the Proximi.io
@@ -55,10 +64,14 @@ dependencies {
 }
 ```
 
-- The versions are the git tags of this repository. Before 1.0, a minor version can change the API.
-  The section "Changelog" lists every change and marks the breaking ones.
+- The versions are the git tags of this repository. From 1.0.0 a minor or patch version does not
+  break the public API. New `ProximiMapEvent` cases come in minor versions; a `when` with `else`
+  keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
+- Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
+  not covered by the rule above and can change in any version.
 - The library depends on SDK `6.0.0-beta.24` and Map `6.0.0-beta.21` and exposes them, with Compose,
-  as `api` dependencies. A host app that also declares these artifacts must use the same versions.
+  as `api` dependencies. The host app needs no dependency on them. A host app that also declares
+  these artifacts must use the same versions.
 - The library ships its own R8 consumer rules. The host app needs no rule for it.
 - With the Gradle configuration cache on, set `kotlin.internal.collectFUSMetrics=false` in the host
   app's `gradle.properties`. Otherwise the Kotlin Gradle plugin registers its build statistics
@@ -75,9 +88,9 @@ The library's manifest adds these permissions to the host app:
 |---|---|
 | `INTERNET` | The venue data, the relay-api and visitor reporting. |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `WAKE_LOCK` | The SDK keeps positioning alive with a foreground service of type `location` and its own notification. |
-| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | The relay-api needs a fix for a wristband take-over. The foreground service needs the location type. |
+| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | The arrival at the museum and a wristband take-over need a fix. The foreground service needs the location type. |
 | `POST_NOTIFICATIONS` | The journey notification, the geofence and next-stop notifications. |
-| `CAMERA` (`android.hardware.camera` not required) | The QR scanner of `WristbandPairingScreen`. |
+| `CAMERA` (`android.hardware.camera` not required) | The QR scanner of the Proximi GAD app's pairing screen. |
 
 The manifest also removes `ACCESS_BACKGROUND_LOCATION`: the foreground service keeps the process
 alive, so background location is never requested. The phone scans nothing (relay-only), so no
@@ -88,75 +101,267 @@ The field log has a `FileProvider` with the authority `<applicationId>.gadkit.fi
 
 ### Permissions at run time
 
-- Location: request `ACCESS_FINE_LOCATION` (with `ACCESS_COARSE_LOCATION`) before
-  `VenueService.start`. iOS `VenueService.start` asks itself; on Android a request needs the host
-  app's activity.
-- Notifications (Android 13 and later): `AskNotificationPermission(isNeeded)` asks once per process.
-  `VisitScreen` calls it when it opens. Call it once a wristband session is active, as the Proximi
-  GAD app does:
+`ProximiMapHost` asks for the permissions; the host app asks for none for the library:
 
-```kotlin
-val state by wristband.state.collectAsStateWithLifecycle()
-AskNotificationPermission(isNeeded = state.session != null)
-```
+- Location (`ACCESS_FINE_LOCATION` with `ACCESS_COARSE_LOCATION`): once per process, when
+  `ProximiMapHost` is first composed, unless it is allowed. `start()` does not wait for the answer;
+  the SDK starts its positioning service once location is allowed. A change in Settings applies when
+  the host activity resumes.
+- Location for a wristband take-over: before `connectWristband(code)` sends the bind, when the
+  relay-api needs a fix.
+- Notifications (Android 13 and later): once a wristband is connected, with
+  `GadSettings.postsGeofenceNotifications` on. The journey screen also asks when it opens.
 
 ### Languages
 
 The library ships English and Arabic strings. Declare both languages in the host app's
 `localeConfig`, so that the per-app language applies to the library screens too. The screens
-support right-to-left layouts.
+support right-to-left layouts. `ProximiMapException.message` and `WristbandStatus.NotConnected.notice`
+are in the app's language at the time they are created.
 
 ### Fonts
 
-Guggenheim Sans Display is a font resource of the library (`GuggenheimSansDisplay`). Nothing needs
-registering.
+Guggenheim Sans Display is a font resource of the library. Nothing needs registering.
 
-## Starting
+## Quick start
 
 ```kotlin
-val configuration = GadConfiguration(
-    apiBaseUrl = "https://api.example.com",
-    applicationToken = applicationToken,
-    relayApiBaseUrl = "https://relay-api.example.com",
-    relayApiAppToken = relayApiAppToken,
-)
-// Once per process, for example in an activity-scoped ViewModel. It follows the binding state.
-val wristband = WristbandSession(context, configuration, viewModelScope)
-// After the location request, at launch, before the first map screen.
-val venue = VenueService.start(context, configuration, wristband.binding)
+class MuseumApplication : Application() {
+    // One ProximiMap for the life of the process, for example from the DI container.
+    val map: ProximiMap by lazy {
+        ProximiMap(
+            context = this,
+            configuration = GadConfiguration(
+                apiBaseUrl = "https://api.example.com",
+                applicationToken = applicationToken,
+                relayApiBaseUrl = "https://relay-api.example.com",
+                relayApiAppToken = relayApiAppToken,
+            ),
+            scope = MainScope(),
+        )
+    }
+}
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val map = (application as MuseumApplication).map
+        setContent {
+            // The library's screens open over HomeScreen.
+            ProximiMapHost(map) { HomeScreen(map) }
+            LaunchedEffect(map) {
+                try {
+                    map.start()
+                } catch (error: ProximiMapException) {
+                    // map.status is Failed: show a retry screen.
+                }
+            }
+            LaunchedEffect(map) {
+                map.events.collect { event ->
+                    when (event) {
+                        is ProximiMapEvent.ArtworkReached -> Log.i("Museum", "At ${event.stop.artworkId ?: event.stop.title}")
+                        ProximiMapEvent.CraftNewJourneyRequested -> Log.i("Museum", "Show the audio guide")
+                        else -> Unit
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeScreen(map: ProximiMap) {
+    Column {
+        Button(onClick = { map.open(ProximiMap.Screen.MUSEUM_MAP) }) { Text("Museum map") }
+        Button(onClick = {
+            try {
+                map.setJourney(JourneyPlan(title = "Light & Perception", artworks = listOf("GAD.2010.00033", "GAD.2018.00034")))
+                map.open(ProximiMap.Screen.JOURNEY_READY)
+            } catch (error: ProximiMapException) {
+                Log.w("Museum", error.message.orEmpty())
+            }
+        }) { Text("Start the guide's journey") }
+    }
+}
 ```
 
-- `WristbandSession` confirms a session the SDK stored at the last launch with the relay-api, and
-  follows the binding state in the scope you pass. Create one per process.
-- `VenueService.start` creates the SDK (`ProximiioConfiguration.relayOnly`, no fallback host),
-  reads the permissions, authenticates, starts positioning, loads the route network and attaches
-  the wristband's position provider. Visitor reporting is on.
-- After the start it fetches the organisation's map style in the background into the cache
-  directory. A map screen then starts on that style instead of an empty one.
-- On the first map screen after an install, MapLibre downloads the basemap tiles while the map is on
-  screen. Until they arrive, the map shows the style's white background.
-- `venue.sdk` is the app's only `Proximiio` instance. Other features of the host app, such as the
-  audio guide, use it. Do not create a second `Proximiio`.
-- The library contacts only `apiBaseUrl` and the relay-api host.
-- `GadConfiguration` throws `IllegalArgumentException` when `relayApiBaseUrl` has no host.
-  `toString()` leaves the tokens out; `secrets` lists them for `FieldLog.start`.
+## ProximiMap
 
-### Settings
+`ProximiMap`, `ProximiMapHost` and their types are in the package `io.proximi.gadkit`; `JourneyKind`
+and `VisitMode` are in `io.proximi.gadkit.visit`, `RouteAccessibility` in `io.proximi.gadkit.map`,
+`TrackingHealth` in `io.proximi.gadkit.wristband`. Call the functions of `ProximiMap` on the main
+thread. Its state is in `StateFlow`s, updated on the main thread; in Compose, read them with
+`collectAsState()`.
 
-Every time and distance of the screens is in `GadSettings`. Set them in the configuration, or later
-in `venue.settings`. A screen reads them when it opens, so a change applies to the next screen:
+| Member | |
+|---|---|
+| `ProximiMap(context, configuration, scope)` | Creates the wristband session. Starts nothing. `scope` runs the work for the life of the object: the wristband session, the geofence events and notifications. Create one per process, with a process-wide scope. |
+| `suspend fun start()` | Starts the SDK, the wristband session and the notifications, and loads the venue. A second call while starting waits for the first; after a failure it starts again. Throws `ProximiMapException.StartFailed`. |
+| `status` | `Status.Idle`, `Starting`, `Ready` or `Failed(error)`. For a splash or a retry screen. |
+| `suspend fun connectWristband(code)` | See "Wristband". |
+| `suspend fun endVisit()` | Ends the wristband session on the relay-api, for example when the visitor returns the wristband. Throws `ProximiMapException.Wristband` when the relay-api cannot be reached; the session is kept. |
+| `wristband` | `WristbandStatus`: `NotConnected(notice)`, `Connecting`, `Connected`. |
+| `setJourney(plan): JourneySummary` | Stores a journey. See "Journeys". |
+| `deleteJourney()` | Deletes the stored journey. |
+| `journey` | `JourneySummary?` of the stored journey: `title`, `summary`, `kind`, `stopCount`, `remainingStopCount`, `isStarted`. It survives app launches. |
+| `open(screen)` | Shows a screen. See "Screens". |
+| `close()` | Closes the screen or sheet on screen. |
+| `screen` | The screen or sheet on screen, or `null`. |
+| `events` | `Flow<ProximiMapEvent>`. Each collector receives the events sent while it collects; one that falls more than 100 events behind loses the oldest. |
+| `isAtMuseum` | `true` after a wristband or playback position, or a phone fix within 400 m of a place of the venue. |
+| `isLocationDenied` | `true` when the visitor answered the location dialog without allowing location, or turned location off in Settings. The host app can show its own screen for it. |
+| `routeAccessibility` | `MutableStateFlow<RouteAccessibility>`: the visitor's accessibility needs for routes. See "Accessibility". |
+| `configuration` | The `GadConfiguration` it was created with. |
+
+`start()` creates the SDK (`ProximiioConfiguration.relayOnly`, no fallback host), authenticates,
+starts positioning, loads the route network and attaches the wristband's position provider. Visitor
+reporting is on. Call it at launch: the map style and the venue data are then loaded before the first
+map screen. On the first map screen after an install, MapLibre downloads the basemap tiles while the
+map is on screen; until they arrive, the map shows the style's white background. The library
+contacts only `apiBaseUrl` and the relay-api host.
+
+`GadConfiguration` throws `IllegalArgumentException` when `relayApiBaseUrl` has no host.
+`toString()` leaves the tokens out; `secrets` lists them for `FieldLog.start`.
+
+## Screens
+
+`ProximiMapHost(map, modifier, content)` shows the screen `open(screen)` asks for over `content`, the
+host app's UI. Compose it once, at the root. Nothing opens before `start()` has finished.
+
+| `ProximiMap.Screen` | Shows | Inside the flow |
+|---|---|---|
+| `MUSEUM_MAP` | The museum map: floors, amenities, the visitor's position, search, a route to a tapped place, the gallery legend. | Back closes it. |
+| `JOURNEY_READY` | Journey ready (02.10A): the journey's title and summary. Needs a stored journey. | "Start the Journey" (at the museum) opens the journey. "Go to Museum" (away from it) and "Back to Hub" close it. |
+| `JOURNEY` | The journey: map and list, the stop card, guidance from stop to stop, detours to amenities, the journey notification, Journey Complete. Needs a stored journey. | Back on a journey in progress (a stop visited or skipped, not finished) asks "Leave the tour here" first; otherwise it closes. |
+| `PLAN_JOURNEY` | The stop picker ("Plan your visit"). | "Start" stores a personalised journey and opens Journey ready. |
+| `MANAGE_JOURNEY` | Manage journey (02.11). Needs a stored journey. | "Edit stops" opens the stop picker, or sends `CuratedTourChangeRequested` for a curated tour. "Craft a new journey" sends `CraftNewJourneyRequested`. "Delete journey", then "Delete this journey", deletes it. |
+
+- The museum map, Journey ready, the journey and the stop picker fill `ProximiMapHost`. Manage
+  journey is a bottom sheet.
+- One screen at a time. A screen on screen closes first; the next one shows once it has gone, or
+  after 0.7 s.
+- `ProximiMapEvent.Closed` follows when a screen has gone.
+- Under a full-screen screen, `content` gets no touches and is not in the accessibility tree.
+- The screen on screen and the journey's state stay when the activity is recreated, for example
+  after a language change. After the process ends, the stored journey stays; no screen is open.
+- The journey screen saves its progress on every change. Journey ready and the journey read the
+  stored journey when they open.
+- In an app with Fragments, compose `ProximiMapHost(map)` in a `ComposeView` that fills the
+  activity's window above the fragment container, without `content`. It draws nothing and passes
+  touches through while no screen of the library is shown.
+
+## Journeys
+
+```kotlin
+val summary = map.setJourney(
+    JourneyPlan(
+        title = "Light & Perception",
+        summary = "6 artworks · 45 min",          // null shows "6 stops"
+        kind = JourneyKind.PERSONALISED,
+        artworks = listOf("GAD.2010.00033", "GAD.2018.00034"),
+    ),
+)
+map.open(ProximiMap.Screen.JOURNEY_READY)
+```
+
+- `artworks` are in visit order. Each one is an artwork's collection id (`remote_id`) or a Proximi.io
+  POI id. Ids that match no POI are left out; `summary.stopCount` is the number kept.
+- `setJourney` throws `ProximiMapException.NotStarted` before `start()` has finished, and
+  `ProximiMapException.NoKnownArtworks` when no id matches.
+- A new journey replaces the stored one. `ProximiMapEvent.JourneyChanged` follows every change.
+
+A journey the visitor built with the guide is `JourneyKind.PERSONALISED`; a tour by the museum's
+curators is `JourneyKind.CURATED` (Figma "Personalised" and "Guided"):
+
+| | `PERSONALISED` | `CURATED` |
+|---|---|---|
+| Stop card | Names the gallery of the next stop until the visitor is in it, then the artwork. | Names the artwork. |
+| List | Stops under gallery headers. | Stops without headers. |
+| Skip | The visitor can skip an artwork, also one no accessible route reaches. | No skip. |
+| Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. An artwork visited out of order is marked visited; the rest keep their order. |
+
+The map and the background are the same for both.
+
+## Wristband
+
+The host app scans the wristband's QR code, or the visitor types the code printed on it:
+
+```kotlin
+scope.launch {
+    try {
+        map.connectWristband(scannedCode)
+    } catch (error: ProximiMapException) {
+        errorText = error.message   // the text for the visitor, English or Arabic
+    }
+}
+```
+
+- `connectWristband(code)` trims the code and sends it to the relay-api, which resolves every label
+  format. When the relay-api needs the phone's location for a take-over, the system location dialog
+  comes first (`ProximiMapHost` shows it). It returns when the session is active. It throws
+  `ProximiMapException.Wristband` with the text for the visitor, for example "This wristband is
+  already in use. Please ask the staff."
+- A wristband that another phone follows is taken over when the relay-api allows it. The other
+  phone's session ends; its `wristband` becomes `NotConnected(notice)` with "Your wristband was
+  scanned by another phone. Connect it again to follow it on this phone."
+- Positions arrive only while `wristband` is `Connected`. A session stored by the SDK is confirmed
+  with the relay-api after `start()`.
+- The library shows no wristband alerts. `ProximiMapEvent.WristbandChanged` and `TrackingChanged`
+  let the host app show its own.
+
+## Events
+
+`ProximiMap` performs every action itself; the events report them. They are sent on the main thread.
+
+| Event | When |
+|---|---|
+| `Opened(screen)`, `Closed(screen)` | A screen opened or closed, by `open(screen)` or inside a flow. |
+| `CraftNewJourneyRequested` | "Craft a new journey" on Manage journey, after it closed. The host app shows its journey crafting. |
+| `CuratedTourChangeRequested` | "Edit stops" on Manage journey for a curated tour, after it closed. The host app shows its tour choice. |
+| `ArrivedAtMuseum` | `isAtMuseum` became `true`. Once per `ProximiMap`. |
+| `WristbandChanged(status)` | The wristband session changed. |
+| `TrackingChanged(health)` | During a journey: the wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`) or came back (`TRACKING`). |
+| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. |
+| `JourneyChanged(journey)` | A new, planned, edited or deleted (`null`) journey, and the progress after the journey screen closed. |
+| `NextStop(stop)` | The route leads to this stop now. |
+| `StopNearby(stop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. |
+| `ArtworkReached(stop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or stood in its area: the stop is done and the route leads to the next stop. `GeofenceEntered` arrives at the enter. |
+| `ArtworkVisitedOutOfOrder(stop)` | The visitor stayed at an artwork further down the journey. It counts as visited. In a personalised journey the stops ahead are ordered again; a curated tour keeps its order. |
+| `SkipRequested`, `StopSkipped`, `SkipCancelled`, `SkipUndone` (`stop`) | A swipe on a stop in the list (or its "Skip" TalkBack action), "Skip artwork", "Keep it", "Undo skip". |
+| `AmenitySelected(stop)` | An amenity picked on the map. A card shows it with "Go here". |
+| `DetourStarted(stop)`, `DetourEnded(stop, completed)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
+| `JourneyResumed` | "Resume your Journey" or "Show the route from here". |
+| `OffRoute(duration)`, `BackOnRoute` | The visitor has been off the route for `offRouteAfter`; the visitor is on the route again. |
+| `JourneyFinished` | Every stop is visited or skipped. Journey Complete shows. |
+| `FloorWithoutPositioningEntered(level)`, `FloorWithoutPositioningLeft(level)` | See "Floors without positioning". |
+| `ModeChanged(mode)`, `Recentred`, `AccessibleRoutesChanged(isOn)` | The Map / List toggle (`VisitMode`), "Centre on me", the accessible routes button. |
+| `ExitRequested`, `ExitConfirmed`, `ExitCancelled` | Back during a journey in progress (a stop visited or skipped, not finished), "Leave the tour", "Carry on". |
+
+The museum map sends only `Opened` and `Closed`; the other screen events come from the journey
+screen.
+
+`ProximiStop` has the POI `id`, the `title`, the artwork's collection id `artworkId` (`null` for an
+amenity) and the `level`. `ProximiGeofence` has the geofence `id`, `name`, `type` and `artworkId`.
+
+## Settings
+
+Every time and distance of the screens is in `GadSettings`. Set them in the configuration. Pass the
+arguments by name:
 
 ```kotlin
 val configuration = GadConfiguration(
-    apiBaseUrl, applicationToken, relayApiBaseUrl, relayApiAppToken,
-    settings = GadSettings(offRouteMeters = 50.0, trackingLostAfter = 90.seconds),
+    apiBaseUrl = apiBaseUrl,
+    applicationToken = applicationToken,
+    relayApiBaseUrl = relayApiBaseUrl,
+    relayApiAppToken = relayApiAppToken,
+    settings = GadSettings(offRouteMeters = 50.0, postsGeofenceNotifications = false),
 )
 ```
 
 | Setting | Default | Effect |
 |---|---|---|
-| `trackingLostAfter` | 110 s | Time without positioning before `VisitEvent.TrackingChanged(LOST_PLACE)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
-| `trackingStoppedAfter` | 170 s | Time without positioning before `VisitEvent.TrackingChanged(STOPPED_RESPONDING)` (about 3 min). |
+| `trackingLostAfter` | 110 s | Time without positioning before `ProximiMapEvent.TrackingChanged(LOST_PLACE)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
+| `trackingStoppedAfter` | 170 s | Time without positioning before `TrackingChanged(STOPPED_RESPONDING)` (about 3 min). |
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
@@ -172,96 +377,14 @@ val configuration = GadConfiguration(
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `journeyNotificationMinimumInterval` | 5 s | The shortest gap between two updates of the instruction in the journey notification. |
+| `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name ("You entered this area.", "You left this area."), and the notification permission request once a wristband is connected. The "next stop" notification of the journey (`stopNearbyMeters`) does not depend on it. |
 
 Times are `kotlin.time.Duration`, distances metres.
 
-### Notifications
-
-Notifications for geofence enter and exit:
-
-```kotlin
-scope.launch { GeofenceNotifier(context).run(venue.sdk) }
-```
-
-- Every geofence with a name posts one: the title is the name, the text "You entered this area." or
-  "You left this area.". A notification replaces the earlier one of the same geofence and direction.
-  Privacy zones post nothing.
-- During a visit, `VisitScreen` posts "The next stop of your journey is less than 5 m away." once per
-  stop.
-- Both use the channel `alerts` (high importance, no sound). The journey notification uses the
-  channel `visit`; the SDK's positioning service has its own channel.
-- Without the notification permission nothing is shown.
-
-## Wristband
-
-The host app scans the wristband's QR code, or the visitor types the code printed on it. Pass the
-result to `connect(code)`:
-
-```kotlin
-scope.launch {
-    try {
-        wristband.connect(scannedCode)
-    } catch (error: BindingError) {
-        errorText = WristbandCopy.message(error).resolve(context)   // English or Arabic
-    }
-}
-```
-
-- `connect(code)` trims the code and sends it to the relay-api, which resolves every label format.
-  It returns when the session is active and throws `BindingError` otherwise
-  (`BindingError.InvalidTagId` for an empty code).
-- When the relay-api needs the phone's location for a take-over, the system location dialog comes
-  first. Compose `WristbandLocationDialogHost(wristband)` on the screen that calls `connect(code)`;
-  without it the bind goes out without asking.
-- A wristband that another phone follows is taken over when the relay-api allows it. The other
-  phone's session ends.
-- `isActive`, `state` (`StateFlow<BlueiotBindingState>`) and `endNotice` describe the session.
-  Positions arrive only while it is active. `end()` ends the session on the relay-api.
-- `VisitScreen` shows no wristband alerts: the host app handles the wristband states, for example
-  an ended session (`state`, `endNotice`). `VisitScreen` reports lost and returning positions as
-  `VisitEvent.TrackingChanged(TrackingHealth)`.
-
-## Screens
-
-| Composable | Content |
-|---|---|
-| `MuseumMapScreen(venue, onBack)` | The museum map: floors, amenities, the visitor's position, a route to a tapped place, the accessible routes button. |
-| `VisitScreen(venue, journey, onClose, kind, onVisitEvent)` | The journey: map and list with a toggle, skip and undo, the stop card, the journey notification. `kind` is `JourneyKind.PERSONALISED` (default) or `CURATED`. |
-| `WristbandPairingScreen(flow, onFinish)` | Optional: the pairing flow of the Proximi GAD app, with its QR scanner. Create the flow with `WristbandPairingFlow.of(wristband, scope)`. |
-| `VisitPlanPicker(places, onStart, onCancel)` | Choosing stops by hand. |
-| `JourneyReadyScreen(meta, isAtMuseum, onStart, onBack)` | "Journey ready" (02.10A). |
-| `ManageJourneySheet(title, summary, onEdit, onCraftNew, onDelete, onClose)` | "Manage journey" (02.11). Each action runs once the sheet has gone. |
-
-`VisitScreen` keeps its state while the activity is recreated, for example after a language change.
-It ends the visit's work (notification, tracking monitor, navigator) when it leaves the composition
-for good. `onClose` is called after the visitor confirmed leaving, or after the journey is complete.
-
-A journey from Proximi.io POI ids, for example from the audio guide:
-
-```kotlin
-val places = venue.places(language)        // the app's language tag, for example "ar"
-val galleries = venue.galleries(language)
-val journey = VisitPlan.journey(poiIds, places, galleries)
-```
-
-`VisitStore.of(context)` keeps the journey in progress and its `VisitMeta` across launches
-(`journey`, `meta`, `save`, `saveMeta`). `VisitScreen` saves the journey on every change. Call
-`VisitStore.of` off the main thread the first time: it reads the disk.
-
-### Personalised and curated journeys
-
-A journey the visitor built with the guide is `PERSONALISED`; a tour by the museum's curators is
-`CURATED` (Figma "Personalised" and "Guided"):
-
-| | `PERSONALISED` | `CURATED` |
-|---|---|---|
-| Stop card | Names the gallery of the next stop until the visitor is in it, then the artwork. | Names the artwork. |
-| List | Stops under gallery headers. | Stops without headers. |
-| Skip | The visitor can skip an artwork, also one no accessible route reaches. | No skip. |
-| Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. An artwork visited out of order is marked visited; the rest keep their order. |
-
-The map and the background are the same for both. `VisitMeta.kind` stores the kind with the journey
-for the host app's own screens.
+The geofence and "next stop" notifications use the channel `alerts` (high importance, no sound). A
+notification replaces the earlier one of the same geofence and direction; privacy zones post
+nothing. The journey notification uses the channel `visit`; the SDK's positioning service has its
+own channel. Without the notification permission nothing is shown.
 
 ## The journey list
 
@@ -293,20 +416,18 @@ level 0, with the café and the prayer room. A route there, on the journey map a
    off-route warning and no "Probably at …" shows, and the card says that the position is not shown.
 
 The map follows the visitor again when the destination changes ("Resume your Journey", another stop
-or route), on "Centre on me" or "Follow my floor", or after `floorWithoutPositioningMaximum`.
-`VisitScreen` reports `VisitEvent.FloorWithoutPositioningEntered(level)` and
-`FloorWithoutPositioningLeft(level)`. The view shows the lift or stairs icon until the animation
-from the design team exists. The view has the test tag `floorChangeView`.
+or route), on "Centre on me" or "Follow my floor", or after `floorWithoutPositioningMaximum`. The
+journey screen sends `FloorWithoutPositioningEntered(level)` and `FloorWithoutPositioningLeft(level)`.
+The view shows the lift or stairs icon until the animation from the design team exists. The view
+has the test tag `floorChangeView`.
 
 ## Accessibility
 
-The host app passes the visitor's accessibility needs to the map and journey screens. Every route
-then avoids what they name, and a change routes the route on screen again:
+The host app sets the visitor's accessibility needs. Every route then avoids what they name, and a
+change re-routes the route on screen:
 
 ```kotlin
-CompositionLocalProvider(LocalRouteAccessibility provides RouteAccessibility(avoidsStairs = true, avoidsRevolvingDoors = true)) {
-    HostContent()
-}
+map.routeAccessibility.value = RouteAccessibility(avoidsStairs = true, avoidsRevolvingDoors = true)
 ```
 
 | Need | Avoids, where the venue data marks it |
@@ -318,77 +439,25 @@ CompositionLocalProvider(LocalRouteAccessibility provides RouteAccessibility(avo
 
 - The GAD venue data on 2026-10-14 has staircases and elevators. It has no escalators, no `door`
   features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
-- `RouteAccessibility.routeOptions` is the SDK's `RouteOptions` for the needs, for routes the host app
-  computes itself.
 - The museum map and the journey map have an accessible routes button (a wheelchair, blue while on).
-  While it is on, routes avoid all four (`RouteAccessibility.ACCESSIBLE`), whatever the host app
-  provides. Its state is a Boolean in the shared preferences file `proximiio_gadkit` under
-  `ProximiioGADKit.accessibleRoutes` (`RouteAccessibility.PREFERENCES_FILE`,
-  `ACCESSIBLE_ROUTES_KEY`), for both maps and later launches. `VisitScreen` reports
-  `VisitEvent.AccessibleRoutesChanged`.
+  While it is on, routes avoid all four (`RouteAccessibility.ACCESSIBLE`), whatever the host app set.
+  Its state is kept on the device for both maps and later launches.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
   settings." In a journey, the stop card shows "No route to this stop with your accessibility
   settings." and the stop keeps its place; in a personalised journey the visitor can skip it in the
   list.
 
-## Events from VisitScreen
-
-`VisitScreen` performs every action itself. The host app receives a `VisitEvent` for each visitor
-action and each journey change, on the main thread:
-
-```kotlin
-VisitScreen(venue, journey, onClose = onClose, onVisitEvent = { event ->
-    when (event) {
-        is VisitEvent.SkipRequested -> log("Swiped ${event.stop.title}")
-        is VisitEvent.StopSkipped -> log("Skipped ${event.stop.title}")
-        is VisitEvent.ArtworkReached -> log("At ${event.stop.title}")
-        else -> Unit
-    }
-})
-```
-
-| Event | When |
-|---|---|
-| `ModeChanged(VisitMode)` | The Map / List toggle. |
-| `SkipRequested(JourneyStop)` | A swipe on a stop in the list, or its "Skip" TalkBack action. "Skip artwork?" follows. |
-| `StopSkipped(JourneyStop)` | "Skip artwork" confirmed. |
-| `SkipCancelled(JourneyStop)` | "Keep it". |
-| `SkipUndone(JourneyStop)` | "Undo skip" in the list. |
-| `AmenitySelected(VenuePlace)` | An amenity picked on the map. A card shows it. |
-| `DetourStarted(VenuePlace)` | "Change your route?" confirmed. |
-| `JourneyResumed` | "Resume your Journey" or "Show the route from here". |
-| `Recentred` | "Centre on me". |
-| `AccessibleRoutesChanged(Boolean)` | The accessible routes button turned on (`true`) or off. |
-| `ExitRequested` | Back during a visit in progress. "Leave" or "Carry on" follows. |
-| `ExitConfirmed` | "Leave". `onClose` follows. |
-| `ExitCancelled` | "Carry on". |
-| `StopNearby(JourneyStop)` | The active stop is less than 5 m away on the visitor's level. Once per stop per visit. |
-| `ArtworkReached(JourneyStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The stop is done 2 s later, when the event arrives, and the route leads to the next stop. |
-| `ArtworkVisitedOutOfOrder(JourneyStop)` | The visitor stayed at an artwork further down the journey. The stop is done and the stops ahead are ordered again. |
-| `FloorWithoutPositioningEntered(Int)` | The map shows a floor without positioning after the lift or stairs view. |
-| `FloorWithoutPositioningLeft(Int)` | The map follows the visitor again. |
-| `TrackingChanged(TrackingHealth)` | The wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`) or came back (`TRACKING`). `VisitScreen` shows no alert. |
-| `Journey(JourneyEvent)` | Every event of the journey navigator: `LegChanged`, `StopSkipped`, `Rerouted`, `DetourStarted`, `StopReached` (detours only), `JourneyFinished` and others. The navigator does not report artworks reached: use `ArtworkReached`. |
-
 ## Journey notification
 
 The iOS Live Activity is an ongoing notification on Android: the current step, "Stop N of M", the
-next instruction and the level. `VisitScreen` posts, updates and removes it (channel `visit`). It
-needs the notification permission.
-
-## Design system
-
-`Palette`, `GadTextStyle`, `GuggenheimSansDisplay`, `PrimaryButton`, `GhostButton`, `SmallButton`,
-`TextActionButton`, `OutlineBadge`, `Modifier.glassSurface`, `ProvideGlassBackdrop`,
-`Modifier.glassBackdrop`, `AuroraBox`, `BackButton`, `OverlaySheet` and `Chip` are the Figma tokens and
-components, for the host app's own screens (package `io.proximi.gadkit.designsystem` and
-`io.proximi.gadkit.ui`).
+next instruction and the level. The journey screen posts, updates and removes it (channel `visit`).
+It needs the notification permission.
 
 ## Field log
 
-`FieldLog` writes positions, tracking health, geofence, journey and binding events to
+`FieldLog` writes positions, tracking health, geofence, journey, binding and `ProximiMap` events to
 `files/fieldlog/gad-debug.log` in app-private storage, and to Logcat with the tag `GAD`. It is off by
-default. Turn it on at launch, before `VenueService.start`, in test builds only:
+default. Turn it on at launch, before `start()`, in test builds only:
 
 ```kotlin
 FieldLog.start(context, configuration.secrets)   // the tokens are replaced by <redacted>
@@ -400,13 +469,8 @@ it passes 8 MB.
 
 ## Debug builds
 
-In a debuggable host build, `DebugLaunch` reads intent extras. The SDK-dependent extras take effect
-when the host app calls `run` after `VenueService.start`:
-
-```kotlin
-val options = DebugLaunch.read(activity)   // null in a build that is not debuggable
-if (options != null) DebugLaunch.run(options, venue, venue.places(language))
-```
+In a debuggable host build, `start()` reads these intent extras of the activity that composes
+`ProximiMapHost`:
 
 ```
 adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> --es gad.journeySpeed 2 --ez gad.journeyLoops true
@@ -418,16 +482,17 @@ adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> -
 | `gad.journeySpeed <x>` | Playback speed. Default 1. |
 | `gad.journeyLoops true` | Restarts playback after the last waypoint. |
 | `gad.listJourneys true` | Logs the organisation's places and journeys with their ids. |
-| `gad.routeTo <title>` | `MuseumMapScreen` routes to the first place whose title matches, after the first position. |
-| `gad.mapGalleryFills true` | `MuseumMapScreen` fills every gallery. |
-| `gad.visitList true` | `VisitScreen` opens in List mode. |
+| `gad.pairWristband <code>` | Binds the wristband after the start. Ignored with `gad.journey`. |
+| `gad.visit "<title>,<title>,…"` | Stores a journey through the first place matching each title and opens it. |
+| `gad.visitKind personalised\|curated` | With `gad.visit`: the kind of journey. Default personalised. |
+| `gad.visitList true` | The journey opens in List mode. |
 | `gad.visitAutoAdvance true` | A reached detour ends 5 m after the visitor leaves it, without "Resume your Journey". |
-| `gad.visitKind personalised\|curated` | Sets `Options.visitKind`. The host app passes it to `VisitScreen`. |
-| `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `Options.routeAccessibility`. The host app provides it with `LocalRouteAccessibility`. |
+| `gad.openMap true` | Opens the museum map. |
+| `gad.routeTo <title>` | The museum map routes to the first place whose title matches, after the first position. |
+| `gad.mapGalleryFills true` | The museum map fills every gallery. |
+| `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
 
-`DebugLaunch` also reads `gad.visit` (`Options.visitStops`) and `gad.hubPage` (`Options.hubPage`).
-The library does not act on them; the Proximi GAD app reads them. `VenueService.playJourney` plays a
-journey in a debuggable build only.
+`gad.hubPage` is read by the Proximi GAD app; the library does not act on it.
 
 Sandbox data (GAD Sandbox organisation):
 
@@ -462,30 +527,34 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
   client requires no consent prompt for it.
 - The Play Console Data safety form of the host app declares precise location and a device
   identifier (the anonymous visitor id), sent to Proximi.io, not shared and not used for tracking.
-- The library asks for no permission itself; the host app requests location and notifications.
+- `ProximiMapHost` asks for location while the app is in use and for notifications. The library
+  never asks for background location.
 
 ## Differences from the iOS package
 
 | iOS | Android | Note |
 |---|---|---|
-| `GADConfiguration(apiBaseURL: URL, …, relayAPI: BlueiotCloudRelayEndpoint, …)` | `GadConfiguration(apiBaseUrl: String, …, relayApiBaseUrl: String, …)` | URLs are strings; an invalid relay-api URL throws. |
+| `ProximiMap(configuration:)` | `ProximiMap(context, configuration, scope)` | Android needs a context. `scope` runs the session, the event streams and the notifications. Create one per process, for example in the `Application`. |
+| `@Observable` properties | `StateFlow`s; `routeAccessibility` is a `MutableStateFlow` | Read them in Compose with `collectAsState()`. |
+| `events`: a new `AsyncStream` per access, the newest 100 buffered | `events`: one `Flow` for all collectors, 100 buffered per collector, the oldest dropped | |
+| `.proximiMap(_:)` on a view | `ProximiMapHost(map) { content }` at the root | Compose takes the content as a parameter. With Fragments, a `ComposeView` above the fragment container. |
+| Full-screen covers and sheets | Screens in `ProximiMapHost`, in the activity's window; Manage journey is a bottom sheet | The stop picker is full screen (iOS: a sheet). `open` can be called while a screen of the host app is closing. |
+| `start()` asks for location and waits for the answer | `ProximiMapHost` asks once per process when it is first composed; `start()` does not wait | A permission dialog needs an activity. The SDK starts its positioning service once location is allowed; a change in Settings applies on resume. |
+| `isLocationDenied` from the authorization status | `true` only after the dialog of `ProximiMapHost` was answered | Android does not tell a refusal from a permission never asked for. |
+| Notification authorization asked once a wristband is connected | `ProximiMapHost` asks for `POST_NOTIFICATIONS` (Android 13 and later) | The geofence notifications use the channel `alerts`. |
+| The location dialog of a take-over | `ProximiMapHost` shows it | |
+| `ProximiMapError`, `localizedDescription` | `ProximiMapException` subclasses, `message` | `startFailed(String)` is `StartFailed` with `reason`. |
+| `ProximiMap.Screen.museumMap` … | `ProximiMap.Screen.MUSEUM_MAP` … | |
+| `ProximiMapEvent` enum cases (`.artworkReached(stop)`) | `ProximiMapEvent` sealed interface (`ProximiMapEvent.ArtworkReached(stop)`) | `offRoute(duration: TimeInterval)` is `OffRoute(duration: Duration)`. `artworkID` is `artworkId`. |
+| `TrackingHealth` cases (`.lostPlace`), `JourneyKind` (`.curated`), `VisitMode` | Enums (`LOST_PLACE`, `CURATED`, `MAP`) | |
+| `GADConfiguration(apiBaseURL: URL, …, relayAPIBaseURL: URL, …)`, `nil` for an invalid relay-api URL | `GadConfiguration(apiBaseUrl: String, …, relayApiBaseUrl: String, …)` | An invalid relay-api URL throws `IllegalArgumentException`. |
 | `GADSettings` (`var`s, seconds as `TimeInterval`) | `GadSettings` (data class, `Duration`) | `offRouteSeconds` is `offRouteAfter`; `levelChangeViewSeconds` is `levelChangeViewDuration`; `floorWithoutPositioningMaximumSeconds` is `floorWithoutPositioningMaximum`; `liveActivityMinimumInterval` is `journeyNotificationMinimumInterval`. |
-| `WristbandSession(configuration:)` + `run()` | `WristbandSession(context, configuration, scope)` | It follows the binding state in `scope`; there is no `run()`. |
-| `VenueService.start` asks for location | The host app asks for location first | Android needs an activity for the dialog. |
-| `VisitView(venue:journey:kind:onClose:)` with the modifier `onVisitEvent` | `VisitScreen(venue, journey, onClose, kind, onVisitEvent)` | Compose takes lambdas as parameters. |
-| `.routeAccessibility(_:)` | `CompositionLocalProvider(LocalRouteAccessibility provides …)` | |
-| `VisitEvent` enum cases (`.skipRequested(stop)`) | `VisitEvent` sealed interface (`VisitEvent.SkipRequested(stop)`) | `journey(JourneyEvent)` is `Journey(event)`. The stop is the library's `JourneyStop`. |
-| `TrackingHealth` cases (`.lostPlace`) | `TrackingHealth` enum (`LOST_PLACE`) | |
-| `.buttonStyle(.small(selected:strength:))` | `SmallButton(text, onClick, selected = …, strength = …)` | |
-| `WristbandPairing` + `WristbandPairingView(pairing:onFinish:)` | `WristbandPairingFlow.of(wristband, scope)` + `WristbandPairingScreen(flow, onFinish)` | |
-| `WristbandCopy.message(for:)` returns `String` | `WristbandCopy.message(error)` returns `UiText` | Resolve it with `resolve(context)` or `asString()` in Compose. |
-| `UserDefaults` `ProximiioGADKit.accessibleRoutes` | Shared preferences `proximiio_gadkit`, same key | |
-| `VisitStore.save` / `load` (static) | `VisitStore.of(context)` | |
-| `VenuePlace.all(in: await venue.sdk.features())` | `venue.places(language)` | Also `venue.galleries(language)`. |
-| `GeofenceNotifier().run(sdk:)` + `requestAuthorization()` | `GeofenceNotifier(context).run(sdk)` + `AskNotificationPermission` | Android posts on the channel `alerts`. |
-| `FieldLog.isEnabled = true` + `logLaunch()`, `FieldLogShareButton` | `FieldLog.start(context, secrets)`, `FieldLog.share(context)` | |
-| `DebugLaunch.current.run(with:wristband:)`, launch arguments `-journeyPlayback` | `DebugLaunch.read(activity)` + `run(options, venue, places)`, intent extras `gad.journey` | Debuggable host builds only, as `#if DEBUG`. |
+| `@_spi(GADApp)` | `@ProximiGadAppApi` (`RequiresOptIn`, level `ERROR`) | The Android pairing screen is `WristbandPairingScreen(map.makeWristbandPairing(), onFinish)`. Android has no `DemoPairing`. |
+| Launch arguments in the Debug configuration (`-journeyPlayback`) | Intent extras in a debuggable build (`gad.journey`) | Read from the activity that composes `ProximiMapHost`. |
+| A view keeps its state while SwiftUI redraws it | A recreated activity keeps the screen on screen and the journey's state | For example after a language change. After the process ends only the stored journey stays. |
 | Live Activity (`ProximiioGADLiveActivity`) | Ongoing journey notification | No widget extension. |
+| `FieldLog.isEnabled = true` + `logLaunch()`, `FieldLogShareButton` | `FieldLog.start(context, secrets)`, `FieldLog.share(context)` | |
+| 0.15.0: SDK 6.0.0-beta.59 and Map 6.0.0-beta.44, text for the swap and signing errors | Not in 1.0.0 | It waits for the Android SDK 6.0.0-beta.25 and a Map release. |
 
 ## Tests
 
@@ -493,17 +562,18 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 ./gradlew :proximiio-gadkit:testDebugUnitTest
 ```
 
-The JVM tests cover the rules without a map or an SDK: the card and instruction text, the ride
-merge, the floor without positioning, galleries, level changers, artwork geofences, journey order
-and the settings. The UI tests run in the Proximi GAD Android app (`app/src/androidTest`), against
-the sandbox.
+The JVM tests cover the rules without a map or an SDK: `ProximiMap` (artwork ids, the journey
+summary, the wristband status, the events, the screen order), the card and instruction text, the
+ride merge, the floor without positioning, galleries, level changers, artwork geofences, journey
+order and the settings. The UI tests run in the Proximi GAD Android app (`app/src/androidTest`),
+against the sandbox.
 
 ## Changelog
 
 The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/). Every change of
 the library adds an entry under `[Unreleased]` in the same commit. A release moves the entries
 under a heading with the version and the date. A tag `X.Y.0` has the behaviour of the iOS tag
-`X.Y.0`.
+`X.Y.0`. Entries before 1.0.0 name the types of the API before `ProximiMap`.
 
 - **BREAKING:** the host app has to change its code: a public API is renamed or removed, a
   parameter is new and required, a type changes, or a default changes. The entry says what to change.
@@ -512,10 +582,33 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-The behaviour of the iOS package 0.5.0 (geofence events sent at once).
+Version 1.0.0, with the behaviour of the iOS package 1.0.1 without 0.15.0 (see "Differences from
+the iOS package"). One entry point, `ProximiMap`, replaces the screens and services of 0.14.0
+(Nagarro, 2026-10-16: "a single exposed wrapper component that encapsulates all internal UI
+components and logic"). From 1.0.0 a minor or patch version does not break the public API.
 
 #### Changed
 
+- **BREAKING:** these are no longer public; `ProximiMap` and `ProximiMapHost` do what they did:
+
+  | 0.14.0 | 1.0.0 |
+  |---|---|
+  | `WristbandSession(context, configuration, scope)` + `VenueService.start(context, configuration, wristband.binding)` | `ProximiMap(context, configuration, scope)` + `start()` |
+  | `venue.sdk` | `ProximiMapEvent` (for example `GeofenceEntered`, `ArtworkReached`). The host app does not use the SDK instance. |
+  | `WristbandSession.connect(code)`, `end()`, `state`, `isActive`, `endNotice`, `WristbandCopy.message(error)`, `BindingError` | `connectWristband(code)`, `endVisit()`, `wristband`, `ProximiMapException.Wristband` and its `message` |
+  | `WristbandLocationDialogHost(wristband)`, the location request before `VenueService.start`, `AskNotificationPermission(isNeeded)` | `ProximiMapHost` asks. |
+  | `MuseumMapScreen`, `VisitScreen`, `JourneyReadyScreen`, `VisitPlanPicker`, `ManageJourneySheet` | `ProximiMapHost(map)` and `open(Screen.MUSEUM_MAP)`, `JOURNEY`, `JOURNEY_READY`, `PLAN_JOURNEY`, `MANAGE_JOURNEY` |
+  | `VisitPlan.journey(poiIds, places, galleries)`, `VisitStore`, `VisitMeta`, `venue.places(language)`, `venue.galleries(language)` | `setJourney(JourneyPlan)`, `deleteJourney()`, `journey` |
+  | `VisitScreen(onVisitEvent = { VisitEvent })` | `map.events.collect { ProximiMapEvent }` |
+  | `CompositionLocalProvider(LocalRouteAccessibility provides …)` | `map.routeAccessibility.value = …` |
+  | `GeofenceNotifier(context).run(venue.sdk)` | `GadSettings.postsGeofenceNotifications` (default `true`) |
+  | `DebugLaunch.read(activity)` + `DebugLaunch.run(options, venue, places)` | `start()` runs the debug extras in debuggable builds. |
+  | `VenueService.settings` | `GadConfiguration.settings` |
+  | `VenuePlace`, `Gallery`, `Journey`, `JourneyStop`, `StopState`, `StopKind`, `Coordinate`, `UiText`, `BindingState`, `JourneyKind.of` and the `JourneyKind` rules, `RouteAccessibility.routeOptions`, `PREFERENCES_FILE`, `ACCESSIBLE_ROUTES_KEY` | Internal. |
+  | `WristbandPairingFlow.of(wristband, scope)`, `WristbandPairingScreen`, the design system (`Palette`, `GadTextStyle`, `GuggenheimSansDisplay`, the buttons, `glassSurface`, the glass backdrop, `AuroraBox`, `LabeledField`), `BackButton`, `OverlaySheet`, `asHeading`, `DebugLaunch` | Behind `@ProximiGadAppApi`: not for host apps. |
+
+- **BREAKING:** `ProximiMapEvent` has library payloads (`ProximiStop`, `ProximiGeofence`) instead of
+  the library's `JourneyStop` and `VenuePlace` and the map library's `JourneyEvent`.
 - **BREAKING:** the library depends on the Proximi.io Android SDK `6.0.0-beta.24` (was
   `6.0.0-beta.23`); the Map stays `6.0.0-beta.21`. A host app that declares the SDK artifacts
   itself moves them to `6.0.0-beta.24`. The SDK's `ProximiioConfiguration` has a new parameter
@@ -524,6 +617,31 @@ The behaviour of the iOS package 0.5.0 (geofence events sent at once).
 - **Visible:** each geofence enter and exit is sent to `apiBaseUrl` at once, not in the batch every
   60 s. Beacon and privacy-zone events are no longer uploaded; the SDK still delivers them to the
   app. See "Privacy". No change in the host app.
+- **Visible:** `ProximiMapHost` asks for location once per process when it is first composed, and
+  for notifications once a wristband is connected. Remove the host app's own requests for the
+  library.
+
+#### Added
+
+- `ProximiMap`: `start()`, `status`, `connectWristband(code)`, `endVisit()`, `wristband`,
+  `setJourney(plan)`, `deleteJourney()`, `journey`, `open(screen)`, `close()`, `screen`, `events`,
+  `isAtMuseum`, `isLocationDenied`, `routeAccessibility`.
+- `ProximiMapHost(map, modifier, content)` presents the screens and sheets; one at a time, the next
+  after the previous one has gone.
+- Journeys by artwork collection id (`remote_id`) or POI id (`JourneyPlan.artworks`).
+- `ProximiMapEvent.GeofenceEntered` and `GeofenceExited` for every geofence, with or without a
+  journey.
+- `NextStop`, `DetourEnded`, `OffRoute`, `BackOnRoute` and `JourneyFinished` events from the journey
+  navigator.
+- Manage journey sends `CraftNewJourneyRequested` and, for a curated tour,
+  `CuratedTourChangeRequested`.
+- `GadSettings.postsGeofenceNotifications` (default `true`), after
+  `journeyNotificationMinimumInterval`.
+- `isAtMuseum` and `ArrivedAtMuseum`, moved from the Proximi GAD app. A phone fix counts within
+  400 m of any place of the venue. The app compared it with the mean of all places, which for the
+  two GAD venues 11 km apart is near neither.
+- Debug extras `gad.openMap` and `gad.pairWristband`, as the iOS launch arguments `-openMap` and
+  `-pairWristband`. `gad.visit` stores the journey before it opens it.
 
 #### Fixed
 

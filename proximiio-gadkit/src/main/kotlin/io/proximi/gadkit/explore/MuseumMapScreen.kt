@@ -27,7 +27,7 @@ import io.proximi.gadkit.ui.asHeading
  * and the gallery legend.
  */
 @Composable
-public fun MuseumMapScreen(venue: VenueService, onBack: () -> Unit, modifier: Modifier = Modifier) {
+internal fun MuseumMapScreen(venue: VenueService, onBack: () -> Unit, modifier: Modifier = Modifier) {
     AuroraBox(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {

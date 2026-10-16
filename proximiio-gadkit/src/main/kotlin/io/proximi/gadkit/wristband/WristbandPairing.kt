@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.update
 import kotlin.coroutines.cancellation.CancellationException
 
 /** What to ask for before a bind. */
-public enum class WristbandLocationAsk {
+internal enum class WristbandLocationAsk {
     /** Location permission. Asked only while it is undetermined. */
     PERMISSION,
 
@@ -17,15 +17,15 @@ public enum class WristbandLocationAsk {
 }
 
 /** Binds the phone to a wristband. The SDK binding in the app; a fake in tests and in the debug pairing demo. */
-public interface WristbandConnecting {
+internal interface WristbandConnecting {
     /** What to ask for before a bind, or `null` when nothing can or needs to be asked. */
-    public suspend fun locationAsk(): WristbandLocationAsk?
+    suspend fun locationAsk(): WristbandLocationAsk?
 
     /** Shows the system dialog for [ask] and returns when it is answered. */
-    public suspend fun ask(ask: WristbandLocationAsk)
+    suspend fun ask(ask: WristbandLocationAsk)
 
     /** Binds the phone to the band with [label]. Returns when the session is active. Throws [BindingError]. */
-    public suspend fun bind(label: String)
+    suspend fun bind(label: String)
 }
 
 /**
@@ -36,12 +36,12 @@ public interface WristbandConnecting {
  * replaces any current one. A band that another phone follows is taken over when the relay-api
  * allows it.
  *
- * With [WristbandSession], the location dialog needs [WristbandLocationDialogHost] on screen.
+ * With [WristbandSession], the location dialog needs `ProximiMapHost` or the pairing screen on screen.
  *
  * @throws BindingError when the bind fails, [BindingError.InvalidTagId] for an empty code.
  *   `WristbandCopy.message(error)` is the text for the visitor.
  */
-public suspend fun WristbandConnecting.connect(code: String) {
+internal suspend fun WristbandConnecting.connect(code: String) {
     val label = code.trim()
     if (label.isEmpty()) throw BindingError.InvalidTagId()
     locationAsk()?.let { ask(it) }

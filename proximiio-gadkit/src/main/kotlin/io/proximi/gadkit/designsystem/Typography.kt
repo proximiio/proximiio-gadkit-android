@@ -1,5 +1,6 @@
 package io.proximi.gadkit.designsystem
 
+import io.proximi.gadkit.ProximiGadAppApi
 import io.proximi.gadkit.R
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -12,6 +13,7 @@ import androidx.compose.ui.unit.sp
  * Guggenheim Sans Display. It has no Arabic glyphs; Android falls back to the system Arabic
  * font per glyph, as iOS does.
  */
+@ProximiGadAppApi
 public val GuggenheimSansDisplay: FontFamily = FontFamily(
     Font(R.font.guggenheim_sans_display_light, FontWeight.Light),
     Font(R.font.guggenheim_sans_display_regular, FontWeight.Normal),
@@ -26,6 +28,7 @@ public val GuggenheimSansDisplay: FontFamily = FontFamily(
  * size), as on iOS and in the Figma text layers ("leading normal"). Sizes are in sp, so every style
  * scales with the system font size.
  */
+@ProximiGadAppApi
 public enum class GadTextStyle(public val weight: FontWeight, public val sizeSp: Int) {
     CardTitle(FontWeight.SemiBold, 32),
     H1Regular(FontWeight.Normal, 24),

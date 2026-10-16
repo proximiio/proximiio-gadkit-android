@@ -41,7 +41,7 @@ public object FieldLog {
 
     /**
      * Turns the log on, opens the file and writes the header of a new session: the host app's
-     * version, its version code and the date. Call it at launch, before `VenueService.start`.
+     * version, its version code and the date. Call it at launch, before `ProximiMap.start`.
      * [secrets] are the tokens to redact, such as the application token.
      */
     public fun start(context: Context, secrets: List<String>) {

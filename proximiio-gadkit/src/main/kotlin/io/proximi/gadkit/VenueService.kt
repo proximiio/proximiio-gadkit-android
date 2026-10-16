@@ -37,9 +37,9 @@ import kotlinx.coroutines.launch
  * (`relayOnly`). The API host comes from [GadConfiguration], so a production build reaches only
  * the client's on-prem install.
  */
-public class VenueService private constructor(
-    /** The app's only `Proximiio` instance. Other features of the host app use it too; do not create a second one. */
-    public val sdk: Proximiio,
+internal class VenueService private constructor(
+    /** The process's only `Proximiio` instance. Do not create a second one. */
+    internal val sdk: Proximiio,
     private val binding: BlueiotWristbandBinding,
     /** True in a debuggable host build, as iOS `#if DEBUG`: journey playback and [DebugLaunch]. */
     internal val isDebugBuild: Boolean,
@@ -50,7 +50,7 @@ public class VenueService private constructor(
      * when it opens, so a change applies to the next one.
      */
     @Volatile
-    public var settings: GadSettings = settings
+    internal var settings: GadSettings = settings
 
     /** Name of the attached position provider. Providers are detached by name. */
     private var attachedProvider: String? = null
@@ -66,7 +66,7 @@ public class VenueService private constructor(
      * stops and starts the provider, which reopens its relay-api stream. In debug builds it also
      * ends journey playback.
      */
-    public suspend fun attachBinding() {
+    internal suspend fun attachBinding() {
         val provider = binding.positionProvider
         attach(provider)
         if (FieldLog.isEnabled) logSamples(provider)
@@ -109,7 +109,7 @@ public class VenueService private constructor(
      * playback of a journey stored on Proximi.io; the positions are generated on the phone.
      * [attachBinding] ends the playback.
      */
-    public suspend fun playJourney(id: String, speed: Double, loops: Boolean) {
+    internal suspend fun playJourney(id: String, speed: Double, loops: Boolean) {
         check(isDebugBuild) { "Journey playback is for debug builds only" }
         val journey = sdk.fetchJourney(id)
         journey.validationFailure()?.let { throw IllegalStateException("Journey cannot be played: $it") }
@@ -161,9 +161,9 @@ public class VenueService private constructor(
         }
     }
 
-    public companion object {
+    internal companion object {
         /** The SDK configuration for [configuration]. Separate from [start] so tests can check it. */
-        public fun configuration(context: Context, configuration: GadConfiguration): ProximiioConfiguration =
+        internal fun configuration(context: Context, configuration: GadConfiguration): ProximiioConfiguration =
             configuration(
                 configuration,
                 ProximiioServiceOptions(
@@ -200,7 +200,7 @@ public class VenueService private constructor(
          * proximiio-blueiot-minimal-android `Venue.start`. Then fetches the map style in the
          * background, so call it at launch, before the first map screen.
          */
-        public suspend fun start(context: Context, configuration: GadConfiguration, binding: BlueiotWristbandBinding): VenueService {
+        internal suspend fun start(context: Context, configuration: GadConfiguration, binding: BlueiotWristbandBinding): VenueService {
             val sdk = Proximiio(context.applicationContext, configuration(context, configuration))
             sdk.refreshPermissions()
             sdk.authenticate()

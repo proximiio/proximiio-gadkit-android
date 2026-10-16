@@ -114,7 +114,7 @@ import kotlin.math.roundToInt
  *   the main thread.
  */
 @Composable
-public fun VisitScreen(
+internal fun VisitScreen(
     venue: VenueService,
     journey: Journey,
     onClose: () -> Unit,

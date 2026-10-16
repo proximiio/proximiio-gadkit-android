@@ -1,5 +1,6 @@
 package io.proximi.gadkit.designsystem
 
+import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -7,6 +8,7 @@ import androidx.compose.ui.graphics.Color
  * The hex values are final; the semantic names are our reading of the design and are to be
  * confirmed with the design team.
  */
+@ProximiGadAppApi
 public object Palette {
     // Brand spectrum, in the order the palette shows it.
     public val lime: Color = Color(0xFF65FF2E)

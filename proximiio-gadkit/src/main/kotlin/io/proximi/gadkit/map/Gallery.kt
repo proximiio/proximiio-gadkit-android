@@ -9,12 +9,12 @@ import io.proximi.gadkit.roundedInt
  * gallery POI inside them, and from polygon geofences. Journey stops and the visitor's position
  * are placed in a gallery by a point-in-polygon test on the same level.
  */
-public data class Gallery(
-    public val id: String,
-    public val name: String,
-    public val level: Double,
+internal data class Gallery(
+    internal val id: String,
+    internal val name: String,
+    internal val level: Double,
     /** Outline as (latitude, longitude) pairs. */
-    public val ring: List<Coordinate>,
+    internal val ring: List<Coordinate>,
 ) {
     internal fun contains(coordinate: Coordinate, level: Double?): Boolean {
         if (level != null && !VenueLevel.same(level, this.level)) return false

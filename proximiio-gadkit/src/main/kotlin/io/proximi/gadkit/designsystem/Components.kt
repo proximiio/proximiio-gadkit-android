@@ -1,5 +1,6 @@
 package io.proximi.gadkit.designsystem
 
+import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.annotation.DrawableRes
@@ -32,7 +33,7 @@ import androidx.compose.ui.unit.sp
  * acted on (swiped) are filled red with a white number. A visited stop is white with a red stroke.
  */
 @Composable
-public fun StopNumberBadge(number: Int, modifier: Modifier = Modifier, emphasis: Emphasis = Emphasis.Normal) {
+internal fun StopNumberBadge(number: Int, modifier: Modifier = Modifier, emphasis: Emphasis = Emphasis.Normal) {
     Box(
         modifier
             .size(34.dp)
@@ -48,11 +49,11 @@ public fun StopNumberBadge(number: Int, modifier: Modifier = Modifier, emphasis:
     }
 }
 
-public enum class Emphasis { Normal, Filled, Visited }
+internal enum class Emphasis { Normal, Filled, Visited }
 
 /** Small outlined label, e.g. a level ("L2") or a gallery code. */
 @Composable
-public fun OutlineBadge(text: String, modifier: Modifier = Modifier) {
+internal fun OutlineBadge(text: String, modifier: Modifier = Modifier) {
     Box(
         modifier
             .defaultMinSize(minWidth = 25.dp, minHeight = 20.dp)
@@ -70,7 +71,7 @@ public fun OutlineBadge(text: String, modifier: Modifier = Modifier) {
 
 /** [OutlineBadge] with a 10 dp glyph in place of the text, for example the audio note of a journey stop. */
 @Composable
-public fun OutlineBadge(@DrawableRes icon: Int, contentDescription: String?, modifier: Modifier = Modifier) {
+internal fun OutlineBadge(@DrawableRes icon: Int, contentDescription: String?, modifier: Modifier = Modifier) {
     Box(
         modifier
             .defaultMinSize(minWidth = 25.dp, minHeight = 20.dp)
@@ -84,6 +85,7 @@ public fun OutlineBadge(@DrawableRes icon: Int, contentDescription: String?, mod
 
 /** Figma input: label above a 60 dp field with the input fill, gradient and white or error stroke. */
 @Composable
+@ProximiGadAppApi
 public fun LabeledField(label: String, modifier: Modifier = Modifier, isError: Boolean = false, field: @Composable () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {

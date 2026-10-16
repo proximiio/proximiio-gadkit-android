@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
  * museum, else "Go to Museum" with "It will be ready when you arrive at GAD", and "Back to Hub".
  */
 @Composable
-public fun JourneyReadyScreen(meta: VisitMeta, isAtMuseum: Boolean, onStart: () -> Unit, onBack: () -> Unit) {
+internal fun JourneyReadyScreen(meta: VisitMeta, isAtMuseum: Boolean, onStart: () -> Unit, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Image(painterResource(R.drawable.background_hub), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         Column(Modifier.fillMaxSize().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {

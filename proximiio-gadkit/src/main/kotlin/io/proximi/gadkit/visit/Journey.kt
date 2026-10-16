@@ -3,13 +3,13 @@ package io.proximi.gadkit.visit
 import io.proximi.gadkit.Coordinate
 
 /** State of a stop. Mirrors `JourneyStop.State` of the Proximi.io map SDK. */
-public enum class StopState { PENDING, ACTIVE, REACHED, DONE, SKIPPED }
+internal enum class StopState { PENDING, ACTIVE, REACHED, DONE, SKIPPED }
 
 /** Planned stops come from the plan; a detour is inserted by the visitor. Mirrors `JourneyStop.Kind`. */
-public enum class StopKind { PLANNED, DETOUR }
+internal enum class StopKind { PLANNED, DETOUR }
 
 /** One stop of a [Journey]. The app maps it to and from the SDK's `JourneyStop`. */
-public data class JourneyStop(
+internal data class JourneyStop(
     val id: String,
     val title: String,
     val coordinate: Coordinate,
@@ -29,4 +29,4 @@ public data class JourneyStop(
 }
 
 /** The ordered stops of a visit. */
-public data class Journey(val stops: List<JourneyStop>)
+internal data class Journey(val stops: List<JourneyStop>)

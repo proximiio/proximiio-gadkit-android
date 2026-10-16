@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.visit.JourneyKind
+import io.proximi.gadkit.wristband.WristbandSession
 import io.proximi.sdk.journeys
 import kotlinx.coroutines.CancellationException
 
@@ -21,26 +22,31 @@ import kotlinx.coroutines.CancellationException
  *
  * - `gad.journey`: plays the journey with this id in place of the wristband's positions
  *   (`VenueService.playJourney`), at `gad.journeySpeed` (default 1), looping with `gad.journeyLoops`.
+ * - `gad.pairWristband <code>`: binds the wristband after the start (iOS `-pairWristband`).
+ *   Ignored with `gad.journey`.
  * - `gad.listJourneys`: logs the places and the organisation's journeys (tag `GAD`).
+ * - `gad.openMap`: opens the museum map after the start (iOS `-openMap`).
  * - `gad.routeTo`: routes to the first place matching the text once there is a position.
  * - `gad.mapGalleryFills`: fills every gallery on the museum map, to check [JourneyMapLayers].
- * - `gad.visit`: starts a visit through the first place matching each comma-separated title
- *   (iOS `-visit`). It is stored once the navigator activates the first stop, as on iOS.
+ * - `gad.visit`: stores a journey through the first place matching each comma-separated title and
+ *   opens it (iOS `-visit`).
  * - `gad.visitList`: opens the journey screen in List mode (iOS `-visitList`).
  * - `gad.visitAutoAdvance`: a reached detour ends 5 m after the visitor leaves it, without
  *   "Resume your Journey" (iOS `-visitAutoAdvance`). It applies to every visit of the process.
  * - `gad.routeAvoid`: `stairs,escalators,revolvingDoors,inaccessiblePaths` sets
- *   [Options.routeAccessibility] (iOS `-routeAvoid`). The host app passes it to
- *   `LocalRouteAccessibility`.
- * - `gad.visitKind`: `personalised` (default) or `curated` sets [Options.visitKind] (iOS
- *   `-visitKind`). The host app passes it to `VisitScreen`.
- * - `gad.hubPage`: [Options.hubPage] for the host app, as iOS `-hubPage`. The library does not act on it.
+ *   `ProximiMap.routeAccessibility` (iOS `-routeAvoid`).
+ * - `gad.visitKind`: `personalised` (default) or `curated`, the kind of the `gad.visit` journey (iOS
+ *   `-visitKind`).
+ * - `gad.hubPage`: [Options.hubPage] for the Proximi GAD app, as iOS `-hubPage`. The library does not
+ *   act on it.
  *
- * `gad.journeyPlayback` is accepted for `gad.journey`, as iOS names it `-journeyPlayback`. The
- * playback starts with the Hub, so a visit gets positions without opening the museum map.
+ * `gad.journeyPlayback` is accepted for `gad.journey`, as iOS names it `-journeyPlayback`.
+ * `ProximiMap.start` runs the playback, the bind, `gad.openMap` and `gad.visit` with the extras of
+ * the activity that composes `ProximiMapHost`.
  *
  * A host build that is not debuggable reads nothing: [read] returns `null`.
  */
+@ProximiGadAppApi
 public object DebugLaunch {
     public data class Options(
         public val journeyId: String?,
@@ -52,12 +58,16 @@ public object DebugLaunch {
         public val visitStops: List<String> = emptyList(),
         public val visitList: Boolean = false,
         public val visitAutoAdvance: Boolean = false,
-        /** `gad.routeAvoid`: the accessibility needs the host app passes to `LocalRouteAccessibility`. */
+        /** `gad.routeAvoid`: `ProximiMap.start` sets `ProximiMap.routeAccessibility` to it. */
         public val routeAccessibility: RouteAccessibility = RouteAccessibility.NONE,
-        /** `gad.visitKind`: `personalised` or `curated`, for the host app's `VisitScreen`. */
+        /** `gad.visitKind`: the kind of the `gad.visit` journey. */
         public val visitKind: JourneyKind = JourneyKind.PERSONALISED,
-        /** `gad.hubPage`: `welcome` or `craft`. The library does not act on it; the host app can. */
+        /** `gad.hubPage`: `welcome` or `craft`. The library does not act on it; the Proximi GAD app does. */
         public val hubPage: String? = null,
+        /** `gad.openMap`: the museum map opens after the start. */
+        public val openMap: Boolean = false,
+        /** `gad.pairWristband`: the wristband code to bind after the start, without `gad.journey`. */
+        public val pairWristband: String? = null,
     )
 
     /** Playback starts once per process; the map screen can open many times. */
@@ -83,6 +93,8 @@ public object DebugLaunch {
             routeAccessibility = routeAvoid(value("gad.routeAvoid")),
             visitKind = JourneyKind.of(value("gad.visitKind")),
             hubPage = value("gad.hubPage"),
+            openMap = value("gad.openMap").toBoolean(),
+            pairWristband = value("gad.pairWristband")?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 
@@ -100,8 +112,11 @@ public object DebugLaunch {
         )
     }
 
-    /** Lists the journeys and starts the playback the options ask for, once per process. */
-    public suspend fun run(options: Options, venue: VenueService, places: List<VenuePlace>) {
+    /**
+     * Lists the journeys and starts the playback the options ask for, once per process. Without a
+     * playback, binds [Options.pairWristband] through [wristband].
+     */
+    internal suspend fun run(options: Options, venue: VenueService, places: List<VenuePlace>, wristband: WristbandSession? = null) {
         if (!venue.isDebugBuild || hasRun) return
         hasRun = true
         if (options.listJourneys) {
@@ -125,14 +140,28 @@ public object DebugLaunch {
                 log("journeys failed: ${e.message}")
             }
         }
-        val id = options.journeyId ?: return
+        val id = options.journeyId
+        if (id != null) {
+            try {
+                venue.playJourney(id, options.journeySpeed, options.journeyLoops)
+                log("journey playback started: $id")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("journey playback failed: ${e.message}")
+            }
+            return
+        }
+        val code = options.pairWristband ?: return
+        val session = wristband ?: return
+        log("binding wristband $code")
         try {
-            venue.playJourney(id, options.journeySpeed, options.journeyLoops)
-            log("journey playback started: $id")
+            session.bind(code)
+            log("wristband $code: bound")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log("journey playback failed: ${e.message}")
+            log("wristband $code: ${e.message}")
         }
     }
 

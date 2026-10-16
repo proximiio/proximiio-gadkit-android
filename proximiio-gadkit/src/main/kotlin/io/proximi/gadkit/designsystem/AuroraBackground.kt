@@ -1,5 +1,6 @@
 package io.proximi.gadkit.designsystem
 
+import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -11,6 +12,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 /** The colour scheme of [AuroraBackground], as iOS `AuroraBackground.Variant`. */
+@ProximiGadAppApi
 public enum class AuroraVariant {
     /** Peach top, pastel band along the bottom. */
     Standard,
@@ -24,6 +26,7 @@ public enum class AuroraVariant {
  * iOS blurs solid circles; radial gradients give the same falloff without a blur pass.
  */
 @Composable
+@ProximiGadAppApi
 public fun AuroraBackground(modifier: Modifier = Modifier, variant: AuroraVariant = AuroraVariant.Standard) {
     Canvas(modifier.fillMaxSize()) {
         drawRect(Palette.white)
@@ -65,6 +68,7 @@ public fun AuroraBackground(modifier: Modifier = Modifier, variant: AuroraVarian
 
 /** A box on [AuroraBackground] whose glass surfaces blur the aurora. */
 @Composable
+@ProximiGadAppApi
 public fun AuroraBox(modifier: Modifier = Modifier, variant: AuroraVariant = AuroraVariant.Standard, content: @Composable BoxScope.() -> Unit) {
     val backdrop = rememberGlassBackdrop()
     Box(modifier) {

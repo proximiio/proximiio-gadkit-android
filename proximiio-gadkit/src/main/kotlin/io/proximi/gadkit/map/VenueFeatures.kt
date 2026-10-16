@@ -38,7 +38,7 @@ private fun JsonValue.decoded(): Any? = when (this) {
 }
 
 /** Every point POI of the cached venue data, for [language] (an app language tag such as `ar`). */
-public suspend fun VenueService.places(language: String?): List<VenuePlace> = withContext(Dispatchers.Default) {
+internal suspend fun VenueService.places(language: String?): List<VenuePlace> = withContext(Dispatchers.Default) {
     VenuePlace.all(sdk.features().map { it.toVenueFeature() }, language)
 }
 
@@ -46,7 +46,7 @@ public suspend fun VenueService.places(language: String?): List<VenuePlace> = wi
  * The venue's galleries, as iOS `VisitView` loads them: the `gallery` polygon features named
  * after the gallery place inside them, else the named gallery geofences.
  */
-public suspend fun VenueService.galleries(language: String?): List<Gallery> {
+internal suspend fun VenueService.galleries(language: String?): List<Gallery> {
     val outlines = withContext(Dispatchers.Default) {
         val features = sdk.features().map { it.toVenueFeature() }
         Gallery.all(features, VenuePlace.all(features, language))

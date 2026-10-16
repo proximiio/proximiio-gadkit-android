@@ -47,6 +47,7 @@
     <string name="head_straight_for_n_m">Head straight for %d m</string>
     <string name="help_desk">Help Desk</string>
     <string name="hold_the_qr_code_on_the_back">Hold the QR code on the back of your wristband inside the frame</string>
+    <string name="i_couldn_t_get_things_started_check">I couldn’t get things started. Check your connection and let’s try again.</string>
     <string name="it_will_be_ready_when_you_arrive">It will be ready when you arrive at GAD</string>
     <string name="it_will_be_removed_from_your_route">It will be removed from your route. Artworks you have visited stay saved.</string>
     <string name="journey_complete">JOURNEY COMPLETE</string>
@@ -87,6 +88,7 @@
     <string name="no_route_from_here">No route from here.</string>
     <string name="no_route_from_here_with_your_accessibility">No route from here with your accessibility settings.</string>
     <string name="no_route_to_this_stop_with_your">No route to this stop with your accessibility settings.</string>
+    <string name="none_of_these_artworks_is_on_the">None of these artworks is on the museum map.</string>
     <string name="not_here">Not here</string>
     <string name="off">Off</string>
     <string name="on">On</string>

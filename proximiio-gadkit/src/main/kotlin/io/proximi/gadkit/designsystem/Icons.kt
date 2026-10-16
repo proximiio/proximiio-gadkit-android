@@ -4,7 +4,7 @@ import io.proximi.gadkit.R
 import androidx.annotation.DrawableRes
 
 /** The design's icons (Figma "Icons", node 6902:47690), as in iOS `GADIcon`. */
-public enum class GadIcon(@param:DrawableRes public val glyph: Int, @param:DrawableRes public val marker: Int?) {
+internal enum class GadIcon(@param:DrawableRes val glyph: Int, @param:DrawableRes val marker: Int?) {
     Cafe(R.drawable.icon_cafe, R.drawable.icon_cafe_marker),
     Compass(R.drawable.icon_compass, null),
     Elevator(R.drawable.icon_elevator, R.drawable.icon_elevator_marker),

@@ -88,13 +88,3 @@ internal fun LocationDialogHost(dialog: LocationDialog) {
         launcher.launch(current.permissions)
     }
 }
-
-/**
- * Shows the system location dialog that [WristbandSession] asks for before a take-over. A host
- * screen that calls `connect(code)` with its own scanner composes it; without it the bind goes out
- * without asking. `WristbandPairingScreen` has its own.
- */
-@Composable
-public fun WristbandLocationDialogHost(wristband: WristbandSession) {
-    LocationDialogHost(wristband.locationDialog)
-}
