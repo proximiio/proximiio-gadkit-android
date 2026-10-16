@@ -57,7 +57,7 @@ dependencies {
 
 - The versions are the git tags of this repository. Before 1.0, a minor version can change the API.
   The section "Changelog" lists every change and marks the breaking ones.
-- The library depends on SDK `6.0.0-beta.23` and Map `6.0.0-beta.21` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.24` and Map `6.0.0-beta.21` and exposes them, with Compose,
   as `api` dependencies. A host app that also declares these artifacts must use the same versions.
 - The library ships its own R8 consumer rules. The host app needs no rule for it.
 - With the Gradle configuration cache on, set `kotlin.internal.collectFUSMetrics=false` in the host
@@ -456,9 +456,10 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 ## Privacy
 
 - The SDK reports the visitor to `apiBaseUrl`: a visitor id, positions at most every 10 s (or after
-  5 m), and geofence enter and exit events. The Android SDK `6.0.0-beta.23` sends positions and
-  events in batches every 60 s. Without network they wait on the device and go out once the network
-  is back. The client requires no consent prompt for it.
+  5 m), and geofence enter and exit events. Positions are uploaded every 60 s and when the app goes
+  to the background. Each geofence enter or exit is sent at once. Without network they wait on the
+  device and go out once the network is back. Beacon and privacy-zone events are not uploaded. The
+  client requires no consent prompt for it.
 - The Play Console Data safety form of the host app declares precise location and a device
   identifier (the anonymous visitor id), sent to Proximi.io, not shared and not used for tracking.
 - The library asks for no permission itself; the host app requests location and notifications.
@@ -485,7 +486,6 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `FieldLog.isEnabled = true` + `logLaunch()`, `FieldLogShareButton` | `FieldLog.start(context, secrets)`, `FieldLog.share(context)` | |
 | `DebugLaunch.current.run(with:wristband:)`, launch arguments `-journeyPlayback` | `DebugLaunch.read(activity)` + `run(options, venue, places)`, intent extras `gad.journey` | Debuggable host builds only, as `#if DEBUG`. |
 | Live Activity (`ProximiioGADLiveActivity`) | Ongoing journey notification | No widget extension. |
-| Geofence events sent as they happen (SDK beta.58) | Sent in batches every 60 s (SDK beta.23) | The Android SDK port is pending. |
 
 ## Tests
 
@@ -512,7 +512,23 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-No changes yet.
+The behaviour of the iOS package 0.5.0 (geofence events sent at once).
+
+#### Changed
+
+- **BREAKING:** the library depends on the Proximi.io Android SDK `6.0.0-beta.24` (was
+  `6.0.0-beta.23`); the Map stays `6.0.0-beta.21`. A host app that declares the SDK artifacts
+  itself moves them to `6.0.0-beta.24`. The SDK's `ProximiioConfiguration` has a new parameter
+  `eventBatching` before `positioning`: a host app that builds a `ProximiioConfiguration` passes
+  `positioning` and the parameters after it by name, and recompiles.
+- **Visible:** each geofence enter and exit is sent to `apiBaseUrl` at once, not in the batch every
+  60 s. Beacon and privacy-zone events are no longer uploaded; the SDK still delivers them to the
+  app. See "Privacy". No change in the host app.
+
+#### Fixed
+
+- **Visible:** the position dot no longer stops during the visitor-analytics upload, which ran
+  every 60 s for up to the request timeout. No change in the host app.
 
 ### [0.14.0] — 2026-10-15
 

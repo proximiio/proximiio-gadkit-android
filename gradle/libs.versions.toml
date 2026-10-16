@@ -7,7 +7,7 @@ compileSdk = "37"
 targetSdk = "36"
 minSdk = "26"
 
-proximiioSdk = "6.0.0-beta.23"
+proximiioSdk = "6.0.0-beta.24"
 proximiioMap = "6.0.0-beta.21"
 
 coroutines = "1.11.0"
