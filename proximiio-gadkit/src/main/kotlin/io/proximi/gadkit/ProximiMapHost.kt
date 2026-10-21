@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,6 +34,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -49,6 +54,9 @@ import io.proximi.gadkit.visit.VisitPlanPicker
 import io.proximi.gadkit.visit.VisitScreen
 import io.proximi.gadkit.visit.VisitStore
 import io.proximi.gadkit.wristband.LocationDialogHost
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * Presents the screens and sheets of [map] over [content], as the iOS modifier `.proximiMap(_:)`.
@@ -174,12 +182,17 @@ private fun Cover(map: ProximiMap, presentation: Presentation) {
 /**
  * `gad.hostedMap`: [ProximiMapView] on the app's SDK with the default options, as Nagarro's app uses
  * it. This view is the host app: it skips a stop the visitor swiped, and "Visited" marks the first
- * pending stop visited. The line at the top counts the stop states of its journey, for UI tests.
+ * pending stop visited. The lines at the top count the stop states of its journey and list the
+ * events of the navigator it got from `onNavigator`, for UI tests.
  */
 @Composable
 private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     val journey by map.hostedJourney.collectAsState()
     val accessibility by map.routeAccessibility.collectAsState()
+    val scope = rememberCoroutineScope()
+    /** The names of the navigator's events, oldest first. */
+    var navigatorEvents by remember { mutableStateOf(emptyList<String>()) }
+    var navigatorJob by remember { mutableStateOf<Job?>(null) }
     fun set(id: String, state: ProximiJourney.State) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
     }
@@ -193,17 +206,29 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                 FieldLog.log("hosted map → host app: $event")
                 if (event is ProximiMapEvent.SkipRequested) set(event.stop.id, ProximiJourney.State.SKIPPED)
             },
+            onNavigator = { navigator ->
+                navigatorJob?.cancel()
+                navigatorJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    navigator.events.collect { navigatorEvents = navigatorEvents + (it::class.simpleName ?: "?") }
+                }
+            },
         )
-        Row(
+        Column(
             Modifier.align(Alignment.TopCenter).statusBarsPadding().background(Color.White.copy(alpha = 0.8f)),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(hostedStates(journey), style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("hostedJourneyStates"))
-            journey.stops.firstOrNull { it.state == ProximiJourney.State.PENDING }?.let { first ->
-                TextButton(onClick = { set(first.id, ProximiJourney.State.VISITED) }) { Text("Visited", style = MaterialTheme.typography.labelSmall) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(hostedStates(journey), style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("hostedJourneyStates"))
+                journey.stops.firstOrNull { it.state == ProximiJourney.State.PENDING }?.let { first ->
+                    TextButton(onClick = { set(first.id, ProximiJourney.State.VISITED) }) { Text("Visited", style = MaterialTheme.typography.labelSmall) }
+                }
+                TextButton(onClick = map.presenter::hide) { Text("Close map", style = MaterialTheme.typography.labelSmall) }
             }
-            TextButton(onClick = map.presenter::hide) { Text("Close map", style = MaterialTheme.typography.labelSmall) }
+            Text(
+                "navigator: ${navigatorEvents.takeLast(6).joinToString(" ")}",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.testTag("hostedNavigatorEvents"),
+            )
         }
     }
 }

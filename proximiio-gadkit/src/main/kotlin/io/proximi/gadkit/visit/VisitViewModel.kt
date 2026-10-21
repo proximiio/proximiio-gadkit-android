@@ -60,6 +60,7 @@ import io.proximi.map.core.RouteGuidance
 import io.proximi.sdk.wayfinding.NoRouteReason
 import io.proximi.map.core.VenuePosition
 import io.proximi.map.core.JourneyStop as MapJourneyStop
+import io.proximi.map.live.JourneyNavigator
 import io.proximi.map.live.ProximiioMapSession
 import io.proximi.sdk.geofenceEvents
 import io.proximi.sdk.geofencing.GeofenceEvent
@@ -114,6 +115,8 @@ internal class VisitViewModel(
     private val onClose: (() -> Unit)?,
     /** The host app's `onVisitEvent` of `VisitScreen`. Called on the main thread. */
     private val onEvent: (VisitEvent) -> Unit = {},
+    /** Gets the navigator before the journey starts (`ProximiMapView`'s `onNavigator`). */
+    private val onNavigator: ((JourneyNavigator) -> Unit)? = null,
 ) {
     /** What the navigator reports, read on each change of its journey. */
     data class Progress(
@@ -292,6 +295,8 @@ internal class VisitViewModel(
         get() = progress.activeStop?.let { VisitPlan.numbers(progress.journey)[it.id] }
 
     init {
+        // Before `controller.start` below: the host app's collectors get the journey's first events.
+        onNavigator?.invoke(controller.navigator)
         session.journeyStopMarkerStyle = MapStyle.journeyStops
         controller.onArtworkDone = { stop, isActiveStop ->
             onEvent(if (isActiveStop) VisitEvent.ArtworkReached(stop.toCore()) else VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))

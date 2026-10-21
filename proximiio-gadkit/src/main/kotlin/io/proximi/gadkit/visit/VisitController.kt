@@ -475,8 +475,8 @@ internal class VisitController(
 
     /**
      * The stops whose POI is no longer a place after a change of the venue data, each once. With
-     * [managesProgress] they are skipped: the navigator has no call that removes or changes a stop
-     * (map 6.0.0-beta.21). When the journey screen of `ProximiMap` closes, the stored journey drops
+     * [managesProgress] they are skipped: the library does not use the navigator's `remove` and
+     * `replace` of map 6.0.0-beta.22 yet, as the iOS package 1.7.0. When the journey screen of `ProximiMap` closes, the stored journey drops
      * these stops and takes the changed places ([VisitPlan.reconciled]). Without [managesProgress]
      * the stops stay; the host app decides.
      */

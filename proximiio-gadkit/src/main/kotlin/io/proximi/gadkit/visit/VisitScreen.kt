@@ -93,6 +93,7 @@ import io.proximi.gadkit.map.mapText
 import io.proximi.gadkit.map.remainingText
 import io.proximi.gadkit.map.toCore
 import io.proximi.map.compose.ProximiioMap
+import io.proximi.map.live.JourneyNavigator
 import kotlin.math.roundToInt
 
 /**
@@ -122,6 +123,7 @@ import kotlin.math.roundToInt
  * @param persist stores the journey after each change; `null` after Journey Complete.
  * @param onVisitEvent receives a [VisitEvent] for each visitor action and each journey change, on
  *   the main thread.
+ * @param onNavigator gets the navigator before the journey starts (`ProximiMapView`'s `onNavigator`).
  */
 @Composable
 internal fun VisitScreen(
@@ -134,6 +136,7 @@ internal fun VisitScreen(
     incoming: IncomingJourney? = null,
     persist: (Journey?) -> Unit,
     onVisitEvent: (VisitEvent) -> Unit = {},
+    onNavigator: ((JourneyNavigator) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -159,6 +162,7 @@ internal fun VisitScreen(
             persist = { holder.persist(it) },
             onClose = onClose?.let { { holder.onClose?.invoke() } },
             onEvent = { holder.onVisitEvent(it) },
+            onNavigator = onNavigator,
         )
     }
     DisposableEffect(model) {

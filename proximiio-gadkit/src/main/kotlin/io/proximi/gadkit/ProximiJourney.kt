@@ -7,6 +7,8 @@ import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.StopKind
 import io.proximi.gadkit.visit.StopState
 import io.proximi.gadkit.visit.VisitPlan
+import io.proximi.map.core.Journey as MapJourney
+import io.proximi.map.core.JourneyStop as MapJourneyStop
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -68,6 +70,25 @@ public data class ProximiJourney(
         public fun ofArtworks(artworks: List<String>, kind: JourneyKind = JourneyKind.PERSONALISED): ProximiJourney =
             ProximiJourney(kind, artworks.map { Stop(it) })
 
+        /**
+         * The stops of a map library journey, for a host app that built a `Journey` for its own
+         * `JourneyNavigator`. Each stop keeps its id (`JourneyStop(poi)` uses the POI id). A done stop
+         * is visited, a skipped stop is skipped, and a pending, active or reached stop is pending. A
+         * detour stop is left out.
+         */
+        public fun ofJourney(journey: MapJourney, kind: JourneyKind = JourneyKind.PERSONALISED): ProximiJourney =
+            ProximiJourney(
+                kind,
+                journey.stops.filter { it.kind != MapJourneyStop.Kind.DETOUR }.map { stop ->
+                    val state = when (stop.state) {
+                        MapJourneyStop.State.DONE -> State.VISITED
+                        MapJourneyStop.State.SKIPPED -> State.SKIPPED
+                        MapJourneyStop.State.PENDING, MapJourneyStop.State.ACTIVE, MapJourneyStop.State.REACHED -> State.PENDING
+                    }
+                    Stop(stop.id, state)
+                },
+            )
+
         /** The journey of [toJson], or `null` for unreadable JSON. An unknown kind is personalised. */
         public fun fromJson(text: String): ProximiJourney? = runCatching {
             val fields = Json.parseToJsonElement(text).jsonObject
@@ -97,9 +118,9 @@ internal data class HostedJourney(
 ) {
     /**
      * Whether the open screen, which shows [shown], can take this journey in place: the same kind, a
-     * stop on the map in both, and every stop of [shown] still in this one. The navigator cannot
-     * remove a stop (map 6.0.0-beta.21), and a screen without stops has no started navigator to add
-     * them to. Pure; covered by tests.
+     * stop on the map in both, and every stop of [shown] still in this one. The library does not use
+     * the navigator's `remove` of map 6.0.0-beta.22 yet, and a screen without stops has no started
+     * navigator to add them to. Pure; covered by tests.
      */
     fun canReplace(shown: HostedJourney, kind: JourneyKind, shownKind: JourneyKind): Boolean =
         kind == shownKind && shown.journey.stops.isNotEmpty() && journey.stops.isNotEmpty() &&

@@ -6,7 +6,10 @@ import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.JourneyStop
 import io.proximi.gadkit.visit.StopKind
 import io.proximi.gadkit.visit.StopState
+import io.proximi.map.core.MapCoordinate
 import kotlin.test.Test
+import io.proximi.map.core.Journey as MapJourney
+import io.proximi.map.core.JourneyStop as MapJourneyStop
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -131,6 +134,26 @@ class HostedJourneyTest {
         assertEquals(journey, ProximiJourney.fromJson(journey.toJson()))
         assertEquals("""{"kind":"curated","stops":[{"id":"GAD.1","state":"visited"},{"id":"b","state":"pending"}]}""", journey.toJson())
         assertNull(ProximiJourney.fromJson("not json"))
+    }
+
+    @Test
+    fun aMapLibraryJourneyKeepsItsStopIdsAndProgressWithoutTheDetour() {
+        fun stop(id: String, state: MapJourneyStop.State, kind: MapJourneyStop.Kind = MapJourneyStop.Kind.PLANNED) =
+            MapJourneyStop(id = id, title = id, coordinate = MapCoordinate(24.5, 54.4), poiId = id, kind = kind, state = state)
+        val journey = MapJourney(
+            listOf(
+                stop("a", MapJourneyStop.State.DONE), stop("b", MapJourneyStop.State.SKIPPED),
+                stop("cafe", MapJourneyStop.State.ACTIVE, kind = MapJourneyStop.Kind.DETOUR),
+                stop("c", MapJourneyStop.State.REACHED), stop("d", MapJourneyStop.State.ACTIVE), stop("e", MapJourneyStop.State.PENDING),
+            ),
+        )
+        assertEquals(
+            ProximiJourney(
+                JourneyKind.CURATED,
+                listOf(stop("a", ProximiJourney.State.VISITED), stop("b", ProximiJourney.State.SKIPPED), stop("c"), stop("d"), stop("e")),
+            ),
+            ProximiJourney.ofJourney(journey, JourneyKind.CURATED),
+        )
     }
 
     @Test

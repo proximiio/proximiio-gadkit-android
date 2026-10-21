@@ -47,6 +47,7 @@ import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.VisitEvent
 import io.proximi.gadkit.visit.VisitMode
 import io.proximi.gadkit.visit.VisitScreen
+import io.proximi.map.live.JourneyNavigator
 import io.proximi.sdk.Proximiio
 import kotlinx.coroutines.launch
 
@@ -59,7 +60,9 @@ import kotlinx.coroutines.launch
  * wristband session, owns the journey ([ProximiJourney]) and decides when a stop is visited or
  * skipped. The view draws the journey it gets, routes to the first stop still to visit and reports
  * what the visitor does as [ProximiMapEvent]s. It does not start or stop the SDK, does not change
- * the wristband session and reports no geofence or wristband event.
+ * the wristband session and reports no geofence or wristband event. It hands its
+ * `JourneyNavigator` to `onNavigator`, so the host app reads the map library's journey events and
+ * route cues itself.
  *
  * Everything beyond that is in [Option], off by default: the bottom bar, the background, the view's
  * own prompts, the journey logic (visits, order) and the journey notification. [ProximiMap] uses all
@@ -126,6 +129,13 @@ public object ProximiMapView {
  * @param onClose Back on the bottom bar, "Leave the tour" and the close button of Journey Complete.
  *   `null` (default): the bottom bar has no Back, so "Leave the tour here" never shows, the close
  *   button of Journey Complete returns to the map, and the system Back stays with the host app.
+ * @param onNavigator called on the main thread with the `JourneyNavigator` that draws the journey,
+ *   before the journey starts, and again with a new navigator each time the screen starts again (a
+ *   new journey kind, a removed stop, the first journey on an empty map). Start collecting
+ *   `navigator.events` inside the call, so no event is missed, and cancel the collection of the
+ *   previous navigator; set `onCue` and `cueRules` there. The view sets neither. Change the journey
+ *   through `journey` only: the view does not see calls such as `skip(stopId)` or `markDone(stopId)`
+ *   on the navigator. A recreated activity keeps the navigator and does not call it again.
  */
 @Composable
 public fun ProximiMapView(
@@ -139,6 +149,7 @@ public fun ProximiMapView(
     mode: VisitMode = VisitMode.MAP,
     onEvent: (ProximiMapEvent) -> Unit = {},
     onClose: (() -> Unit)? = null,
+    onNavigator: (JourneyNavigator) -> Unit = {},
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -147,6 +158,7 @@ public fun ProximiMapView(
     SideEffect {
         model.onEvent = onEvent
         model.onJourneyChange = onJourneyChange
+        model.onNavigator = onNavigator
     }
     LaunchedEffect(model) { model.start(context.applicationContext, sdk, settings, options, journey, language) }
     LaunchedEffect(model, journey) { model.journeyChanged(journey) }
@@ -169,6 +181,7 @@ public fun ProximiMapView(
                     incoming = model.incoming,
                     persist = { model.write(it, loaded.generation) },
                     onVisitEvent = model::handle,
+                    onNavigator = { model.onNavigator(it) },
                 )
             }
         } else {
@@ -202,6 +215,7 @@ internal class HostedMapModel : ViewModel() {
 
     var onEvent: (ProximiMapEvent) -> Unit = {}
     var onJourneyChange: (ProximiJourney) -> Unit = {}
+    var onNavigator: (JourneyNavigator) -> Unit = {}
 
     private var venue: VenueService? = null
     private var settings = GadSettings.STANDARD

@@ -37,8 +37,8 @@ import kotlinx.coroutines.withContext
  * - Geofences, floors and places: the SDK sync applies them every 300 s. A `Feature` record of the
  *   sync rebuilds the route network from the store.
  *
- * The open map keeps the POIs it has drawn: the map library reads the features once per session
- * (map 6.0.0-beta.21). Main thread only.
+ * The open map keeps the POIs it has drawn: the library does not call the session's
+ * `reloadVenueData()` of map 6.0.0-beta.22 yet, as the iOS package 1.7.0. Main thread only.
  */
 internal class VenueDataRefresh(private val sdk: Proximiio, private val scope: CoroutineScope) {
     private val mutableVersion = MutableStateFlow(0)

@@ -33,7 +33,7 @@ Add this repository to the host app as a git submodule at a tag, for example at 
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.0.0
+git -C gadkit checkout 1.7.0
 ```
 
 In the host app's `settings.gradle.kts`, include the library's build and add the Proximi.io
@@ -69,9 +69,12 @@ dependencies {
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.25` and Map `6.0.0-beta.21` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.25` and Map `6.0.0-beta.22` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
+- A host app that draws its journey with the map library's `ProximiioMap` and its own
+  `JourneyNavigator` moves to `ProximiMapView` with [MIGRATION.md](MIGRATION.md). It lists the SDK
+  and Map changes since SDK 6.0.0-beta.23 and Map 6.0.0-beta.21.
 - The library ships its own R8 consumer rules. The host app needs no rule for it.
 - With the Gradle configuration cache on, set `kotlin.internal.collectFUSMetrics=false` in the host
   app's `gradle.properties`. Otherwise the Kotlin Gradle plugin registers its build statistics
@@ -271,6 +274,7 @@ val heard = journey.copy(stops = journey.stops.mapIndexed { i, stop -> if (i == 
 | `mode` | `VisitMode.MAP` (default) or `LIST` when the view opens. |
 | `onEvent` | `ProximiMapEvent`s of the journey screen, on the main thread. |
 | `onClose` | Back on the bottom bar, "Leave the tour" and the close button of Journey Complete. Default `null`: the bottom bar has no Back, "Leave the tour here" never shows, the close button of Journey Complete returns to the map, and the system Back stays with the host app. |
+| `onNavigator` | The map library's `JourneyNavigator` that draws the journey, on the main thread, before the journey starts and again each time the screen starts again. See "The navigator". |
 
 The host app:
 
@@ -307,6 +311,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `stops` | `List<ProximiJourney.Stop>` in visit order. A stop has the `id` the host app gave (a collection id `remote_id` or a Proximi.io POI id) and a `state`: `PENDING`, `VISITED` or `SKIPPED`. |
 | `ProximiJourney.ofArtworks(artworks, kind)` | A journey whose stops are all pending. |
 | `ProximiJourney(kind, stops)` | A journey with its progress. |
+| `ProximiJourney.ofJourney(journey, kind)` | The stops of a map library `Journey`, with their ids. `DONE` is `VISITED`, `SKIPPED` is `SKIPPED`, `PENDING`, `ACTIVE` and `REACHED` are `PENDING`. Detour stops are left out. |
 | `toJson()`, `ProximiJourney.fromJson(text)` | The journey as JSON, the format of the iOS `Codable`: `{"kind": "curated", "stops": [{"id": "GAD.1", "state": "visited"}]}`. `fromJson` returns `null` for unreadable JSON. |
 
 - The route leads to the first pending stop in the journey's order. In a `PERSONALISED` journey it
@@ -315,8 +320,9 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
   added or moved. The map, the camera and the route of an unchanged leg stay. Changes apply one
   after another; while one applies, only the latest waits.
 - These changes start the screen again (new map session, camera and mode): a removed stop and a new
-  `kind`, because the navigator of the map library cannot remove a stop (map 6.0.0-beta.21), and the
-  first journey on a map without one, because that map has no navigator.
+  `kind`, because the library does not use the navigator's `remove(stopId)` of map 6.0.0-beta.22 yet
+  (as the iOS package 1.7.0), and the first journey on a map without one, because that map has no
+  navigator.
 - A journey without stops, or without a stop on the map, shows the map alone: search, floors and
   "Centre on me", no Map / List toggle and no stop card, in either `mode`. "Go here" on an amenity
   draws the route to it.
@@ -345,6 +351,56 @@ positioning events, `ModeChanged`, `Recentred` and `AccessibleRoutesChanged`; wi
 also `ArtworkReached` and `ArtworkVisitedOutOfOrder`; with `BOTTOM_BAR`, `PROMPTS` and `onClose` also
 the exit events. Screen, wristband, arrival, geofence and `JourneyChanged` events come only from
 `ProximiMap`; geofence enter and exit events are on the host app's SDK (`geofenceEvents()`).
+
+### The navigator
+
+`onNavigator` gives the host app the map library's `JourneyNavigator` that draws the journey. The
+host app collects its `events` and sets its `onCue` as on a navigator of its own.
+
+```kotlin
+var navigatorJob: Job? = null   // for example in the host app's ViewModel
+
+ProximiMapView(sdk = sdk, journey = journey, onJourneyChange = { journey = it }, onNavigator = { navigator ->
+    navigatorJob?.cancel()      // a new navigator replaces the previous one
+    // UNDISPATCHED: the collection starts inside the call and gets every later event.
+    navigatorJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+        navigator.events.collect { event ->
+            when (event) {
+                is JourneyEvent.StopSkipped -> println("skipped ${event.stop.id}")
+                is JourneyEvent.OffRouteTooLong -> println("off route for ${event.duration} s")
+                JourneyEvent.JourneyFinished -> println("finished")
+                else -> Unit
+            }
+        }
+    }
+    navigator.onCue = { cue ->
+        if (cue.kind == RouteGuidanceCue.Kind.APPROACHING_DESTINATION) println("approaching: ${cue.text}")
+    }
+})
+```
+
+- The view calls `onNavigator` before the journey starts. Each time the screen starts again (see
+  "ProximiJourney") it calls it with a new navigator. The `events` flow of the previous navigator
+  never completes: cancel its collection. A recreated activity keeps the navigator and does not
+  call `onNavigator` again.
+- `events` is a shared flow: every collector gets every event after it started collecting. The
+  view's own collection takes no events from the host app's.
+- The view sets neither `onCue` nor `cueRules`. `cueRules` is the map library's default
+  (`RouteGuidanceCueRules.VENUE_WALK`: a cue 15 m before each manoeuvre).
+- The host app changes the journey through `journey` only. The view does not see calls that change
+  the navigator (`markDone(stopId)`, `skip(stopId)`, `reopen(stopId)`, `add`, `move`, `apply`,
+  `detour`, `resumeJourney()`, `setRouteOptions`), and its next change of the journey can undo
+  them.
+
+The view's navigator differs from a navigator with the map library's default rules:
+
+| | The view's navigator |
+|---|---|
+| `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies a change of `journey`. |
+| `FarFromRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (30 m) and `GadSettings.offRouteAfter` (300 s). |
+| Off the route | Without `PROMPTS` the route follows the visitor (`JourneyDeviationPolicy.AUTOMATIC`); with `PROMPTS` the view asks (`ASK_APP`). |
+| `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
+| The cue `APPROACHING_DESTINATION` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
 
 ## Screens
 
@@ -433,7 +489,8 @@ app returns to the foreground; the SDK sync brings geofences and floors. After a
 
 - Routes computed after the change use the new paths and level changers. The leg on screen and the
   journey overview keep the old ones until the navigator routes again: the next stop, a skip, or a
-  re-route after the visitor left the route (map 6.0.0-beta.21).
+  re-route after the visitor left the route. The library does not call the navigator's
+  `routeNetworkChanged()` of map 6.0.0-beta.22 yet (as the iOS package 1.7.0).
 - The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
 - The stored journey follows its POIs. A done stop keeps its title and position. Another stop whose
@@ -443,8 +500,8 @@ app returns to the foreground; the SDK sync brings geofences and floors. After a
   POI was deleted is skipped and reported as `StopPlaceDeleted`. The stored journey removes it when
   the screen closes. A changed POI moves its stop when the screen closes.
 
-Not yet: an open map keeps the POIs and amenities it has drawn until it opens again. The map library
-reads them once per screen (map 6.0.0-beta.21).
+Not yet: an open map keeps the POIs and amenities it has drawn until it opens again. The library
+does not call the session's `reloadVenueData()` of map 6.0.0-beta.22 yet (as the iOS package 1.7.0).
 
 ## Wristband
 
@@ -739,7 +796,9 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `ProximiMapView.Options` (`OptionSet`, `.all`) | `Set<ProximiMapView.Option>` (`Option.ALL`) | `.liveActivity` is `JOURNEY_NOTIFICATION`. |
 | `ProximiJourney(kind:artworks:)`, `Codable` | `ProximiJourney.ofArtworks(artworks, kind)`, `toJson()`, `fromJson(text)` | Same JSON. |
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
-| 0.15.0: SDK 6.0.0-beta.59 and Map 6.0.0-beta.44, text for the swap and signing errors | SDK 6.0.0-beta.25 and the texts, as on iOS. The map background stays black until the style draws. | The clear map background waits for Map 6.0.0-beta.22. |
+| `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
+| `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
+| 0.15.0: SDK 6.0.0-beta.59 and Map 6.0.0-beta.44, text for the swap and signing errors | SDK 6.0.0-beta.25 and the texts, as on iOS. The map background stays black until the style draws. | Map 6.0.0-beta.22 has a clear background as an option (`MapOptions.backgroundColor`, a `TextureView`); Map 6.0.0-beta.23 makes it the default, as on iOS. |
 | 1.4.0: SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | The level changers are drawn on the floors of their `levels`, as on iOS. The SDK router still connects a level changer to its own floor too, a ride over several floors still has a marker per floor, and a session the relay-api gives no verdict on binds again. | The Android SDK takes the iOS rules in 6.0.0-beta.26. |
 
 ## Tests
@@ -768,12 +827,30 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-Version 1.6.0, with the behaviour of the iOS package 1.6.0, without the clear map background of
+Version 1.7.0, with the behaviour of the iOS package 1.7.0, without the clear map background of
 0.15.0 and without the SDK and Map changes of 1.4.0 (see "Differences from the iOS package"). It is the first release since 0.14.0:
 the 1.0.0 entries below were never tagged. One entry point, `ProximiMap`, replaces the screens and
 services of 0.14.0 (Nagarro, 2026-10-16: "a single exposed wrapper component that encapsulates all
 internal UI components and logic"). `ProximiMapView` is the journey map alone on the host app's SDK.
 From 1.0.0 a minor or patch version does not break the public API.
+
+#### Added (iOS 1.7.0)
+
+- `ProximiMapView`'s `onNavigator`: the `JourneyNavigator` that draws the journey. The host app
+  collects its `events` and sets `onCue` itself. See "The navigator".
+- `ProximiJourney.ofJourney(journey, kind)`: a `ProximiJourney` from a map library `Journey`.
+- [MIGRATION.md](MIGRATION.md): moving from `ProximiioMap` and an own `JourneyNavigator` on SDK
+  6.0.0-beta.23 and Map 6.0.0-beta.21 to `ProximiMapView`.
+
+#### Changed (Map 6.0.0-beta.22)
+
+- **BREAKING:** the library depends on Map `6.0.0-beta.22` (was `6.0.0-beta.21`). A host app that
+  declares the Map artifacts itself moves them to `6.0.0-beta.22`. No source change.
+- **Visible:** the map no longer crashes when it loads the organisation's style over the cached one
+  (`Calling getLayer when a newer style is loading`), for example on the first start after the
+  installation. No change in the host app.
+- **Visible:** `setRouteOptions` keeps the leg to a reached stop and a leg the options do not
+  change; a changed amenity icon is drawn again. See MIGRATION.md section 1.
 
 #### Added (iOS 1.1.0 to 1.6.0)
 
