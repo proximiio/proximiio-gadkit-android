@@ -55,11 +55,14 @@ internal class VenueDataRefresh(private val sdk: Proximiio, private val scope: C
     private val jobs = mutableListOf<Job>()
     private var foregroundObserver: LifecycleEventObserver? = null
 
-    /** Call after the first `loadRouteNetwork()`. With [interval] 0 only the SDK sync is followed. */
-    suspend fun start(interval: Duration) {
+    /**
+     * Call after the first `loadRouteNetwork()`. With [interval] 0 only the SDK sync is followed. Runs
+     * on the main thread whatever the caller's thread: the lifecycle takes observers there only.
+     */
+    suspend fun start(interval: Duration): Unit = withContext(Dispatchers.Main.immediate) {
         features = withContext(Dispatchers.Default) { sorted(sdk.features()) }
         jobs += scope.launch { followSync() }
-        if (!interval.isPositive()) return
+        if (!interval.isPositive()) return@withContext
         val lifecycle = ProcessLifecycleOwner.get().lifecycle
         jobs += scope.launch {
             while (isActive) {
