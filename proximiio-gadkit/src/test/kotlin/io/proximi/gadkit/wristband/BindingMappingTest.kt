@@ -44,6 +44,9 @@ class BindingMappingTest {
                 BindingError.BindingClosed(BindingEndReason.Superseded, "r10"),
             BlueiotBindingError.SessionLost(null) to BindingError.SessionLost(null),
             BlueiotBindingError.RateLimited(12.5, "r11") to BindingError.RateLimited(12.5, "r11"),
+            BlueiotBindingError.SwapBandsApart("r15") to BindingError.SwapBandsApart("r15"),
+            BlueiotBindingError.SwapAtReception("r16") to BindingError.SwapAtReception("r16"),
+            BlueiotBindingError.SigningUnavailable(3.0, "r17") to BindingError.SigningUnavailable(3.0, "r17"),
             BlueiotBindingError.Server(503, "r12") to BindingError.Server(503, "r12"),
             BlueiotBindingError.Unexpected("invalid_transition", 409, "m", "r13") to
                 BindingError.Unexpected("invalid_transition", 409, "m", "r13"),

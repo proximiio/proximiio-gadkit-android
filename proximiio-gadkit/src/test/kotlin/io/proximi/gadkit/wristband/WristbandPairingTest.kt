@@ -126,6 +126,13 @@ class WristbandCopyTest {
     }
 
     @Test
+    fun refusedSwapAndSigningOutageHaveTheirOwnText() {
+        assertEquals(UiText.Resource("wristband_error_swap_bands_apart"), WristbandCopy.message(BindingError.SwapBandsApart()))
+        assertEquals(UiText.Resource("wristband_error_swap_at_reception"), WristbandCopy.message(BindingError.SwapAtReception()))
+        assertEquals(UiText.Resource("wristband_error_signing_unavailable"), WristbandCopy.message(BindingError.SigningUnavailable(retryAfterSeconds = 3.0)))
+    }
+
+    @Test
     fun supersededSessionTellsTheVisitorAnotherPhoneScannedTheBand() {
         assertEquals(UiText.Resource("wristband_notice_superseded"), WristbandCopy.notice(BindingEndReason.Superseded))
         assertEquals(WristbandCopy.notice(BindingEndReason.UserEnded), WristbandCopy.notice(BindingEndReason.Unknown("NEW_REASON")))

@@ -21,6 +21,9 @@ internal object WristbandCopy {
      * - `wristband_error_invalid_tag_id` "This is not a wristband code. Check the code printed on the wristband."
      * - `wristband_error_rate_limited` "Too many attempts. Try again in a moment."
      * - `wristband_error_rate_limited_seconds` "Too many attempts. Try again in %d seconds."
+     * - `wristband_error_swap_bands_apart` "Hold your current wristband next to the new one and scan again."
+     * - `wristband_error_swap_at_reception` "Your wristband isn't reachable. Please swap it at the reception desk."
+     * - `wristband_error_signing_unavailable` "The museum’s server is busy. Try again in a moment."
      * - `wristband_error_network` "The museum’s server cannot be reached. Check your connection and try again."
      * - `wristband_error_server` "The museum’s server failed. Try again in a moment."
      * - `wristband_error_session_ended` "The wristband session has ended. Connect the wristband again."
@@ -43,6 +46,10 @@ internal object WristbandCopy {
                 UiText.Resource("wristband_error_rate_limited_seconds", listOf(ceil(retryAfter).toInt()))
             }
         }
+        // A refused swap to a new wristband outside reception. The current session is kept.
+        is BindingError.SwapBandsApart -> res("wristband_error_swap_bands_apart")
+        is BindingError.SwapAtReception -> res("wristband_error_swap_at_reception")
+        is BindingError.SigningUnavailable -> res("wristband_error_signing_unavailable")
         is BindingError.Network -> res("wristband_error_network")
         is BindingError.Server, is BindingError.InvalidResponse -> res("wristband_error_server")
         is BindingError.SessionLost, is BindingError.BindingClosed -> res("wristband_error_session_ended")

@@ -47,6 +47,16 @@ internal sealed class BindingError(message: String, cause: Throwable? = null) : 
     internal data class RateLimited(val retryAfterSeconds: Double? = null, override val requestId: String? = null) :
         BindingError("Too many wristband changes in a short time.")
 
+    /** A swap to a new wristband outside reception, while the current one is not next to it. The session is kept. */
+    internal data class SwapBandsApart(override val requestId: String? = null) : BindingError("The current wristband is not next to the new one.")
+
+    /** A swap outside reception while the current wristband is silent. The session is kept. */
+    internal data class SwapAtReception(override val requestId: String? = null) : BindingError("Your wristband isn't reachable.")
+
+    /** The relay cannot sign wristband sessions for a moment. Any session is kept. */
+    internal data class SigningUnavailable(val retryAfterSeconds: Double? = null, override val requestId: String? = null) :
+        BindingError("The relay cannot issue wristband sessions right now.")
+
     internal data class Server(val status: Int, override val requestId: String? = null) : BindingError("The relay failed (HTTP $status).")
 
     internal data class Unexpected(

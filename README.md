@@ -69,7 +69,7 @@ dependencies {
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.24` and Map `6.0.0-beta.21` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.25` and Map `6.0.0-beta.21` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library ships its own R8 consumer rules. The host app needs no rule for it.
@@ -701,8 +701,13 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
   to the background. Each geofence enter or exit is sent at once. Without network they wait on the
   device and go out once the network is back. Beacon and privacy-zone events are not uploaded. The
   client requires no consent prompt for it.
+- Every request to `apiBaseUrl` carries the headers `X-Visitor-Id` (the visitor id) and
+  `X-Proximiio-SDK` (the SDK version). The API limits the request rate per device by `X-Visitor-Id`.
+  A proxy in front of an on-premises API must pass both headers through.
 - The Play Console Data safety form of the host app declares precise location and a device
-  identifier (the anonymous visitor id), sent to Proximi.io, not shared and not used for tracking.
+  identifier, sent to Proximi.io, not shared and not used for tracking. The device identifier is the
+  anonymous visitor id (Analytics, and the rate limit: App functionality) and the wristband binding
+  id, which only the relay-api receives (App functionality).
 - `ProximiMapHost` asks for location while the app is in use and for notifications. The library
   never asks for background location.
 
@@ -734,7 +739,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `ProximiMapView.Options` (`OptionSet`, `.all`) | `Set<ProximiMapView.Option>` (`Option.ALL`) | `.liveActivity` is `JOURNEY_NOTIFICATION`. |
 | `ProximiJourney(kind:artworks:)`, `Codable` | `ProximiJourney.ofArtworks(artworks, kind)`, `toJson()`, `fromJson(text)` | Same JSON. |
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
-| 0.15.0: SDK 6.0.0-beta.59 and Map 6.0.0-beta.44, text for the swap and signing errors | Not yet | It waits for the Android SDK 6.0.0-beta.25 (the binding errors) and Map 6.0.0-beta.22 (the clear map background). The texts are in the string resources. |
+| 0.15.0: SDK 6.0.0-beta.59 and Map 6.0.0-beta.44, text for the swap and signing errors | SDK 6.0.0-beta.25 and the texts, as on iOS. The map background stays black until the style draws. | The clear map background waits for Map 6.0.0-beta.22. |
 | 1.4.0: SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | The level changers are drawn on the floors of their `levels`, as on iOS. The SDK router still connects a level changer to its own floor too, a ride over several floors still has a marker per floor, and a session the relay-api gives no verdict on binds again. | The Android SDK takes the iOS rules in 6.0.0-beta.26. |
 
 ## Tests
@@ -763,8 +768,8 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-Version 1.6.0, with the behaviour of the iOS package 1.6.0, without 0.15.0 and without the SDK and
-Map changes of 1.4.0 (see "Differences from the iOS package"). It is the first release since 0.14.0:
+Version 1.6.0, with the behaviour of the iOS package 1.6.0, without the clear map background of
+0.15.0 and without the SDK and Map changes of 1.4.0 (see "Differences from the iOS package"). It is the first release since 0.14.0:
 the 1.0.0 entries below were never tagged. One entry point, `ProximiMap`, replaces the screens and
 services of 0.14.0 (Nagarro, 2026-10-16: "a single exposed wrapper component that encapsulates all
 internal UI components and logic"). `ProximiMapView` is the journey map alone on the host app's SDK.
@@ -821,6 +826,22 @@ From 1.0.0 a minor or patch version does not break the public API.
 - Field log time stamps have the date in UTC: `2026-10-19T12:52:10.123Z` instead of the local
   `14:52:10.123`. The field log no longer writes the SDK's geofence events during a visit. (iOS 1.4.2)
 - The library depends on `androidx.lifecycle:lifecycle-process` for the foreground downloads.
+
+#### Changed (iOS 0.15.0)
+
+- **BREAKING:** the library depends on the Proximi.io Android SDK `6.0.0-beta.25` (was
+  `6.0.0-beta.24`); the Map stays `6.0.0-beta.21`. A host app that declares the SDK artifacts itself
+  moves them to `6.0.0-beta.25`. The SDK's `BlueiotBindingError` has the cases `SwapBandsApart`,
+  `SwapAtReception` and `SigningUnavailable(retryAfter)`: a `when` over it without `else` needs
+  them. `BlueiotBindingPolicy` has a new parameter `swapNearMeters` after `bindReceptionRequired`:
+  a positional `copy` or destructuring of it needs a change.
+- **Visible:** every request to `apiBaseUrl` carries `X-Visitor-Id` and `X-Proximiio-SDK`. The host
+  app's Data safety form declares the device identifier for App functionality as well as Analytics
+  (see "Privacy").
+- **Visible:** the wristband errors of a refused swap and of the relay-api's signing outage have
+  their own text: "Hold your current wristband next to the new one and scan again.", "Your
+  wristband isn't reachable. Please swap it at the reception desk." and "The museum’s server is
+  busy. Try again in a moment." (`ProximiMapException.Wristband`, `message`).
 
 #### Changed (iOS 1.0.0)
 
