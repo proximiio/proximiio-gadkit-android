@@ -7,7 +7,14 @@ import io.proximi.gadkit.map.ringContains
  * The shape of an artwork geofence: a polygon, or a circle around [center], as iOS `ArtworkArea`.
  * [polygon] is GeoJSON `[longitude, latitude]` pairs, as `ProximiioGeofence.polygon`.
  */
-internal data class ArtworkArea(val center: Coordinate?, val radius: Double, val polygon: List<List<Double>>? = null) {
+internal data class ArtworkArea(
+    val center: Coordinate?,
+    val radius: Double,
+    /** `[longitude, latitude]` pairs. */
+    val polygon: List<List<Double>>? = null,
+    /** The geofence's id. */
+    val id: String = "",
+) {
     private val ring: List<Coordinate>? =
         polygon?.mapNotNull { pair -> if (pair.size >= 2) Coordinate(pair[1], pair[0]) else null }?.takeIf { it.size >= 3 }
 

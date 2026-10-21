@@ -31,6 +31,9 @@ import kotlinx.coroutines.CancellationException
  * - `gad.visit`: stores a journey through the first place matching each comma-separated title and
  *   opens it (iOS `-visit`).
  * - `gad.visitList`: opens the journey screen in List mode (iOS `-visitList`).
+ * - `gad.hostedMap`: opens the `gad.visit` journey in [io.proximi.gadkit.ProximiMapView] on the
+ *   app's SDK with the default options (iOS `-hostedMap`). Without `gad.visit` the view shows the map
+ *   alone.
  * - `gad.visitAutoAdvance`: a reached detour ends 5 m after the visitor leaves it, without
  *   "Resume your Journey" (iOS `-visitAutoAdvance`). It applies to every visit of the process.
  * - `gad.routeAvoid`: `stairs,escalators,revolvingDoors,inaccessiblePaths` sets
@@ -68,6 +71,8 @@ public object DebugLaunch {
         public val openMap: Boolean = false,
         /** `gad.pairWristband`: the wristband code to bind after the start, without `gad.journey`. */
         public val pairWristband: String? = null,
+        /** `gad.hostedMap`: `ProximiMap` opens the visit in `ProximiMapView` instead of its journey screen. */
+        public val hostedMap: Boolean = false,
     )
 
     /** Playback starts once per process; the map screen can open many times. */
@@ -95,6 +100,7 @@ public object DebugLaunch {
             hubPage = value("gad.hubPage"),
             openMap = value("gad.openMap").toBoolean(),
             pairWristband = value("gad.pairWristband")?.trim()?.takeIf { it.isNotEmpty() },
+            hostedMap = value("gad.hostedMap").toBoolean(),
         )
     }
 

@@ -121,6 +121,34 @@ public data class GadSettings(
      * notification of the journey ([stopNearbyMeters]) does not depend on it.
      */
     val postsGeofenceNotifications: Boolean = true,
+
+    // Venue data
+
+    /**
+     * Time between two downloads of the venue's features (`GET /v7/geo/features`) while the app is
+     * in the foreground. The features are also downloaded when the app returns to the foreground.
+     * Changed features update the routes, the screens and the stored journey. [Duration.ZERO] turns
+     * the downloads off.
+     */
+    val venueDataRefreshInterval: Duration = 300.seconds,
+
+    // Map
+
+    /**
+     * The smallest width and height in metres of the area the map shows for an amenity picked in the
+     * menu, so a near amenity does not zoom the map in further than this.
+     */
+    val amenityFramingMinimumMeters: Double = 40.0,
+
+    // Gallery first
+
+    /**
+     * Gallery first: a leg leads to an artwork's gallery only when the artwork lies in the gallery's
+     * geofence on the same floor, or at most this many metres outside it. Otherwise the leg ends at
+     * the artwork. In the GAD data of 2026-10-19, 34 artworks lie 5–29 m outside their gallery's
+     * geofence.
+     */
+    val galleryFirstMarginMeters: Double = 50.0,
 ) {
     public companion object {
         /** The defaults. */

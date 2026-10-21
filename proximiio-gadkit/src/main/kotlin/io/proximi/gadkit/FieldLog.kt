@@ -9,10 +9,12 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import java.io.File
-import java.time.LocalTime
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -20,6 +22,9 @@ import java.util.concurrent.Executors
  * as iOS `FieldLog`. It is off until the host app calls [start], in test builds only. The file is
  * `files/fieldlog/gad-debug.log` in app-private storage; [share] hands it to the share sheet through
  * the FileProvider `<applicationId>.gadkit.fieldlog`. Each line also goes to Logcat (tag `GAD`).
+ *
+ * A line is `[GAD] <time stamp> <message>`. The time stamp is ISO 8601 in UTC with the date and
+ * milliseconds, for example `2026-10-19T12:52:10.123Z` ([TIME_STAMP]).
  *
  * The secrets passed to [start] are replaced by `<redacted>`. The file is cut to its last
  * [KEEP_BYTES] when it grows past [MAX_BYTES]. While it is off, every call returns at once.
@@ -31,7 +36,11 @@ public object FieldLog {
     private const val TAG = "GAD"
 
     private val writer = lazy { Executors.newSingleThreadExecutor { Thread(it, "gad-field-log").apply { isDaemon = true } } }
-    private var file: File? = null
+
+    /** The log file, `files/fieldlog/gad-debug.log`, after [start]; `null` before. iOS `FieldLog.url`. */
+    @Volatile
+    public var file: File? = null
+        private set
     private var secrets: List<String> = emptyList()
 
     /** True after [start]. */
@@ -58,7 +67,7 @@ public object FieldLog {
     public fun log(message: String) {
         if (!isEnabled) return
         val text = redact(message, secrets)
-        val line = "[GAD] ${LocalTime.now().format(TIME)} $text\n"
+        val line = "[GAD] ${TIME_STAMP.format(Instant.now())} $text\n"
         Log.i(TAG, text)
         val file = file ?: return
         writer.value.execute { append(file, line) }
@@ -72,14 +81,21 @@ public object FieldLog {
     /** Opens the share sheet with the log, for the host app's "Share debug log" button. */
     public fun share(context: Context) {
         if (!isEnabled) return
-        val file = file?.takeIf { it.isFile } ?: return
+        share(context, file?.takeIf { it.isFile } ?: return)
+    }
+
+    /**
+     * Opens the share sheet with [file], a text file in the log's folder ([file]'s parent), for
+     * example an excerpt of the log.
+     */
+    public fun share(context: Context, file: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.gadkit.fieldlog", file)
         val send = Intent(Intent.ACTION_SEND)
             .setType("text/plain")
             .putExtra(Intent.EXTRA_STREAM, uri)
-            .putExtra(Intent.EXTRA_SUBJECT, FILE_NAME)
+            .putExtra(Intent.EXTRA_SUBJECT, file.name)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        send.clipData = ClipData.newRawUri(FILE_NAME, uri)
+        send.clipData = ClipData.newRawUri(file.name, uri)
         try {
             context.startActivity(Intent.createChooser(send, null))
         } catch (_: ActivityNotFoundException) {
@@ -107,5 +123,6 @@ public object FieldLog {
         file.writeBytes(data.copyOfRange(start, data.size))
     }
 
-    private val TIME = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+    /** The time stamp of a line: ISO 8601 in UTC with the date and milliseconds, as iOS `FieldLog.timeStamp`. */
+    public val TIME_STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT).withZone(ZoneOffset.UTC)
 }

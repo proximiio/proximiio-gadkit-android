@@ -10,6 +10,9 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Bitmap
 import android.content.Context
+import android.graphics.RectF
+import androidx.core.content.res.ResourcesCompat
+import io.proximi.gadkit.R
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryFill
@@ -43,6 +46,10 @@ import org.maplibre.geojson.Polygon
  *   "Level changer highlighting").
  * - every other lift, staircase and escalator that serves the shown floor, with its amenity marker
  *   ([updateLevelChangers], [LevelChangerPlace]; Monday "All level changers visible", 2026-10-15).
+ * - the amenity picked in the menu: the red marker with its white icon ([updateHighlight],
+ *   [PlaceFraming]).
+ * - the gallery a leg leads to first: a red label with the gallery's short name at its POI
+ *   ([updateGalleryMarker]; PM, Monday "Navigation to a gallery").
  *
  * The layers are added after each style load and show the selected floor only. The gallery fills
  * go over the venue's floor and room fills and under its walls, labels and POI icons
@@ -60,6 +67,8 @@ internal class JourneyMapLayers {
     private var connector: List<Coordinate> = emptyList()
     private var levelChanger: LevelChanger? = null
     private var levelChangers: List<LevelChangerPlace> = emptyList()
+    private var highlight: Highlight? = null
+    private var galleryMarker: GalleryMarker? = null
 
     /** The level changer of the route's next level change: its anchor, the floor it leaves and its type. */
     data class LevelChanger(val coordinate: Coordinate, val level: Double, val featureType: String) {
@@ -70,6 +79,20 @@ internal class JourneyMapLayers {
             /** The style image of a level changer that is not on the route: its amenity marker. */
             fun standardImageName(featureType: String): String = "$LEVEL_CHANGER_IMAGE-standard-$featureType"
         }
+    }
+
+    /** The amenity picked in the menu. */
+    data class Highlight(val coordinate: Coordinate, val level: Double, val icon: GadIcon) {
+        val imageName: String get() = imageName(icon)
+
+        internal companion object {
+            fun imageName(icon: GadIcon): String = "gad-highlight-${icon.name}"
+        }
+    }
+
+    /** The gallery a leg leads to first (gallery first). [label] is "G303". */
+    data class GalleryMarker(val coordinate: Coordinate, val level: Double, val label: String) {
+        val imageName: String get() = "gad-gallery-$label"
     }
 
     /** Installs the layers on every style [canvas] loads, the loaded one included. */
@@ -119,6 +142,20 @@ internal class JourneyMapLayers {
         canvas?.style?.let(::applyLevelChanger)
     }
 
+    /** The amenity picked in the menu, or `null` for none. */
+    fun updateHighlight(highlight: Highlight?) {
+        if (highlight == this.highlight) return
+        this.highlight = highlight
+        canvas?.style?.let(::applyLevelChanger)
+    }
+
+    /** The gallery a leg leads to first, or `null` for none. */
+    fun updateGalleryMarker(marker: GalleryMarker?) {
+        if (marker == galleryMarker) return
+        galleryMarker = marker
+        canvas?.style?.let(::applyLevelChanger)
+    }
+
     // Style
 
     private fun install(canvas: ProximiioMapCanvas, style: Style) {
@@ -127,6 +164,10 @@ internal class JourneyMapLayers {
             if (style.getImage(name) == null) levelChangerImage(canvas.context, type)?.let { style.addImage(name, it) }
             val standard = LevelChanger.standardImageName(type)
             if (style.getImage(standard) == null) standardLevelChangerImage(canvas.context, type)?.let { style.addImage(standard, it) }
+        }
+        for (icon in AmenityKind.entries.map { it.gadIcon }.toSet()) {
+            val name = Highlight.imageName(icon)
+            if (style.getImage(name) == null) redMarker(canvas.context, icon)?.let { style.addImage(name, it) }
         }
         if (style.getSource(LEVEL_CHANGER_SOURCE) == null) {
             style.addSource(GeoJsonSource(LEVEL_CHANGER_SOURCE))
@@ -172,6 +213,12 @@ internal class JourneyMapLayers {
             .map { point(it.coordinate, LevelChanger.standardImageName(it.featureType), sort = 0) }
             .toMutableList()
         if (highlighted != null) features += point(highlighted.coordinate, highlighted.imageName, sort = 1)
+        highlight?.takeIf { VenueLevel.same(it.level, level) }?.let { features += point(it.coordinate, it.imageName, sort = 2) }
+        galleryMarker?.takeIf { VenueLevel.same(it.level, level) }?.let { marker ->
+            val context = canvas?.context
+            if (style.getImage(marker.imageName) == null && context != null) style.addImage(marker.imageName, galleryLabel(context, marker.label))
+            features += point(marker.coordinate, marker.imageName, sort = 3)
+        }
         source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
@@ -191,9 +238,12 @@ internal class JourneyMapLayers {
         return ContextCompat.getDrawable(context, marker)?.toBitmap(size, size)
     }
 
-    /** 30 dp: a red circle with a white 2 dp ring and the white glyph in its middle 18 dp. */
-    private fun levelChangerImage(context: Context, featureType: String): Bitmap? {
-        val glyph = icon(featureType).glyph
+    /** The red marker of the route's next level change. */
+    private fun levelChangerImage(context: Context, featureType: String): Bitmap? = redMarker(context, icon(featureType))
+
+    /** 30 dp: a red circle with a white 2 dp ring and the white glyph of [icon] in its middle 18 dp. */
+    private fun redMarker(context: Context, icon: GadIcon): Bitmap? {
+        val glyph = icon.glyph
         val drawable = ContextCompat.getDrawable(context, glyph)?.mutate() ?: return null
         val density = context.resources.displayMetrics.density
         val size = (MARKER_DP * density).roundToInt()
@@ -242,6 +292,42 @@ internal class JourneyMapLayers {
     }
 
     internal companion object {
+        /** [place] with the icon of its amenity kind; `null` for a place of no [AmenityKind]. */
+        fun highlight(place: VenuePlace?): Highlight? {
+            place ?: return null
+            val kind = AmenityKind.entries.firstOrNull { it.matches(place) } ?: return null
+            return Highlight(place.coordinate, place.level, kind.gadIcon)
+        }
+
+        /**
+         * The red label of a gallery that a leg leads to first: white text, 28 dp high, like the white
+         * gallery labels of the venue style (Figma, Monday "Navigation to a gallery").
+         */
+        fun galleryLabel(context: Context, text: String): Bitmap {
+            val density = context.resources.displayMetrics.density
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = 14 * density
+                typeface = ResourcesCompat.getFont(context, R.font.guggenheim_sans_display_semibold)
+            }
+            val height = (28 * density).roundToInt()
+            val width = (paint.measureText(text) + 28 * density).roundToInt()
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val pill = RectF(density, density, width - density, height - density)
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = MARKER_COLOR }
+            canvas.drawRoundRect(pill, 13 * density, 13 * density, fill)
+            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 2 * density
+            }
+            canvas.drawRoundRect(pill, 13 * density, 13 * density, stroke)
+            val baseline = height / 2f - (paint.descent() + paint.ascent()) / 2
+            canvas.drawText(text, 14 * density, baseline, paint)
+            return bitmap
+        }
+
         const val GALLERY_SOURCE = "gad-journey-galleries"
         const val DESTINATION_LAYER = "gad-gallery-destination"
         const val VISITED_LAYER = "gad-gallery-visited"

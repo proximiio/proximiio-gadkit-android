@@ -13,8 +13,19 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -36,6 +47,7 @@ import io.proximi.gadkit.visit.JourneyReadyScreen
 import io.proximi.gadkit.visit.ManageJourneySheet
 import io.proximi.gadkit.visit.VisitPlanPicker
 import io.proximi.gadkit.visit.VisitScreen
+import io.proximi.gadkit.visit.VisitStore
 import io.proximi.gadkit.wristband.LocationDialogHost
 
 /**
@@ -137,21 +149,69 @@ private fun Cover(map: ProximiMap, presentation: Presentation) {
                         onBack = map.presenter::hide,
                     )
                 }
-                is Presentation.Visit -> VisitScreen(
-                    venue,
-                    presentation.journey,
-                    onClose = map.presenter::hide,
-                    kind = presentation.kind,
-                    onVisitEvent = map::handle,
-                )
+                is Presentation.Visit -> {
+                    val context = LocalContext.current
+                    VisitScreen(
+                        venue,
+                        presentation.journey,
+                        onClose = map.presenter::hide,
+                        kind = presentation.kind,
+                        persist = VisitStore.of(context)::persist,
+                        onVisitEvent = map::handle,
+                    )
+                }
                 Presentation.PlanJourney -> {
                     val places by map.places.collectAsState()
                     VisitPlanPicker(places, onStart = map::planned, onCancel = map.presenter::hide)
                 }
+                Presentation.HostedMap -> HostedMapCheck(map, venue.sdk)
                 is Presentation.ManageJourney -> Unit
             }
         }
     }
+}
+
+/**
+ * `gad.hostedMap`: [ProximiMapView] on the app's SDK with the default options, as Nagarro's app uses
+ * it. This view is the host app: it skips a stop the visitor swiped, and "Visited" marks the first
+ * pending stop visited. The line at the top counts the stop states of its journey, for UI tests.
+ */
+@Composable
+private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
+    val journey by map.hostedJourney.collectAsState()
+    val accessibility by map.routeAccessibility.collectAsState()
+    fun set(id: String, state: ProximiJourney.State) {
+        map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
+    }
+    Box(Modifier.fillMaxSize()) {
+        ProximiMapView(
+            sdk = sdk,
+            journey = journey,
+            onJourneyChange = { map.hostedJourney.value = it },
+            routeAccessibility = accessibility,
+            onEvent = { event ->
+                FieldLog.log("hosted map → host app: $event")
+                if (event is ProximiMapEvent.SkipRequested) set(event.stop.id, ProximiJourney.State.SKIPPED)
+            },
+        )
+        Row(
+            Modifier.align(Alignment.TopCenter).statusBarsPadding().background(Color.White.copy(alpha = 0.8f)),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(hostedStates(journey), style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("hostedJourneyStates"))
+            journey.stops.firstOrNull { it.state == ProximiJourney.State.PENDING }?.let { first ->
+                TextButton(onClick = { set(first.id, ProximiJourney.State.VISITED) }) { Text("Visited", style = MaterialTheme.typography.labelSmall) }
+            }
+            TextButton(onClick = map.presenter::hide) { Text("Close map", style = MaterialTheme.typography.labelSmall) }
+        }
+    }
+}
+
+/** For example "pending 3 · visited 0 · skipped 1". */
+internal fun hostedStates(journey: ProximiJourney): String {
+    fun count(state: ProximiJourney.State) = journey.stops.count { it.state == state }
+    return "pending ${count(ProximiJourney.State.PENDING)} · visited ${count(ProximiJourney.State.VISITED)} · skipped ${count(ProximiJourney.State.SKIPPED)}"
 }
 
 /**

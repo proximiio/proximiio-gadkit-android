@@ -2,6 +2,7 @@ package io.proximi.gadkit
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import io.proximi.gadkit.map.VenueDataRefresh
 import io.proximi.map.live.VenueStyleLoader
 import io.proximi.sdk.Proximiio
 import io.proximi.sdk.ProximiioConfiguration
@@ -13,6 +14,7 @@ import io.proximi.sdk.fetchJourney
 import io.proximi.sdk.floors
 import io.proximi.sdk.journey.JourneyPlaybackConfiguration
 import io.proximi.sdk.journey.JourneyPlaybackProvider
+import io.proximi.sdk.loadCachedRouteNetwork
 import io.proximi.sdk.loadRouteNetwork
 import io.proximi.sdk.positioning.engine.CustomPositionProviding
 import io.proximi.sdk.refreshPermissions
@@ -36,11 +38,15 @@ import kotlinx.coroutines.launch
  * Positions come from the venue's BlueIoT anchors through the relay-api; the phone scans nothing
  * (`relayOnly`). The API host comes from [GadConfiguration], so a production build reaches only
  * the client's on-prem install.
+ *
+ * [hosted] uses an SDK the host app has started (`ProximiMapView`). The host app attaches the
+ * position provider; the service attaches none.
  */
 internal class VenueService private constructor(
     /** The process's only `Proximiio` instance. Do not create a second one. */
     internal val sdk: Proximiio,
-    private val binding: BlueiotWristbandBinding,
+    /** The binding client whose provider delivers the wristband's positions. `null` on the host app's SDK. */
+    private val binding: BlueiotWristbandBinding?,
     /** True in a debuggable host build, as iOS `#if DEBUG`: journey playback and [DebugLaunch]. */
     internal val isDebugBuild: Boolean,
     settings: GadSettings,
@@ -51,6 +57,9 @@ internal class VenueService private constructor(
      */
     @Volatile
     internal var settings: GadSettings = settings
+
+    /** Changes of the venue data while the app runs. Screens read the data again on a change. */
+    internal val data = VenueDataRefresh(sdk, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
 
     /** Name of the attached position provider. Providers are detached by name. */
     private var attachedProvider: String? = null
@@ -67,7 +76,7 @@ internal class VenueService private constructor(
      * ends journey playback.
      */
     internal suspend fun attachBinding() {
-        val provider = binding.positionProvider
+        val provider = binding?.positionProvider ?: return
         attach(provider)
         if (FieldLog.isEnabled) logSamples(provider)
     }
@@ -147,6 +156,11 @@ internal class VenueService private constructor(
         }
     }
 
+    /** Ends the venue data downloads. `ProximiMapView` calls it when it closes. */
+    internal fun stop() {
+        data.stop()
+    }
+
     /** Field log: the visitor id and the SDK's sync events. */
     private suspend fun logReporting(configuration: GadConfiguration) {
         // The visitor id finds this phone's visitor, positions and events on the backend.
@@ -195,6 +209,27 @@ internal class VenueService private constructor(
             )
 
         /**
+         * A venue on the host app's started SDK. Installs the route network from the SDK's feature
+         * cache, or downloads it when the cache has no path. Requests no permission and attaches no
+         * position provider. Call [stop] when the screen closes.
+         */
+        internal suspend fun hosted(context: Context, sdk: Proximiio, settings: GadSettings): VenueService {
+            if (sdk.loadCachedRouteNetwork() == 0) {
+                try {
+                    sdk.loadRouteNetwork()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    FieldLog.log("hosted map: route network not loaded: ${error.message}")
+                }
+            }
+            val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            val venue = VenueService(sdk, null, isDebugBuild, settings)
+            venue.data.start(settings.venueDataRefreshInterval)
+            return venue
+        }
+
+        /**
          * Reads the permissions, authenticates, starts positioning, loads the route network and
          * attaches the binding's position provider. The order matters; see
          * proximiio-blueiot-minimal-android `Venue.start`. Then fetches the map style in the
@@ -211,6 +246,7 @@ internal class VenueService private constructor(
             venue.attachBinding()
             // The map session's default cache directory, so the session finds the style.
             venue.cacheMapStyle(context.applicationContext.cacheDir)
+            venue.data.start(configuration.settings.venueDataRefreshInterval)
             if (FieldLog.isEnabled) venue.logReporting(configuration)
             return venue
         }

@@ -42,6 +42,14 @@ class ArtworkMetadataTest {
     }
 
     @Test
+    fun readsTheEditorKeysForTheBadges() {
+        // Tongari-kun 01c4cf17 in the GAD data, 2026-10-15.
+        val place = place(mapOf("status" to "draft", "augmented_reality" to "enabled", "audio" to "enabled"))
+        assertTrue(place.hasAR)
+        assertTrue(place.hasAudio)
+    }
+
+    @Test
     fun withoutTheKeysThereIsNoArtistAndNoBadge() {
         val place = place(mapOf("artwork_id" to "x", "artist_id" to "y"))
         assertNull(place.artist)
@@ -53,6 +61,8 @@ class ArtworkMetadataTest {
     fun flagValues() {
         assertTrue(VenuePlace.flag(true))
         assertTrue(VenuePlace.flag("TRUE"))
+        assertTrue(VenuePlace.flag("Enabled"))
+        assertFalse(VenuePlace.flag("disabled"))
         assertTrue(VenuePlace.flag(1))
         assertFalse(VenuePlace.flag(false))
         assertFalse(VenuePlace.flag("yes"))

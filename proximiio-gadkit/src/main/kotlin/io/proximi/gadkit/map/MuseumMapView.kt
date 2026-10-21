@@ -66,6 +66,7 @@ import io.proximi.sdk.wayfinding.WayfindingRoutingError
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -171,13 +172,18 @@ internal fun MuseumMapView(
         session.clearRoute()
     }
 
-    /** Routes to the nearest place of [kind], preferring the visitor's floor. */
+    /** Routes to the nearest place of [kind], preferring the visitor's floor, and shows it with the visitor ([PlaceFraming]). */
     fun routeToNearest(kind: AmenityKind) {
         val here = session.position.value
         val from = here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) }
         val place = kind.nearest(places, from, here?.floor?.level) ?: return
         selectedPlace = null
-        scope.launch { route(place) }
+        scope.launch {
+            route(place)
+            // Under the search button, beside the map buttons, above the route card.
+            val density = resources.displayMetrics.density
+            PlaceFraming.show(place, session, FloorWithoutPositioningGuide.insets(density, top = 90, left = 40, bottom = 230, right = 90), venue.settings.amenityFramingMinimumMeters)
+        }
     }
 
     LaunchedEffect(session) { session.guidanceRules = RouteFollowRules.VENUE_WALK }
@@ -206,6 +212,9 @@ internal fun MuseumMapView(
         }
     }
 
+    // The destination amenity gets the red marker with its white icon.
+    LaunchedEffect(destination) { layers.updateHighlight(JourneyMapLayers.highlight(destination)) }
+
     // A change of the accessibility needs re-routes to the destination on screen.
     LaunchedEffect(accessibility) { destination?.let { route(it) } }
 
@@ -222,7 +231,9 @@ internal fun MuseumMapView(
         onDispose { session.onFeatureTap = null }
     }
 
-    LaunchedEffect(Unit) {
+    // Places and level changers are read again after a change of the venue data.
+    val dataVersion by venue.data.version.collectAsStateWithLifecycle()
+    LaunchedEffect(dataVersion) {
         val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers)
         session.hiddenFeatureIds = levelChangers.map { it.id }.toSet()
@@ -239,6 +250,13 @@ internal fun MuseumMapView(
         if (initialDestination != null && destination == null) {
             session.position.first { it != null }
             route(initialDestination)
+        }
+    }
+    LaunchedEffect(language) {
+        venue.data.version.drop(1).collect {
+            places = venue.places(language)
+            destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
+            selectedPlace = selectedPlace?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
         }
     }
 

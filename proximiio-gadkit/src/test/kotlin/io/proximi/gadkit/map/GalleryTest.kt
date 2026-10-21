@@ -102,9 +102,9 @@ class GalleryOutlineTest {
     }
 }
 
-/** Port of ProximiioGADKit `LevelChangerPlaceTests` (0.13.0). */
+/** Port of ProximiioGADKit `LevelChangerPlaceTests` (1.4.0). */
 class LevelChangerPlaceTest {
-    private fun feature(id: String, type: String, level: Double, levels: List<Double>?, geometry: String = "Point") = VenueFeature(
+    private fun feature(id: String, type: String, level: Double, levels: Any?, geometry: String = "Point") = VenueFeature(
         id = id,
         type = type,
         geometry = Geometry(geometry, listOf(54.399, 24.5397)),
@@ -116,9 +116,12 @@ class LevelChangerPlaceTest {
         level = level,
     )
 
-    /** GAD data 2026-10-15: the lift is a POI on level 0 with `levels` [1, 2, 3, 4]; the web map shows it on levels 1 to 4 as well. */
+    /**
+     * GAD data 2026-10-15: lift 9f411e5a is a POI on level 0 with `levels` [1, 2, 3, 4]. The iOS SDK
+     * router (6.0.0-beta.60) does not use it on level 0, so it is drawn on levels 1 to 4 only.
+     */
     @Test
-    fun aLevelChangerServesItsFloorAndItsLevels() {
+    fun aLevelChangerServesTheFloorsOfItsLevels() {
         val changers = LevelChangerPlace.all(
             listOf(
                 feature("lift", "elevator", 0.0, listOf(1.0, 2.0, 3.0, 4.0)),
@@ -130,8 +133,22 @@ class LevelChangerPlaceTest {
         assertEquals(listOf("lift", "stairs"), changers.map { it.id })
         val lift = changers.first()
         assertEquals(Coordinate(24.5397, 54.399), lift.coordinate)
-        assertTrue(listOf(0.0, 1.0, 4.0).all { lift.serves(it) })
-        assertFalse(lift.serves(5.0))
+        assertTrue(listOf(1.0, 2.0, 4.0).all { lift.serves(it) })
+        assertFalse(lift.serves(0.0) || lift.serves(5.0))
         assertTrue(changers[1].serves(1.0) && !changers[1].serves(2.0))
+    }
+
+    /** Same reading of `properties.levels` as the iOS SDK's `LevelChangerExtractor.levels(from:)`. */
+    @Test
+    fun levelsAreNumbersOrNumericStrings() {
+        val changers = LevelChangerPlace.all(
+            listOf(
+                feature("strings", "elevator", 0.0, listOf("1", " 2 ", "x", true)),
+                feature("single", "staircase", 0.0, 3.0),
+                feature("empty", "escalator", 2.0, emptyList<Any>()),
+                feature("unreadable", "elevator", 1.0, listOf("ground")),
+            ),
+        )
+        assertEquals(listOf(listOf(1.0, 2.0), listOf(3.0), listOf(2.0), listOf(1.0)), changers.map { it.levels })
     }
 }

@@ -54,8 +54,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="delete_this_journey">احذف هذه الرحلة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="dismiss">تجاهل</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="edit_stops">تعديل المحطات</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="elevator">المصعد</string>
@@ -90,6 +88,8 @@
     <string name="help_desk">مكتب المساعدة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="hold_the_qr_code_on_the_back">ضع رمز QR الموجود على ظهر سوارك داخل الإطار</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="hold_your_current_wristband_next_to_the">أمسك سوارك الحالي بجانب السوار الجديد وامسح الرمز مجددًا.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="i_couldn_t_get_things_started_check">لم أتمكن من بدء التشغيل. تحقّق من اتصالك ولنحاول مجددًا.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -238,7 +238,7 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="the_museum_s_server_failed_try_again">حدث خلل في خادم المتحف. حاول مجددًا بعد قليل.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="the_next_stop_of_your_journey_is">المحطة التالية في رحلتك على بعد أقل من %d م.</string>
+    <string name="the_museum_s_server_is_busy_try">خادم المتحف مشغول. حاول مجددًا بعد قليل.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="the_route_stays_as_it_is_until">يبقى المسار كما هو حتى تعود إليه.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -337,7 +337,7 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_wristband">سوارك</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="your_wristband_has_stopped_responding">توقف سوارك عن الاستجابة</string>
+    <string name="your_wristband_isn_t_reachable_please_swap">يتعذر الوصول إلى سوارك. يُرجى استبداله في مكتب الاستقبال.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="your_wristband_tracks_where_you_are_in_2">يتتبّع سوارك موقعك داخل القاعات. اربطه الآن، أو لاحقًا عند بدء رحلتك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

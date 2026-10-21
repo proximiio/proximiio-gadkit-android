@@ -40,10 +40,9 @@ private val strings: Map<String, Int> = mapOf(
     "wristband_notice_expired" to R.string.your_visit_time_is_over,
     "wristband_notice_replaced" to R.string.this_wristband_session_was_replaced_by_a,
     "wristband_notice_session_lost" to R.string.the_connection_to_your_wristband_was_lost,
-    // GeofenceNotifier, StopNearbyNotifier
+    // GeofenceNotifier
     "geofence_entered" to R.string.you_entered_this_area,
     "geofence_exited" to R.string.you_left_this_area,
-    "visit_next_stop_nearby" to R.string.the_next_stop_of_your_journey_is,
     "visit_no_accessible_route" to R.string.no_route_to_this_stop_with_your,
     // VisitCardText, VisitActivity
     "visit_your_journey" to R.string.your_journey_2,

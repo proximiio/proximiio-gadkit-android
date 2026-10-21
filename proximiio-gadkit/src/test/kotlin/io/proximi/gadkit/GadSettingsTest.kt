@@ -1,6 +1,6 @@
 package io.proximi.gadkit
 
-import io.proximi.gadkit.visit.StopNearbyNotifier
+import io.proximi.gadkit.visit.StopNearbyDetector
 import io.proximi.gadkit.wristband.TrackingHealth
 import java.time.Instant
 import kotlin.test.Test
@@ -47,8 +47,8 @@ class GadSettingsTest {
     fun stopNearbyFollowsTheSettings() {
         val stop = Coordinate(24.5, 54.4)
         val eightMetresNorth = Coordinate(24.5 + 8.0 / 111_320, 54.4)
-        assertFalse(StopNearbyNotifier.isNearby(eightMetresNorth, 1.0, stop, 1.0))
-        assertTrue(StopNearbyNotifier.isNearby(eightMetresNorth, 1.0, stop, 1.0, nearbyMeters = 10.0))
-        assertTrue(StopNearbyNotifier.isNearby(eightMetresNorth, 1.0, stop, 1.0, routeMeters = 9.0, nearbyMeters = 10.0))
+        assertFalse(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0))
+        assertTrue(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0, nearbyMeters = 10.0))
+        assertTrue(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0, routeMeters = 9.0, nearbyMeters = 10.0))
     }
 }

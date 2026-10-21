@@ -3,6 +3,7 @@ package io.proximi.gadkit.map
 import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,9 @@ internal fun FollowsVisitorFloor(session: ProximiioMapSession, venue: VenueServi
     var lifts by remember { mutableStateOf(emptyList<LiftArea>()) }
     // The lift the last fix was in.
     var currentLift by remember { mutableStateOf<LiftArea?>(null) }
-    LaunchedEffect(venue) { lifts = venue.lifts() }
+    // Read again after a change of the venue data.
+    val dataVersion by venue.data.version.collectAsState()
+    LaunchedEffect(venue, dataVersion) { lifts = venue.lifts() }
     LaunchedEffect(session) {
         session.position.collect { position ->
             if (position == null) return@collect

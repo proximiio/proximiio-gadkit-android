@@ -36,9 +36,9 @@ internal data class VenuePlace(
     val isArtwork: Boolean = false,
     /** `metadata.artist_name`: a string, or an i18n object like `title_i18n`. The journey list shows it under the title. */
     val artist: String? = null,
-    /** `metadata.has_ar`: the journey list shows "AR". */
+    /** `metadata.augmented_reality` or `metadata.has_ar`: the journey list and the stop card show "AR". */
     val hasAR: Boolean = false,
-    /** `metadata.has_audio`: the journey list shows a note. */
+    /** `metadata.audio` or `metadata.has_audio`: the journey list and the stop card show a note. */
     val hasAudio: Boolean = false,
     /**
      * `metadata.gallery_id`: the gallery of an artwork. The gallery's POI holds the same value in
@@ -85,8 +85,10 @@ internal data class VenuePlace(
                 remoteId = text(properties?.get("remote_id")),
                 isArtwork = isArtwork(text(properties?.get("amenity")), properties?.get("metadata"), text(properties?.get("remote_id"))),
                 artist = metadata?.let { localized(it["artist_name"], language) ?: text(it["artist_name"]) },
-                hasAR = flag(metadata?.get("has_ar")),
-                hasAudio = flag(metadata?.get("has_audio")),
+                // The editor's keys since 2026-10-15 are `augmented_reality` and `audio` with the value
+                // "enabled" (PM, Monday "Augmented Reality and Audio symbols").
+                hasAR = flag(metadata?.get("augmented_reality")) || flag(metadata?.get("has_ar")),
+                hasAudio = flag(metadata?.get("audio")) || flag(metadata?.get("has_audio")),
                 galleryId = text(metadata?.get("gallery_id")),
                 placeId = text(properties?.get("place_id")),
             )
@@ -154,10 +156,10 @@ internal data class VenuePlace(
 
         private fun text(value: Any?): String? = (value as? String)?.takeIf { it.isNotEmpty() }
 
-        /** A metadata flag: `true`, `"true"` in any case, or a non-zero number. Pure; covered by tests. */
+        /** A metadata flag: `true`, `"true"` or `"enabled"` in any case, or a non-zero number. Pure; covered by tests. */
         internal fun flag(value: Any?): Boolean = when (value) {
             is Boolean -> value
-            is String -> value.equals("true", ignoreCase = true)
+            is String -> value.trim().lowercase() in setOf("true", "enabled")
             is Number -> value.toDouble() != 0.0
             else -> false
         }

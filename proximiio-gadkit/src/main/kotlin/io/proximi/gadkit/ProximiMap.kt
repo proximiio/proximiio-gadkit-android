@@ -2,6 +2,8 @@ package io.proximi.gadkit
 
 import android.content.Context
 import io.proximi.gadkit.map.GeofenceNotifier
+import io.proximi.gadkit.map.LocalNotice
+import io.proximi.gadkit.map.LocalNotices
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenuePlace
@@ -25,6 +27,8 @@ import io.proximi.gadkit.wristband.WristbandSession
 import io.proximi.gadkit.wristband.connect
 import io.proximi.gadkit.wristband.toCore
 import io.proximi.map.core.JourneyEvent
+import io.proximi.sdk.Proximiio
+import io.proximi.sdk.blueiot.binding.BlueiotBindingState
 import io.proximi.sdk.core.model.ProximiioGeofence
 import io.proximi.sdk.geofenceEvents
 import io.proximi.sdk.geofencing.GeofenceEvent
@@ -133,7 +137,7 @@ public class ProximiMap(
 
     internal val session = WristbandSession(this.context, configuration, mainScope)
     internal val arrival = ArrivalDetector(this.context)
-    internal val presenter = ProximiMapPresenter(mainScope, ::emit, onDismissed = ::refreshJourney)
+    internal val presenter = ProximiMapPresenter(mainScope, ::emit, onDismissed = ::screenDismissed)
 
     /** `true` once the visitor is at the museum ([ProximiMapEvent.ArrivedAtMuseum]). */
     public val isAtMuseum: StateFlow<Boolean> = arrival.isAtMuseum
@@ -182,6 +186,9 @@ public class ProximiMap(
     /** `true` once [ProximiMapHost] has shown the location dialog in this process. */
     internal var hasAskedLocation: Boolean = false
 
+    /** `gad.hostedMap`: the journey of the [ProximiMapView] the debug launch opens. */
+    internal val hostedJourney = MutableStateFlow(ProximiJourney(stops = emptyList()))
+
     init {
         arrival.onArrival = {
             FieldLog.log("map: at the museum")
@@ -224,7 +231,9 @@ public class ProximiMap(
             // A location answer that came during the start reaches the SDK here.
             venue.sdk.refreshPermissions()
             loadPlaces(venue)
+            reconcileStoredJourney(store)
             arrival.check(places.value)
+            venue.data.onChange = { mainScope.launch { venueDataChanged(venue) } }
             mainScope.launch {
                 // One position from the wristband or playback means the visitor is inside.
                 if (venue.sdk.positions().firstOrNull() != null) arrival.positionReceived()
@@ -251,6 +260,33 @@ public class ProximiMap(
         val language = language
         mutablePlaces.value = venue.places(language)
         galleries = venue.galleries(language)
+    }
+
+    /** The venue data changed on the backend. */
+    private suspend fun venueDataChanged(venue: VenueService) {
+        loadPlaces(venue)
+        store?.let(::reconcileStoredJourney)
+    }
+
+    /**
+     * Updates the stored journey with the current places ([VisitPlan.reconciled]). While the journey
+     * screen is open, the screen updates its journey and stores it.
+     */
+    private fun reconcileStoredJourney(store: VisitStore) {
+        if (presenter.screen.value == Screen.JOURNEY) return
+        val stored = store.load() ?: return
+        val journey = VisitPlan.reconciled(stored, places.value, galleries)
+        if (journey == stored) return
+        FieldLog.log("map: stored journey updated · ${stored.stops.size} → ${journey.stops.size} stops")
+        store.save(journey)
+        if (journey.stops.isEmpty()) store.saveMeta(null)
+        refreshJourney()
+    }
+
+    /** A screen has gone: the stored journey follows the places, then the host app reads it again. */
+    private fun screenDismissed() {
+        store?.let(::reconcileStoredJourney)
+        refreshJourney()
     }
 
     /** The app's language, from [ProximiMapHost]: the places and the stop picker follow it. */
@@ -327,6 +363,31 @@ public class ProximiMap(
         runSession()
         return WristbandPairingFlow.of(session, mainScope)
     }
+
+    /**
+     * The wristband binding's state now, then every change. The Proximi GAD app reads the relay
+     * signal from it for a test notification in debug and staging builds.
+     */
+    @ProximiGadAppApi
+    public fun wristbandBindingStates(): Flow<BlueiotBindingState> = session.binding.stateChanges()
+
+    /**
+     * Posts a notification on the library's channel `alerts`, as the geofence notifications. The
+     * Proximi GAD app posts its "next stop nearby" notification and the test notifications of debug
+     * and staging builds with it. A notice with the same [tag] replaces the earlier one. Nothing
+     * without the notification permission.
+     */
+    @ProximiGadAppApi
+    public fun postNotification(tag: String, title: String, body: String, group: String) {
+        LocalNotices.post(context, LocalNotice(tag, title, UiText.Verbatim(body), group), APP_NOTIFICATION_ID)
+    }
+
+    /**
+     * The started SDK. `null` until [start] succeeds. The Proximi GAD app logs the SDK's events from
+     * it in debug and staging builds.
+     */
+    @ProximiGadAppApi
+    public val sdk: Proximiio? get() = venue?.sdk
 
     // Journey
 
@@ -421,9 +482,13 @@ public class ProximiMap(
 
     // Called by ProximiMapHost.
 
-    /** Journey ready → "Start the Journey". */
+    /**
+     * Journey ready → "Start the Journey": the stored journey, since the venue data can change while
+     * Journey ready is open. Without one the screen closes.
+     */
     internal fun visitStarted(ready: Presentation.JourneyReady) {
-        presenter.swap(Presentation.Visit(ready.journey, ready.meta.kind))
+        val stored = store?.load() ?: return presenter.hide()
+        presenter.swap(Presentation.Visit(stored, ready.meta.kind))
     }
 
     /** "Start" in the stop picker: stores the personalised journey and opens Journey ready. */
@@ -490,9 +555,16 @@ public class ProximiMap(
         options ?: return
         DebugLaunch.run(options, venue, places.value, session)
         if (options.openMap) open(Screen.MUSEUM_MAP)
-        if (options.visitStops.isEmpty()) return
-        val store = storeLoad.await()
         val ids = options.visitStops.mapNotNull { VenuePlace.matching(it, places.value).firstOrNull()?.id }
+        if (options.hostedMap) {
+            // Without `gad.visit` the view shows the map alone.
+            DebugLaunch.log("hosted map: ${ids.size} stops")
+            hostedJourney.value = ProximiJourney.ofArtworks(ids, options.visitKind)
+            presenter.replace { presenter.show(Presentation.HostedMap) }
+            return
+        }
+        if (ids.isEmpty()) return
+        val store = storeLoad.await()
         DebugLaunch.log("visit: ${ids.size} stops")
         val journey = VisitPlan.journey(ids, places.value, galleries)
         saveJourney(store, journey, standardMeta(journey.stops.size, options.visitKind))
@@ -513,6 +585,9 @@ public class ProximiMap(
 
     internal companion object {
         private const val EVENT_BUFFER = 100
+
+        /** The notification id of [postNotification]; the tag tells the notices apart. */
+        private const val APP_NOTIFICATION_ID = 2_003
 
         /** Whether [open] shows [screen]. Pure; covered by tests. */
         fun canOpen(screen: Screen, status: Status, hasJourney: Boolean): Boolean {
@@ -611,6 +686,8 @@ public class ProximiMap(
                 VisitEvent.ExitConfirmed -> ProximiMapEvent.ExitConfirmed
                 VisitEvent.ExitCancelled -> ProximiMapEvent.ExitCancelled
                 is VisitEvent.StopNearby -> ProximiMapEvent.StopNearby(stop(event.stop))
+                is VisitEvent.PositionUncertain -> ProximiMapEvent.PositionUncertain(stop(event.stop))
+                is VisitEvent.StopPlaceDeleted -> ProximiMapEvent.StopPlaceDeleted(stop(event.stop))
                 is VisitEvent.ArtworkReached -> ProximiMapEvent.ArtworkReached(stop(event.stop))
                 is VisitEvent.ArtworkVisitedOutOfOrder -> ProximiMapEvent.ArtworkVisitedOutOfOrder(stop(event.stop))
                 is VisitEvent.TrackingChanged -> ProximiMapEvent.TrackingChanged(event.health)

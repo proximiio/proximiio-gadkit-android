@@ -185,11 +185,22 @@ private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: 
                 }
             }
         }
-        if (place?.hasAR == true) {
+        if (place != null) ArtworkBadges(place)
+    }
+}
+
+/**
+ * "AR" and a note when the artwork has an AR view and audio, in the journey list and on the stop
+ * card (PM, Monday "Augmented Reality and Audio symbols").
+ */
+@Composable
+internal fun ArtworkBadges(place: VenuePlace) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (place.hasAR) {
             val description = stringResource(R.string.ar_view)
             OutlineBadge("AR", Modifier.semantics { contentDescription = description })
         }
-        if (place?.hasAudio == true) OutlineBadge(R.drawable.ic_music_note, stringResource(R.string.audio))
+        if (place.hasAudio) OutlineBadge(R.drawable.ic_music_note, stringResource(R.string.audio))
     }
 }
 

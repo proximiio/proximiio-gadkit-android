@@ -170,6 +170,11 @@ internal fun StopInfoCard(
     icon: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
+    /**
+     * At the end of the caption line: the artwork's AR and audio badges (PM, Monday "Augmented
+     * Reality and Audio symbols").
+     */
+    badges: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
         modifier
@@ -193,7 +198,10 @@ internal fun StopInfoCard(
             Modifier.weight(1f).semantics(mergeDescendants = true) {},
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Text(caption.uppercase(), style = GadTextStyle.Caption.textStyle, color = Palette.ink)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(caption.uppercase(), Modifier.weight(1f), style = GadTextStyle.Caption.textStyle, color = Palette.ink)
+                badges()
+            }
             Text(title, style = GadTextStyle.LargeBodyBold.textStyle, color = Palette.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (instruction != null || remaining != null) {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

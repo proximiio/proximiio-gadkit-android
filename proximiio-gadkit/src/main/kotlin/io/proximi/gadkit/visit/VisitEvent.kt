@@ -19,7 +19,10 @@ internal sealed interface VisitEvent {
     /** The visitor swiped a stop in the list, or used its "Skip" accessibility action. `VisitScreen` asks "Skip artwork?". */
     data class SkipRequested(val stop: JourneyStop) : VisitEvent
 
-    /** The visitor confirmed "Skip artwork". The stop is skipped. */
+    /**
+     * The visitor confirmed "Skip artwork". With [io.proximi.gadkit.ProximiMapView.Option.PROGRESS]
+     * the stop is skipped; without it the host app skips it.
+     */
     data class StopSkipped(val stop: JourneyStop) : VisitEvent
 
     /** The visitor answered "Keep it". The stop stays in the journey. */
@@ -55,8 +58,25 @@ internal sealed interface VisitEvent {
     /** The visitor answered "Carry on". The visit continues. */
     data object ExitCancelled : VisitEvent
 
-    /** The active stop is less than 5 m away on the visitor's level. Once per stop for the whole visit. */
+    /**
+     * The active stop is less than [io.proximi.gadkit.GadSettings.stopNearbyMeters] away on the
+     * visitor's level. Once per stop for the whole visit ([StopNearbyDetector]).
+     */
     data class StopNearby(val stop: JourneyStop) : VisitEvent
+
+    /**
+     * The POI of a stop was deleted on the backend while the screen is open. Once per stop. With
+     * [io.proximi.gadkit.ProximiMapView.Option.PROGRESS] the stop is skipped; without it the stop
+     * stays and the host app decides.
+     */
+    data class StopPlaceDeleted(val stop: JourneyStop) : VisitEvent
+
+    /**
+     * The position is uncertain near the active stop ("Probably at …"). Without
+     * [io.proximi.gadkit.ProximiMapView.Option.PROMPTS] the screen reports it instead of asking. At
+     * most once per [io.proximi.gadkit.GadSettings.locationQuestionQuietPeriod].
+     */
+    data class PositionUncertain(val stop: JourneyStop) : VisitEvent
 
     /**
      * The visitor reached the artwork of the active stop: they entered its geofence or stand in its

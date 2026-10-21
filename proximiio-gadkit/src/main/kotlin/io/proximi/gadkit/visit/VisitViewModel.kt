@@ -15,7 +15,6 @@ import io.proximi.gadkit.map.JourneyMapContent
 import io.proximi.gadkit.map.MapLanguage
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.wristband.TrackingHealth
-import io.proximi.gadkit.visit.GalleryFirst
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyStop
 import io.proximi.gadkit.visit.LocationAmbiguity
@@ -35,13 +34,28 @@ import io.proximi.gadkit.map.gadIcon
 import io.proximi.gadkit.map.toCore
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.map.artworkAreas
+import io.proximi.gadkit.map.GalleryDestination
+import io.proximi.gadkit.map.PlaceFraming
+import io.proximi.gadkit.map.venueGeofences
+import io.proximi.sdk.enteredGeofenceIds
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import io.proximi.gadkit.map.galleries
 import io.proximi.gadkit.map.levelChangers
 import io.proximi.gadkit.map.isArtwork
 import io.proximi.gadkit.map.isGallery
 import io.proximi.gadkit.map.places
 import io.proximi.gadkit.wristband.TrackingMonitor
-import io.proximi.gadkit.map.LocalNotices
+import io.proximi.gadkit.IncomingJourney
+import io.proximi.gadkit.ProximiMapView
+import io.proximi.map.core.JourneyDeviationPolicy
+import io.proximi.sdk.computeRoute
+import io.proximi.sdk.wayfinding.WayfindingRoutingError
+import io.proximi.sdk.core.model.ProximiioCoordinate
+import io.proximi.gadkit.R
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.proximi.map.core.RouteGuidance
 import io.proximi.sdk.wayfinding.NoRouteReason
 import io.proximi.map.core.VenuePosition
@@ -72,8 +86,15 @@ import kotlin.time.toJavaDuration
  * [TrackingMonitor] (reported as [VisitEvent.TrackingChanged], no alert), the journey map layers
  * and the visit notification.
  *
- * @param onClose the host app's `onClose` of `VisitScreen` (iOS `onClose`).
+ * [options] turn the bottom bar, the background, the prompts, the journey logic
+ * ([VisitController] `managesProgress`) and the journey notification on. `ProximiMap` uses all of
+ * them; `ProximiMapView` none by default. A journey without stops shows the map alone.
+ *
+ * @param onClose the host app's `onClose` of `VisitScreen` (iOS `onClose`): Back, "Leave the tour"
+ *   and the close button of Journey Complete. `null`: no Back and no "Leave the tour here"; Journey
+ *   Complete's close button returns to the map.
  * @param onEvent the host app's `onVisitEvent` of `VisitScreen` (iOS `onVisitEvent`).
+ * @param persist stores the journey after each change (`VisitController.persist`).
  */
 internal class VisitViewModel(
     private val application: Application,
@@ -85,7 +106,12 @@ internal class VisitViewModel(
     accessibility: RouteAccessibility,
     /** Personalised or curated: the stop card, the list and skip follow it. */
     val kind: JourneyKind = JourneyKind.PERSONALISED,
-    private val onClose: () -> Unit,
+    /** What the screen does beyond drawing the journey. */
+    val options: Set<ProximiMapView.Option> = ProximiMapView.Option.ALL,
+    /** Map or List when the screen opens. */
+    initialMode: VisitMode = VisitMode.MAP,
+    private val persist: (Journey?) -> Unit,
+    private val onClose: (() -> Unit)?,
     /** The host app's `onVisitEvent` of `VisitScreen`. Called on the main thread. */
     private val onEvent: (VisitEvent) -> Unit = {},
 ) {
@@ -106,11 +132,10 @@ internal class VisitViewModel(
 
     val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false, followZoom = settings.followZoom))
         .also { MapStyle.useAmenityIcons(it, application) }
-    private val store = VisitStore.of(application)
     val controller = VisitController(
         session,
         journey,
-        store,
+        persist,
         scope,
         accessibility,
         amenityIconName = { place ->
@@ -118,6 +143,8 @@ internal class VisitViewModel(
         },
         autoAdvance = debug?.visitAutoAdvance == true,
         keepsOrder = kind.keepsOrder,
+        managesProgress = ProximiMapView.Option.PROGRESS in options,
+        deviationPolicy = if (ProximiMapView.Option.PROMPTS in options) JourneyDeviationPolicy.ASK_APP else JourneyDeviationPolicy.AUTOMATIC,
         settings = settings,
     )
     val monitor = TrackingMonitor(venue.sdk, scope, settings)
@@ -125,12 +152,18 @@ internal class VisitViewModel(
 
     /** The lift or stairs view and the map of a floor without positioning. */
     val floorGuide = FloorWithoutPositioningGuide(settings, scope)
-    private val notification = VisitNotification(application, settings.journeyNotificationMinimumInterval.inWholeMilliseconds / 1000.0)
-
-    /** "The next stop of your journey is less than 5 m away", once per stop in this visit. */
-    private val stopNearby = StopNearbyNotifier(settings.stopNearbyMeters) { notice ->
-        LocalNotices.post(application, notice, StopNearbyNotifier.NOTIFICATION_ID)
+    /** The journey notification (iOS Live Activity), with [ProximiMapView.Option.JOURNEY_NOTIFICATION] and stops only. */
+    private val notification = if (ProximiMapView.Option.JOURNEY_NOTIFICATION in options && journey.stops.isNotEmpty()) {
+        VisitNotification(application, settings.journeyNotificationMinimumInterval.inWholeMilliseconds / 1000.0)
+    } else {
+        null
     }
+
+    /** The active stop less than [GadSettings.stopNearbyMeters] away, once per stop in this visit. */
+    private val stopNearby = StopNearbyDetector(settings.stopNearbyMeters)
+
+    /** Whether the journey has a stop. Without one the screen shows the map alone. */
+    val hasStops: Boolean = journey.stops.isNotEmpty()
 
     var progress by mutableStateOf(readProgress())
         private set
@@ -150,7 +183,7 @@ internal class VisitViewModel(
     /** Floor level of the visitor's last position. */
     var visitorLevel by mutableStateOf<Double?>(null)
         private set
-    private var modeState by mutableStateOf(if (debug?.visitList == true) VisitMode.LIST else VisitMode.MAP)
+    private var modeState by mutableStateOf(if (debug?.visitList == true) VisitMode.LIST else initialMode)
 
     /** Map or List. A change reports [VisitEvent.ModeChanged]. */
     var mode: VisitMode
@@ -160,6 +193,9 @@ internal class VisitViewModel(
             modeState = value
             onEvent(VisitEvent.ModeChanged(value))
         }
+
+    /** List mode with a journey. Without stops the map shows, whatever [mode] is. */
+    val showsList: Boolean get() = mode == VisitMode.LIST && hasStops
     var places by mutableStateOf(emptyList<VenuePlace>())
         private set
     var galleries by mutableStateOf(emptyList<Gallery>())
@@ -177,8 +213,15 @@ internal class VisitViewModel(
     var visitorGallery by mutableStateOf<Gallery?>(null)
         private set
 
-    /** The stop whose gallery the visitor has entered ([GalleryFirst]). */
-    private var reachedStopId by mutableStateOf<String?>(null)
+    /**
+     * The gallery the leg to the active artwork ends at ([VisitController.galleryAhead]), or `null`
+     * when it ends at the artwork.
+     */
+    var galleryAheadDestination by mutableStateOf<GalleryDestination?>(null)
+        private set
+
+    /** The artworks and level changers, which the map draws itself. The gallery a leg leads to first is hidden too. */
+    private var hiddenFeatureIds = emptySet<String>()
 
     /** Galleries the visitor has been in during this visit. */
     private var visitedGalleries = emptySet<String>()
@@ -198,6 +241,14 @@ internal class VisitViewModel(
     /** The amenity whose detour waits for "Change your route?". */
     var amenityToConfirm by mutableStateOf<VenuePlace?>(null)
 
+    /** The amenity routed to from search on a map without a journey (no navigator). */
+    var routedAmenity by mutableStateOf<VenuePlace?>(null)
+        private set
+
+    /** Why there is no route to [routedAmenity] (a string resource), or `null`. */
+    var amenityRouteError by mutableStateOf<Int?>(null)
+        private set
+
     /** EC04d: the soft prompt for an uncertain position near the active stop. */
     var lowConfidenceStop by mutableStateOf<JourneyStop?>(null)
         private set
@@ -213,20 +264,28 @@ internal class VisitViewModel(
     val cardState: VisitCardState
         get() = VisitCardState.make(progress.activeStop, progress.hasArrived, progress.isFinished, visitorLevel)
 
-    /** The gallery of the active stop, from the gallery polygons. */
-    private val stopGallery: Gallery?
-        get() = progress.activeStop?.let { Gallery.containing(it.coordinate, it.level, galleries) }
-
     /**
-     * The gallery the card names instead of the artwork (DAILY-CALL R2). A curated tour names the
-     * artwork at once.
+     * The gallery the card names instead of the artwork (DAILY-CALL R2; PM, Monday "Navigation to a
+     * gallery"): while the leg ends at the gallery of the active artwork. A curated tour has none.
      */
     val galleryAhead: Gallery?
-        get() = if (kind.guidesToGalleryFirst) GalleryFirst.galleryAhead(progress.activeStop?.id, stopGallery, reachedStopId) else null
+        get() = galleryAheadDestination?.gallery
 
-    /** The visitor's gallery for the card's caption; a curated tour names none. */
+    /** The place of the active stop while the card's title names it: the card shows its AR and audio badges. */
+    val namedArtwork: VenuePlace?
+        get() {
+            val stop = progress.activeStop ?: return null
+            val namesStop = when (cardState) {
+                is VisitCardState.Walking -> floorGuide.isActive || galleryAhead == null
+                is VisitCardState.AtStop -> true
+                else -> floorGuide.isActive
+            }
+            return if (namesStop) places.firstOrNull { it.id == (stop.poiId ?: stop.id) } else null
+        }
+
+    /** The visitor's gallery for the card's caption ("GALLERY · …"), in either kind of journey (iOS 1.5.0). */
     val cardVisitorGallery: Gallery?
-        get() = visitorGallery.takeIf { kind.guidesToGalleryFirst }
+        get() = visitorGallery
 
     /** Display number of the active stop. */
     val activeStopNumber: Int?
@@ -261,7 +320,11 @@ internal class VisitViewModel(
         scope.launch {
             loadVenue()
             refreshMapLayers()
+            // A journey without stops shows the map alone; the navigator would report it finished.
+            if (!hasStops) return@launch
             controller.start()
+            // A visitor who opens the journey inside the first artwork's geofence.
+            checkArrival()
             // Starts the heading-up follow at `MapOptions.recentreZoom` once the journey is drawn,
             // the visitor has a position and the camera takes commands (PM review 2026-10-12: the
             // map did not turn until "Centre on me"; PM item 13273799998: the map stayed at world
@@ -274,8 +337,8 @@ internal class VisitViewModel(
             val navigator = controller.navigator
             combine(navigator.journey, navigator.guidance) { _, guidance -> guidance }.collect { guidance ->
                 val wasFinished = progress.isFinished
+                val activeBefore = progress.activeStop?.id
                 progress = readProgress()
-                markGalleryReached()
                 this@VisitViewModel.guidance = guidance
                 val position = session.position.value
                 floorGuide.update(
@@ -284,9 +347,8 @@ internal class VisitViewModel(
                     levelChangeMarkers,
                     destinationId = navigator.detourStop?.id ?: navigator.activeStop?.id,
                 )
-                // On a floor without positioning the fixes come from the floor the visitor left.
-                if (!floorGuide.isActive) controller.checkArtworkGeofences()
-                if (progress.isFinished && !wasFinished) isShowingWrapUp = true
+                if (progress.activeStop?.id != activeBefore) checkArrival()
+                if (progress.isFinished && !wasFinished && ProximiMapView.Option.PROMPTS in options) isShowingWrapUp = true
                 controller.save()
                 refreshMapLayers()
                 refreshConnector()
@@ -304,7 +366,28 @@ internal class VisitViewModel(
                     updateNotification()
                 }
                 visitorGallery = Gallery.containing(Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level, galleries)
-                markGalleryReached()
+                // The map publishes guidance only on a leg with a route, so the arrival is checked on
+                // the position (field test 2026-10-19).
+                checkArrival()
+            }
+        }
+        scope.launch {
+            controller.galleryAhead.collect { gallery ->
+                galleryAheadDestination = gallery
+                galleryAheadChanged(gallery)
+            }
+        }
+        scope.launch {
+            // The amenity picked in the menu while its card or route is on screen.
+            snapshotFlow { selectedAmenity ?: amenityToConfirm ?: routedAmenity }.distinctUntilChanged().drop(1).collect(::showAmenity)
+        }
+        scope.launch {
+            // The venue data changed on the backend: places, galleries and level changers again;
+            // a stop whose POI was deleted is skipped.
+            venue.data.version.drop(1).collect {
+                loadVenue()
+                refreshMapLayers()
+                for (stop in controller.stopsWithoutPlace(places)) onEvent(VisitEvent.StopPlaceDeleted(stop))
             }
         }
         scope.launch {
@@ -315,8 +398,16 @@ internal class VisitViewModel(
             }
         }
         scope.launch {
-            venue.sdk.geofenceEvents().collect { event ->
-                FieldLog.log("geofence: $event")
+            val events = venue.sdk.geofenceEvents()
+            // The stream does not repeat the geofences entered before it started.
+            controller.enteredGeofenceIds = venue.sdk.enteredGeofenceIds()
+            checkArrival()
+            events.collect { event ->
+                when (event) {
+                    is GeofenceEvent.Entered -> controller.enteredGeofenceIds += event.geofence.id
+                    is GeofenceEvent.Exited -> controller.enteredGeofenceIds -= event.geofence.id
+                    else -> Unit
+                }
                 // Only gallery geofences set the current gallery; the artwork geofences inside them do not.
                 when {
                     event is GeofenceEvent.Entered && event.geofence.isGallery -> {
@@ -342,8 +433,23 @@ internal class VisitViewModel(
         }
     }
 
+    /**
+     * Arrival at an artwork, out of order and gallery first. On a floor without positioning the fixes
+     * come from the floor the visitor left, so nothing is checked.
+     */
+    private fun checkArrival() {
+        if (floorGuide.isActive) return
+        controller.checkArtworkGeofences()
+        controller.checkGalleryFirst()
+    }
+
     private fun reportStopNearby(position: VenuePosition?, stop: MapJourneyStop?, guidance: RouteGuidance?) {
         stopNearby.update(position, stop, guidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
+    }
+
+    /** The host app's journey after a change, applied to the open screen ([VisitController.apply]). */
+    fun apply(incoming: IncomingJourney) {
+        scope.launch { controller.apply(incoming.journey) }
     }
 
     /** The accessible routes button. `VisitScreen` routes the leg again with the new needs. */
@@ -354,8 +460,11 @@ internal class VisitViewModel(
 
     /** The host app changed the accessibility needs: the leg on screen is routed again. */
     fun setAccessibility(accessibility: RouteAccessibility) {
+        this.accessibility = accessibility
         scope.launch { controller.setAccessibility(accessibility) }
     }
+
+    private var accessibility = accessibility
 
     /** The app language changed: map labels and place titles follow it. */
     fun setLanguage(appLanguage: String?) {
@@ -378,11 +487,17 @@ internal class VisitViewModel(
         // every floor they serve.
         val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers)
-        session.hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
+        hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
+        session.hiddenFeatureIds = hiddenFeatureIds + listOfNotNull(galleryAheadDestination?.placeId)
+        val destinations = Gallery.destinations(venue.venueGeofences(), places)
+        controller.setGalleryFirst(kind.guidesToGalleryFirst, places, destinations)
         galleries = venue.galleries(language)
         galleryNames = Gallery.names(places)
         if (FieldLog.isEnabled) {
-            FieldLog.log("galleries: " + galleries.joinToString { "${it.name} L${it.level.toInt()}" } + " · ${galleryNames.size} named by id")
+            FieldLog.log(
+                "galleries: " + galleries.joinToString { "${it.name} L${it.level.toInt()}" } +
+                    " · ${galleryNames.size} named by id · ${destinations.size} for gallery first",
+            )
         }
     }
 
@@ -443,21 +558,36 @@ internal class VisitViewModel(
         )
     }
 
-    private fun markGalleryReached() {
-        reachedStopId = GalleryFirst.reachedStopId(progress.activeStop?.id, stopGallery, visitorGallery, reachedStopId)
-    }
-
     // Map layers
 
-    /** Gallery fills for the current journey and floor. The map library draws the stop markers. */
+    /** Highlights [place] and shows it with the visitor ([PlaceFraming]); `null` removes the highlight. */
+    private fun showAmenity(place: VenuePlace?) {
+        layers.updateHighlight(JourneyMapLayers.highlight(place))
+        place ?: return
+        // Under the Map / List toggle, beside the map buttons, above the place card.
+        val density = application.resources.displayMetrics.density
+        PlaceFraming.show(place, session, FloorWithoutPositioningGuide.insets(density, top = 100, left = 40, bottom = 220, right = 90), settings.amenityFramingMinimumMeters)
+    }
+
+    /** The leg now ends at [gallery], or at the artwork for `null` (gallery first). */
+    private fun galleryAheadChanged(gallery: GalleryDestination?) {
+        refreshMapLayers()
+        // The red gallery marker takes the place of the gallery's own POI.
+        session.hiddenFeatureIds = hiddenFeatureIds + listOfNotNull(gallery?.placeId)
+        FieldLog.log("gallery first: ${gallery?.let { "route ends at ${it.gallery.name}" } ?: "route ends at the artwork"}")
+    }
+
+    /** Gallery fills and the gallery marker for the current journey and floor. The map library draws the stop markers. */
     private fun refreshMapLayers() {
         if (isClosed) return
         val journey = progress.journey
         val active = progress.activeStop?.id
+        val galleryAhead = galleryAheadDestination
         layers.update(
-            JourneyMapContent.fills(journey, active, galleries, visitedGalleries),
+            JourneyMapContent.fills(journey, active, galleries, visitedGalleries, galleryAhead?.gallery),
             session.selectedFloor.value.level,
         )
+        layers.updateGalleryMarker(galleryAhead?.let { JourneyMapLayers.GalleryMarker(it.entry, it.gallery.level, it.label) })
     }
 
     /**
@@ -507,7 +637,7 @@ internal class VisitViewModel(
         } else {
             guidance?.let { GuidanceText.instruction(it.toCore(), levelChangeMarkers) }
         }
-        notification.update(VisitActivity.contentState(cardState, progress.journey, progress.activeStop?.id, instruction))
+        notification?.update(VisitActivity.contentState(cardState, progress.journey, progress.activeStop?.id, instruction))
     }
 
     // Card and list actions
@@ -534,17 +664,21 @@ internal class VisitViewModel(
 
     fun dismissOffRoute() = controller.dismissOffRoute()
 
-    /** A swipe on [stop] in the list, or its "Skip" accessibility action: "Skip artwork?". */
+    /**
+     * A swipe on [stop] in the list, or its "Skip" accessibility action: "Skip artwork?" with
+     * [ProximiMapView.Option.PROMPTS], else only the event.
+     */
     fun requestSkip(stop: JourneyStop) {
-        stopToSkip = stop
+        if (ProximiMapView.Option.PROMPTS in options) stopToSkip = stop
         onEvent(VisitEvent.SkipRequested(stop))
     }
 
     fun confirmSkip() {
         val stop = stopToSkip ?: return
         stopToSkip = null
+        // Without PROGRESS the host app skips the stop.
+        if (ProximiMapView.Option.PROGRESS in options) scope.launch { controller.skip(stop.id) }
         onEvent(VisitEvent.StopSkipped(stop))
-        scope.launch { controller.skip(stop.id) }
     }
 
     /** "Keep it". */
@@ -572,10 +706,67 @@ internal class VisitViewModel(
         selectedAmenity?.let { onEvent(VisitEvent.AmenitySelected(it)) }
     }
 
-    /** "Go here" on the amenity card: asks "Change your route?" first. */
+    /**
+     * "Go here" on the amenity card: asks "Change your route?" first with
+     * [ProximiMapView.Option.PROMPTS], else starts the detour. On a map without a journey it draws
+     * the route to the amenity.
+     */
     fun confirmAmenity() {
-        amenityToConfirm = selectedAmenity
+        val place = selectedAmenity ?: return
         selectedAmenity = null
+        when {
+            !hasStops -> scope.launch { route(place) }
+            ProximiMapView.Option.PROMPTS in options -> amenityToConfirm = place
+            else -> {
+                onEvent(VisitEvent.DetourStarted(place))
+                scope.launch { controller.detour(place) }
+            }
+        }
+    }
+
+    /**
+     * "Go here" on a map without a journey: the route from the visitor to [place], as on the museum
+     * map. There is no navigator to add a detour to.
+     */
+    private suspend fun route(place: VenuePlace) {
+        routedAmenity = place
+        val here = session.position.value
+        if (here == null) {
+            amenityRouteError = R.string.waiting_for_your_position
+            session.clearRoute()
+            return
+        }
+        try {
+            val route = withContext(Dispatchers.Default) {
+                venue.sdk.computeRoute(
+                    from = ProximiioCoordinate(here.coordinate.latitude, here.coordinate.longitude),
+                    fromLevel = here.floor?.level ?: 0.0,
+                    to = ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude),
+                    toLevel = place.level,
+                    options = accessibility.routeOptions,
+                )
+            }
+            if (routedAmenity?.id != place.id) return
+            session.setRoute(route)
+            amenityRouteError = null
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            FieldLog.log("route to ${place.title} failed: $error")
+            session.clearRoute()
+            amenityRouteError = if ((error as? WayfindingRoutingError)?.reason is NoRouteReason.NoAccessibleRoute) {
+                R.string.no_route_from_here_with_your_accessibility
+            } else {
+                R.string.no_route_from_here
+            }
+        }
+    }
+
+    /** "Close" on the card of [routedAmenity]. */
+    fun endAmenityRoute() {
+        routedAmenity = null
+        amenityRouteError = null
+        session.clearRoute()
     }
 
     /** "Close" on the "Change your route?" card. */
@@ -602,13 +793,13 @@ internal class VisitViewModel(
 
     // Leaving
 
-    /** Back: a visit in progress asks first (03.10); a visit not started or finished closes. */
+    /** Back: a visit in progress asks first (03.10) with [ProximiMapView.Option.PROMPTS]; otherwise Back closes. */
     fun requestClose() {
-        if (VisitPlan.asksBeforeLeaving(progress.journey, progress.isFinished)) {
+        if (ProximiMapView.Option.PROMPTS in options && VisitPlan.asksBeforeLeaving(progress.journey, progress.isFinished)) {
             isConfirmingExit = true
             onEvent(VisitEvent.ExitRequested)
         } else {
-            onClose()
+            onClose?.invoke()
         }
     }
 
@@ -616,7 +807,7 @@ internal class VisitViewModel(
     fun leave() {
         isConfirmingExit = false
         onEvent(VisitEvent.ExitConfirmed)
-        onClose()
+        onClose?.invoke()
     }
 
     /** "Carry on". */
@@ -625,18 +816,20 @@ internal class VisitViewModel(
         onEvent(VisitEvent.ExitCancelled)
     }
 
-    /** Journey Complete closed: the visit is over. */
+    /** Journey Complete closed: the visit is over. Without `onClose` the map shows again. */
     fun finishVisit() {
         isShowingWrapUp = false
         controller.end()
-        onClose()
+        onClose?.invoke()
     }
 
     // Ambiguous location (EC04)
 
     private val isPresentingSomething: Boolean
+        // Without prompts the off-route state shows nothing and does not hold the report back.
         get() = lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
-            controller.isOffRoute.value || amenityToConfirm != null || isShowingWrapUp || floorGuide.isActive
+            (ProximiMapView.Option.PROMPTS in options && controller.isOffRoute.value) ||
+            amenityToConfirm != null || isShowingWrapUp || floorGuide.isActive
 
     private fun evaluateAmbiguity() {
         if (isPresentingSomething || monitor.health.value != TrackingHealth.TRACKING) return
@@ -652,7 +845,13 @@ internal class VisitViewModel(
         if (LocationAmbiguity.isQuiet(ambiguity.kind, answeredAmbiguity, Instant.now(), settings.locationQuestionQuietPeriod.toJavaDuration())) return
         FieldLog.log("ambiguous location: ${ambiguity.kind}")
         when (ambiguity) {
-            is LocationAmbiguity.LowConfidence -> lowConfidenceStop = ambiguity.stop
+            is LocationAmbiguity.LowConfidence -> if (ProximiMapView.Option.PROMPTS in options) {
+                lowConfidenceStop = ambiguity.stop
+            } else {
+                // Reported once per quiet period, as an answered prompt.
+                answeredAmbiguity[ambiguity.kind] = Instant.now()
+                onEvent(VisitEvent.PositionUncertain(ambiguity.stop))
+            }
         }
     }
 
@@ -672,7 +871,7 @@ internal class VisitViewModel(
     fun close() {
         if (isClosed) return
         isClosed = true
-        notification.end()
+        notification?.end()
         monitor.stop()
         controller.close()
         layers.detach()

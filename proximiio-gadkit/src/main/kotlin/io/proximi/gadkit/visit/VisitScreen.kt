@@ -14,6 +14,8 @@ import io.proximi.gadkit.map.AccessibleRoutesButton
 import io.proximi.gadkit.map.LocalRouteAccessibility
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
+import io.proximi.gadkit.IncomingJourney
+import io.proximi.gadkit.ProximiMapView
 import io.proximi.gadkit.VenueService
 import kotlinx.coroutines.CoroutineScope
 import android.content.pm.PackageManager
@@ -106,10 +108,18 @@ import kotlin.math.roundToInt
  * wristband states, and the screen reports lost and returning positions as
  * [VisitEvent.TrackingChanged] (PM 2026-10-15).
  *
+ * [options] turn the bottom bar, the background, the prompts, the journey logic and the journey
+ * notification on. `ProximiMap` uses all of them; `ProximiMapView` none by default. A journey
+ * without stops shows the map alone.
+ *
  * @param onClose called after the visitor confirmed leaving, or after the journey is complete.
+ *   `null`: no Back and no "Leave the tour here"; Journey Complete's close button returns to the map.
  * @param kind [JourneyKind.PERSONALISED] names the gallery of the next stop first, lists the stops
  *   under gallery names and lets the visitor skip an artwork. [JourneyKind.CURATED] names the
  *   artwork, lists no galleries and has no skip.
+ * @param mode Map or List when the screen opens.
+ * @param incoming the host app's journey after a change (`ProximiMapView`).
+ * @param persist stores the journey after each change; `null` after Journey Complete.
  * @param onVisitEvent receives a [VisitEvent] for each visitor action and each journey change, on
  *   the main thread.
  */
@@ -117,8 +127,12 @@ import kotlin.math.roundToInt
 internal fun VisitScreen(
     venue: VenueService,
     journey: Journey,
-    onClose: () -> Unit,
+    onClose: (() -> Unit)?,
     kind: JourneyKind = JourneyKind.PERSONALISED,
+    options: Set<ProximiMapView.Option> = ProximiMapView.Option.ALL,
+    mode: VisitMode = VisitMode.MAP,
+    incoming: IncomingJourney? = null,
+    persist: (Journey?) -> Unit,
     onVisitEvent: (VisitEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -129,6 +143,7 @@ internal fun VisitScreen(
     SideEffect {
         holder.onClose = onClose
         holder.onVisitEvent = onVisitEvent
+        holder.persist = persist
     }
     val model = holder.visit(journey) { scope ->
         VisitViewModel(
@@ -139,7 +154,10 @@ internal fun VisitScreen(
             DebugLaunch.read(activity),
             accessibility,
             kind,
-            onClose = { holder.onClose() },
+            options,
+            mode,
+            persist = { holder.persist(it) },
+            onClose = onClose?.let { { holder.onClose?.invoke() } },
             onEvent = { holder.onVisitEvent(it) },
         )
     }
@@ -148,7 +166,8 @@ internal fun VisitScreen(
         onDispose { if (activity?.isChangingConfigurations != true) holder.close(model) }
     }
     LaunchedEffect(model, accessibility) { model.setAccessibility(accessibility) }
-    VisitContent(model)
+    LaunchedEffect(model, incoming) { incoming?.let(model::apply) }
+    VisitContent(model, hasBack = onClose != null)
 }
 
 /**
@@ -160,7 +179,10 @@ internal class VisitHolder : ViewModel() {
     private var currentJourney: Journey? = null
 
     /** The host app's latest `onClose`. */
-    var onClose: () -> Unit = {}
+    var onClose: (() -> Unit)? = null
+
+    /** The latest `persist`. */
+    var persist: (Journey?) -> Unit = {}
 
     /** The host app's latest `onVisitEvent`. */
     var onVisitEvent: (VisitEvent) -> Unit = {}
@@ -192,12 +214,13 @@ internal class VisitHolder : ViewModel() {
 }
 
 @Composable
-private fun VisitContent(model: VisitViewModel) {
+private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
     val language = LocalConfiguration.current.locales[0]?.language
     LaunchedEffect(language) { model.setLanguage(language) }
     // The journey notification stands in for the iOS Live Activity.
-    AskNotificationPermission()
-    BackHandler(onBack = model::requestClose)
+    if (ProximiMapView.Option.JOURNEY_NOTIFICATION in model.options && model.hasStops) AskNotificationPermission()
+    // Without `onClose` the host app's Back handling stays.
+    BackHandler(enabled = hasBack, onBack = model::requestClose)
     // The first position zooms in on the visitor, once the map shows (iOS `onChange(of: position == nil)`).
     val position by model.session.position.collectAsStateWithLifecycle()
     val isCameraReady by model.session.isCameraReady.collectAsStateWithLifecycle()
@@ -207,7 +230,9 @@ private fun VisitContent(model: VisitViewModel) {
     val backdrop = rememberGlassBackdrop()
     val mapBackdrop = rememberGlassBackdrop()
     Box(Modifier.fillMaxSize()) {
-        Image(painterResource(R.drawable.background_map), null, Modifier.fillMaxSize().glassBackdrop(backdrop), contentScale = ContentScale.Crop)
+        if (ProximiMapView.Option.BACKGROUND in model.options) {
+            Image(painterResource(R.drawable.background_map), null, Modifier.fillMaxSize().glassBackdrop(backdrop), contentScale = ContentScale.Crop)
+        }
         ProvideGlassBackdrop(backdrop) {
             // As iOS: the card 8 dp under the status bar, the bar 14 dp into the navigation bar inset (at least 4 dp).
             val navigationBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -228,22 +253,28 @@ private fun VisitContent(model: VisitViewModel) {
                     androidx.compose.animation.AnimatedVisibility(model.amenityToConfirm != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
                         Box(Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.5f)))
                     }
-                    ProvideGlassBackdrop(if (model.mode == VisitMode.MAP) mapBackdrop else null) { CardOverlay(model) }
+                    ProvideGlassBackdrop(if (!model.showsList) mapBackdrop else null) { CardOverlay(model) }
                 }
-                BottomGlassBar(
-                    leading = {
-                        RoundGlassButton(model::requestClose, stringResource(R.string.back)) {
-                            MapIcon(R.drawable.ic_chevron_backward, size = 18)
-                        }
-                    },
-                    trailing = {
-                        val showsList = model.mode == VisitMode.LIST
-                        RoundGlassButton(
-                            onClick = { model.mode = if (showsList) VisitMode.MAP else VisitMode.LIST },
-                            contentDescription = stringResource(if (showsList) R.string.map else R.string.list),
-                        ) { MapIcon(if (showsList) R.drawable.ic_map else R.drawable.ic_list, size = 22) }
-                    },
-                )
+                if (ProximiMapView.Option.BOTTOM_BAR in model.options) {
+                    BottomGlassBar(
+                        leading = {
+                            if (hasBack) {
+                                RoundGlassButton(model::requestClose, stringResource(R.string.back)) {
+                                    MapIcon(R.drawable.ic_chevron_backward, size = 18)
+                                }
+                            }
+                        },
+                        trailing = {
+                            if (model.hasStops) {
+                                val showsList = model.showsList
+                                RoundGlassButton(
+                                    onClick = { model.mode = if (showsList) VisitMode.MAP else VisitMode.LIST },
+                                    contentDescription = stringResource(if (showsList) R.string.map else R.string.list),
+                                ) { MapIcon(if (showsList) R.drawable.ic_map else R.drawable.ic_list, size = 22) }
+                            }
+                        },
+                    )
+                }
             }
         }
         val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
@@ -256,7 +287,7 @@ private fun VisitContent(model: VisitViewModel) {
 /** List mode: the stop list over the map, faded in. */
 @Composable
 private fun ListOverlay(model: VisitViewModel) {
-    AnimatedVisibility(model.mode == VisitMode.LIST, enter = fadeIn(), exit = fadeOut()) {
+    AnimatedVisibility(model.showsList, enter = fadeIn(), exit = fadeOut()) {
         VisitStopList(model, Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.92f)))
     }
 }
@@ -268,10 +299,11 @@ private fun ListOverlay(model: VisitViewModel) {
  */
 @Composable
 private fun CardOverlay(model: VisitViewModel) {
-    val isMap = model.mode == VisitMode.MAP
+    // Without stops the map shows, whatever the mode is.
+    val isMap = !model.showsList
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP })
+            if (model.hasStops) MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP })
             Spacer(Modifier.weight(1f))
             if (isMap) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -333,7 +365,18 @@ private fun CardOverlay(model: VisitViewModel) {
                     onPrimary = model::confirmAmenity,
                     onClose = { model.selectedAmenity = null },
                 )
-            } else {
+            } else if (model.routedAmenity != null) {
+                // The route to an amenity on a map without a journey.
+                val place = checkNotNull(model.routedAmenity)
+                val resources = LocalResources.current
+                PlaceInfoCard(
+                    title = place.title,
+                    subtitle = model.amenityRouteError?.let { stringResource(it) } ?: placeSubtitle(place, resources),
+                    primary = stringResource(R.string.close),
+                    onPrimary = model::endAmenityRoute,
+                    onClose = null,
+                )
+            } else if (model.hasStops) {
                 VisitCard(model)
             }
         }
@@ -403,6 +446,7 @@ private fun VisitCard(model: VisitViewModel) {
                 state == VisitCardState.Starting -> CircularProgressIndicator(Modifier.size(18.dp), color = Palette.ink, strokeWidth = 2.dp)
                 state == VisitCardState.Finished -> MapIcon(R.drawable.ic_checkmark, size = 16)
                 number != null && VisitCardText.showsStopNumber(state, galleryAhead) -> Text("$number", style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
+                galleryAhead != null -> MapIcon(R.drawable.ic_gallery, size = 18)
                 else -> MapIcon(R.drawable.ic_map_straight, size = 16)
             }
         },
@@ -412,6 +456,7 @@ private fun VisitCard(model: VisitViewModel) {
                 OutlineBadge("L${state.level}", Modifier.semantics { contentDescription = description })
             }
         },
+        badges = { model.namedArtwork?.let { ArtworkBadges(it) } },
     )
 }
 
@@ -439,7 +484,7 @@ private fun VisitSheets(model: VisitViewModel) {
     val isOffRoute by model.controller.isOffRoute.collectAsStateWithLifecycle()
     val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
     val isOnFloorWithoutPositioning = floorPhase != FloorWithoutPositioningGuide.Phase.Idle
-    if (isOffRoute && !isOnFloorWithoutPositioning && model.stopToSkip == null && model.amenityToConfirm == null) {
+    if (ProximiMapView.Option.PROMPTS in model.options && isOffRoute && !isOnFloorWithoutPositioning && model.stopToSkip == null && model.amenityToConfirm == null) {
         OffRouteWarning(onReroute = model::resumeJourney, onClose = model::dismissOffRoute)
     }
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)

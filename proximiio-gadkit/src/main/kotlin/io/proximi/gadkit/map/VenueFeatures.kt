@@ -67,16 +67,17 @@ internal val ProximiioGeofence.isGallery: Boolean get() = metadata?.get("geofenc
 /** An artwork geofence: `remote_id` is the artwork's collection id, as on the artwork POI. */
 internal val ProximiioGeofence.isArtwork: Boolean get() = metadata?.get("geofence_type")?.stringValue == "artwork"
 
+/** The venue's geofences as core reads them. */
+internal suspend fun VenueService.venueGeofences(): List<VenueGeofence> = sdk.geofences().map {
+    VenueGeofence(
+        it.id, it.name, it.polygon, it.floorId, it.remoteId, it.metadata?.get("geofence_type")?.stringValue,
+        center = it.area?.let { area -> Coordinate(area.latitude, area.longitude) },
+        radius = it.radius,
+    )
+}
+
 /** The shapes of the artwork geofences, by `remote_id` ([VisitController.artworkAreas]). */
-internal suspend fun VenueService.artworkAreas(): Map<String, List<ArtworkArea>> = VisitController.artworkAreas(
-    sdk.geofences().map {
-        VenueGeofence(
-            it.id, it.name, it.polygon, it.floorId, it.remoteId, it.metadata?.get("geofence_type")?.stringValue,
-            center = it.area?.let { area -> Coordinate(area.latitude, area.longitude) },
-            radius = it.radius,
-        )
-    },
-)
+internal suspend fun VenueService.artworkAreas(): Map<String, List<ArtworkArea>> = VisitController.artworkAreas(venueGeofences())
 
 /** The venue's lifts, staircases and escalators ([LevelChangerPlace]). */
 internal suspend fun VenueService.levelChangers(): List<LevelChangerPlace> = withContext(Dispatchers.Default) {

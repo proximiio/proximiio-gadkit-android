@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gallery glyph of the stop card (gallery first), in place of the iOS SF Symbol `photo.artframe`:
+     a frame with a picture of hills. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF2B2B2B"
+        android:fillType="evenOdd"
+        android:pathData="M3,3h18v18H3z M5,5v14h14V5z M6.5,17.5l3.5,-5 2.5,3 2,-2.5 3,4.5z M15.5,9.5a1.5,1.5 0,1 0,0.01 0z" />
+</vector>

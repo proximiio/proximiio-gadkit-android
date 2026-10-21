@@ -30,6 +30,36 @@ internal object VisitPlan {
         group = Gallery.containing(place.coordinate, place.level, galleries)?.id,
     )
 
+    /**
+     * [journey] after a change of the venue data. Pure; covered by tests.
+     * - A reached or done stop keeps its stored values.
+     * - Any other planned stop whose POI is no longer a place is removed.
+     * - Any other planned stop takes the title, coordinate, floor and gallery of its POI. Its id and
+     *   state stay.
+     * - Detour stops stay as they are.
+     */
+    fun reconciled(journey: Journey, places: List<VenuePlace>, galleries: List<Gallery> = emptyList()): Journey {
+        val byId = LinkedHashMap<String, VenuePlace>()
+        for (place in places) byId.putIfAbsent(place.id, place)
+        return Journey(
+            journey.stops.mapNotNull { stop ->
+                val poiId = stop.poiId
+                if (!followsItsPlace(stop) || poiId == null) return@mapNotNull stop
+                val place = byId[poiId] ?: return@mapNotNull null
+                stop(place, galleries).copy(id = stop.id, state = stop.state)
+            },
+        )
+    }
+
+    /** The pending, active and skipped planned stops whose POI is no longer a place. Pure; covered by tests. */
+    fun stopsWithoutPlace(journey: Journey, places: List<VenuePlace>): List<JourneyStop> {
+        val ids = places.mapTo(HashSet()) { it.id }
+        return journey.stops.filter { stop -> followsItsPlace(stop) && stop.poiId?.let { it !in ids } == true }
+    }
+
+    private fun followsItsPlace(stop: JourneyStop): Boolean =
+        stop.kind == StopKind.PLANNED && stop.state != StopState.REACHED && stop.state != StopState.DONE
+
     /** [journey] with stop [id] set to [state]. The running navigator edits stops itself; this builds journeys in tests. */
     internal fun setting(state: StopState, id: String, journey: Journey): Journey {
         val index = journey.stops.indexOfFirst { it.id == id }

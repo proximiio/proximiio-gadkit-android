@@ -28,7 +28,6 @@
     <string name="current_artwork">CURRENT ARTWORK</string>
     <string name="delete_journey">Delete journey</string>
     <string name="delete_this_journey">Delete this journey</string>
-    <string name="dismiss">Dismiss</string>
     <string name="edit_stops">Edit stops</string>
     <string name="elevator">Elevator</string>
     <string name="end_route">End route</string>
@@ -47,6 +46,7 @@
     <string name="head_straight_for_n_m">Head straight for %d m</string>
     <string name="help_desk">Help Desk</string>
     <string name="hold_the_qr_code_on_the_back">Hold the QR code on the back of your wristband inside the frame</string>
+    <string name="hold_your_current_wristband_next_to_the">Hold your current wristband next to the new one and scan again.</string>
     <string name="i_couldn_t_get_things_started_check">I couldn’t get things started. Check your connection and let’s try again.</string>
     <string name="it_will_be_ready_when_you_arrive">It will be ready when you arrive at GAD</string>
     <string name="it_will_be_removed_from_your_route">It will be removed from your route. Artworks you have visited stay saved.</string>
@@ -128,7 +128,7 @@
     <string name="the_connection_to_your_wristband_was_lost">The connection to your wristband was lost. Connect it again.</string>
     <string name="the_museum_s_server_cannot_be_reached">The museum’s server cannot be reached. Check your connection and try again.</string>
     <string name="the_museum_s_server_failed_try_again">The museum’s server failed. Try again in a moment.</string>
-    <string name="the_next_stop_of_your_journey_is">The next stop of your journey is less than %d m away.</string>
+    <string name="the_museum_s_server_is_busy_try">The museum’s server is busy. Try again in a moment.</string>
     <string name="the_route_stays_as_it_is_until">The route stays as it is until you return to it.</string>
     <string name="the_staff_released_this_wristband">The staff released this wristband.</string>
     <string name="the_wristband_left_the_museum">The wristband left the museum.</string>
@@ -177,7 +177,7 @@
     <string name="your_visit_has_ended">Your visit has ended.</string>
     <string name="your_visit_time_is_over">Your visit time is over.</string>
     <string name="your_wristband">your wristband</string>
-    <string name="your_wristband_has_stopped_responding">Your wristband has stopped responding</string>
+    <string name="your_wristband_isn_t_reachable_please_swap">Your wristband isn\'t reachable. Please swap it at the reception desk.</string>
     <string name="your_wristband_tracks_where_you_are_in_2">Your wristband tracks where you are in the galleries. Pair it now, or later when your journey begins.</string>
     <string name="your_wristband_was_scanned_by_another_phone">Your wristband was scanned by another phone. Connect it again to follow it on this phone.</string>
 </resources>

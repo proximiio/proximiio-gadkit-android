@@ -138,8 +138,27 @@ public sealed interface ProximiMapEvent {
     /** The route leads to this stop now. */
     public data class NextStop(public val stop: ProximiStop) : ProximiMapEvent
 
-    /** The active stop is less than [GadSettings.stopNearbyMeters] away on the visitor's level. Once per stop. */
+    /**
+     * The active stop is less than [GadSettings.stopNearbyMeters] away on the visitor's level. Once
+     * per stop. The library posts no notification for it.
+     */
     public data class StopNearby(public val stop: ProximiStop) : ProximiMapEvent
+
+    /**
+     * The position is uncertain near the active stop: the accuracy is worse than
+     * [GadSettings.uncertainAccuracyMeters] and the stop is within it. Sent by [ProximiMapView]
+     * without [ProximiMapView.Option.PROMPTS], which otherwise asks "Probably at …". At most once per
+     * [GadSettings.locationQuestionQuietPeriod].
+     */
+    public data class PositionUncertain(public val stop: ProximiStop) : ProximiMapEvent
+
+    /**
+     * The stop's POI was deleted on the backend while [ProximiMapView] is open. Once per stop. Without
+     * [ProximiMapView.Option.PROGRESS] the stop stays on the screen until the host app changes the
+     * journey; that change starts the screen again without it. With [ProximiMapView.Option.PROGRESS]
+     * the stop is skipped.
+     */
+    public data class StopPlaceDeleted(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
      * [GadSettings.artworkAdvanceDelay] after the visitor reached the artwork of the active stop: the
@@ -153,7 +172,10 @@ public sealed interface ProximiMapEvent {
      */
     public data class ArtworkVisitedOutOfOrder(public val stop: ProximiStop) : ProximiMapEvent
 
-    /** The visitor swiped a stop in the list. A dialog asks "Skip artwork?". */
+    /**
+     * The visitor swiped a stop in the list. With [ProximiMapView.Option.PROMPTS] a dialog asks "Skip
+     * artwork?"; without them the host app decides.
+     */
     public data class SkipRequested(public val stop: ProximiStop) : ProximiMapEvent
 
     public data class StopSkipped(public val stop: ProximiStop) : ProximiMapEvent
@@ -180,7 +202,10 @@ public sealed interface ProximiMapEvent {
     /** The visitor is on the route again after [OffRoute]. */
     public data object BackOnRoute : ProximiMapEvent
 
-    /** Every stop is visited or skipped. "Journey Complete" shows. */
+    /**
+     * Every stop is visited or skipped. [ProximiMap], and [ProximiMapView] with
+     * [ProximiMapView.Option.PROMPTS], show Journey Complete.
+     */
     public data object JourneyFinished : ProximiMapEvent
 
     /** The map shows a floor without positioning and does not follow the visitor. */

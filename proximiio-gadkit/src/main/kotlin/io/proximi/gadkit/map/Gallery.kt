@@ -2,6 +2,10 @@ package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.roundedInt
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.min
 
 /**
  * A gallery has a name, a level and an outline. Galleries come from the venue's polygon
@@ -9,6 +13,25 @@ import io.proximi.gadkit.roundedInt
  * gallery POI inside them, and from polygon geofences. Journey stops and the visitor's position
  * are placed in a gallery by a point-in-polygon test on the same level.
  */
+/**
+ * A gallery that a personalised journey leads to before the artworks in it (PM, Monday "Navigation to
+ * a gallery", 2026-10-15), as iOS `GalleryDestination`. Two records share the id that an artwork
+ * names in `metadata.gallery_id`: the gallery geofence (`metadata.geofence_type` gallery) has it in
+ * `remote_id`, and so does the gallery's POI. The geofence gives the outline; the POI gives the name
+ * and the end of the route.
+ *
+ * @property gallery `id` is the `gallery_id`, `name` the POI's title, such as "G303 Language", `level`
+ *   the POI's, `ring` the geofence's outline.
+ * @property entry the gallery's POI: where the route to the gallery ends.
+ * @property placeId the id of the gallery's POI.
+ */
+internal data class GalleryDestination(val gallery: Gallery, val entry: Coordinate, val placeId: String) {
+    val id: String get() = gallery.id
+
+    /** The text of the map marker: the first word of the name, such as "G303". */
+    val label: String get() = gallery.name.split(' ').firstOrNull { it.isNotEmpty() } ?: gallery.name
+}
+
 internal data class Gallery(
     internal val id: String,
     internal val name: String,
@@ -19,6 +42,32 @@ internal data class Gallery(
     internal fun contains(coordinate: Coordinate, level: Double?): Boolean {
         if (level != null && !VenueLevel.same(level, this.level)) return false
         return ringContains(ring, coordinate)
+    }
+
+    /**
+     * Metres from [coordinate] to the outline, 0 inside it. Measured on a flat projection around
+     * [coordinate], which is exact enough within a building.
+     */
+    internal fun distanceTo(coordinate: Coordinate): Double {
+        if (contains(coordinate, null)) return 0.0
+        val metersPerLatitude = 111_320.0
+        val metersPerLongitude = metersPerLatitude * cos(coordinate.latitude * PI / 180)
+        fun x(point: Coordinate) = (point.longitude - coordinate.longitude) * metersPerLongitude
+        fun y(point: Coordinate) = (point.latitude - coordinate.latitude) * metersPerLatitude
+        var nearest = Double.POSITIVE_INFINITY
+        var j = ring.size - 1
+        for (i in ring.indices) {
+            val ax = x(ring[j])
+            val ay = y(ring[j])
+            val dx = x(ring[i]) - ax
+            val dy = y(ring[i]) - ay
+            val lengthSquared = dx * dx + dy * dy
+            // The point of the edge nearest the origin, [coordinate].
+            val t = if (lengthSquared > 0) (-(ax * dx + ay * dy) / lengthSquared).coerceIn(0.0, 1.0) else 0.0
+            nearest = min(nearest, hypot(ax + t * dx, ay + t * dy))
+            j = i
+        }
+        return nearest
     }
 
     /** Fill colours of a level as ARGB, opaque. */
@@ -69,6 +118,32 @@ internal data class Gallery(
                 Coordinate(latitude, longitude)
             }
             return ring?.takeIf { it.size >= 3 }
+        }
+
+        /**
+         * The galleries a personalised journey leads to first, by `gallery_id` ([GalleryDestination]).
+         * A gallery without a polygon geofence or a POI is left out. Geofence polygons are GeoJSON
+         * `[longitude, latitude]` pairs. Pure; covered by tests.
+         */
+        internal fun destinations(geofences: List<VenueGeofence>, places: List<VenuePlace>): Map<String, GalleryDestination> {
+            val pois = LinkedHashMap<String, VenuePlace>()
+            for (place in places) {
+                if (place.isArtwork) continue
+                val id = place.remoteId?.takeIf { it.isNotEmpty() } ?: continue
+                pois.putIfAbsent(id, place)
+            }
+            val destinations = LinkedHashMap<String, GalleryDestination>()
+            for (geofence in geofences) {
+                if (geofence.geofenceType != "gallery") continue
+                val id = geofence.remoteId?.takeIf { it.isNotEmpty() } ?: continue
+                if (id in destinations) continue
+                val poi = pois[id] ?: continue
+                val polygon = geofence.polygon ?: continue
+                val ring = polygon.mapNotNull { pair -> if (pair.size >= 2) Coordinate(pair[1], pair[0]) else null }
+                if (ring.size < 3) continue
+                destinations[id] = GalleryDestination(Gallery(id, poi.title, poi.level, ring), poi.coordinate, poi.id)
+            }
+            return destinations
         }
 
         /**

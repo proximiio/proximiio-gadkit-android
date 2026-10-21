@@ -16,8 +16,7 @@ import io.proximi.gadkit.UiText
 import io.proximi.gadkit.ui.resolve
 
 /**
- * A local notification: the iOS `UNNotificationRequest` of `GeofenceNotifier` and
- * `StopNearbyNotifier`. [tag] is the iOS identifier: a new notice replaces the earlier one with the
+ * A local notification: the iOS `UNNotificationRequest` of `GeofenceNotifier`. [tag] is the iOS identifier: a new notice replaces the earlier one with the
  * same tag. [group] is the iOS thread identifier.
  */
 internal data class LocalNotice(val tag: String, val title: String, val body: UiText, val group: String)

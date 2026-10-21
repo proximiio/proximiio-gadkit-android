@@ -70,6 +70,12 @@ internal class VisitStore private constructor(context: Context, private val scop
         write { if (text == null) it.remove(JOURNEY_KEY) else it[JOURNEY_KEY] = text }
     }
 
+    /** Saves [journey]; `null` removes the stored visit and its title (`VisitController.persist`). */
+    internal fun persist(journey: Journey?) {
+        save(journey)
+        if (journey == null) saveMeta(null)
+    }
+
     internal fun saveMeta(meta: VisitMeta?) {
         if (meta == mutableMeta.value) return
         mutableMeta.value = meta
