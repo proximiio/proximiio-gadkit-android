@@ -69,7 +69,7 @@ dependencies {
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.25` and Map `6.0.0-beta.22` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.27` and Map `6.0.0-beta.23` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - A host app that draws its journey with the map library's `ProximiioMap` and its own
@@ -491,6 +491,8 @@ app returns to the foreground; the SDK sync brings geofences and floors. After a
   journey overview keep the old ones until the navigator routes again: the next stop, a skip, or a
   re-route after the visitor left the route. The library does not call the navigator's
   `routeNetworkChanged()` of map 6.0.0-beta.22 yet (as the iOS package 1.7.0).
+- The open map draws the new POIs, amenity icons, floors and geofences: the map library follows the
+  SDK's `venueDataChanges()` (map 6.0.0-beta.23). Camera, floor, route and journey stay.
 - The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
 - The stored journey follows its POIs. A done stop keeps its title and position. Another stop whose
@@ -499,9 +501,6 @@ app returns to the foreground; the SDK sync brings geofences and floors. After a
 - On the open journey screen of `ProximiMap` (and of `ProximiMapView` with `PROGRESS`), a stop whose
   POI was deleted is skipped and reported as `StopPlaceDeleted`. The stored journey removes it when
   the screen closes. A changed POI moves its stop when the screen closes.
-
-Not yet: an open map keeps the POIs and amenities it has drawn until it opens again. The library
-does not call the session's `reloadVenueData()` of map 6.0.0-beta.22 yet (as the iOS package 1.7.0).
 
 ## Wristband
 
@@ -798,8 +797,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| 0.15.0: SDK 6.0.0-beta.59 and Map 6.0.0-beta.44, text for the swap and signing errors | SDK 6.0.0-beta.25 and the texts, as on iOS. The map background stays black until the style draws. | Map 6.0.0-beta.22 has a clear background as an option (`MapOptions.backgroundColor`, a `TextureView`); Map 6.0.0-beta.23 makes it the default, as on iOS. |
-| 1.4.0: SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | The level changers are drawn on the floors of their `levels`, as on iOS. The SDK router still connects a level changer to its own floor too, a ride over several floors still has a marker per floor, and a session the relay-api gives no verdict on binds again. | The Android SDK takes the iOS rules in 6.0.0-beta.26. |
+| SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | SDK 6.0.0-beta.27 (as iOS SDK 6.0.0-beta.61) and Map 6.0.0-beta.23 | The open map draws venue data changes at once (see "Venue data changes"); on iOS it does so from the next opening. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -827,8 +825,8 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-Version 1.7.0, with the behaviour of the iOS package 1.7.0, without the clear map background of
-0.15.0 and without the SDK and Map changes of 1.4.0 (see "Differences from the iOS package"). It is the first release since 0.14.0:
+Version 1.7.0, with the behaviour of the iOS package 1.7.0 on newer SDK and Map versions (see
+"Differences from the iOS package"). It is the first release since 0.14.0:
 the 1.0.0 entries below were never tagged. One entry point, `ProximiMap`, replaces the screens and
 services of 0.14.0 (Nagarro, 2026-10-16: "a single exposed wrapper component that encapsulates all
 internal UI components and logic"). `ProximiMapView` is the journey map alone on the host app's SDK.
@@ -842,15 +840,33 @@ From 1.0.0 a minor or patch version does not break the public API.
 - [MIGRATION.md](MIGRATION.md): moving from `ProximiioMap` and an own `JourneyNavigator` on SDK
   6.0.0-beta.23 and Map 6.0.0-beta.21 to `ProximiMapView`.
 
-#### Changed (Map 6.0.0-beta.22)
+#### Changed (SDK 6.0.0-beta.27, Map 6.0.0-beta.23)
 
-- **BREAKING:** the library depends on Map `6.0.0-beta.22` (was `6.0.0-beta.21`). A host app that
-  declares the Map artifacts itself moves them to `6.0.0-beta.22`. No source change.
+- **BREAKING:** the library depends on SDK `6.0.0-beta.27` (was `6.0.0-beta.25`) and Map
+  `6.0.0-beta.23` (was `6.0.0-beta.21`). A host app that declares these artifacts itself moves them
+  to the same versions. No source change. The first start moves the SDK's database to a new schema:
+  a test install that goes back to an older SDK clears the app's data first.
+- **Visible:** the SDK router connects a lift, staircase or escalator only to the floors in its
+  `properties.levels` (iOS 1.4.0). Routes can change. In the GAD data of 2026-10-21 no route reaches
+  level 0 while path 72013669 does not reach lift b462d813; the venue data needs the fix, the host
+  app does not.
+- **Visible:** a ride over several floors is one level change: one instruction and one floor-change
+  marker, from the floor boarded to the floor left (iOS 1.4.0).
+- **Visible:** after the relay-api refuses the refresh token, a wristband session the relay-api
+  gives no verdict on ends with "session lost", and the visitor scans the wristband again (iOS
+  1.4.0).
+- **Visible:** the map background is clear, as on iOS (0.15.0): the screen behind the map shows
+  until the style's first frame. The map draws into a `TextureView`.
+- **Visible:** a map shown again centres on the visitor at the zoom that shows their whole place.
+- **Visible:** the open map draws venue data changes at once. See "Venue data changes".
 - **Visible:** the map no longer crashes when it loads the organisation's style over the cached one
   (`Calling getLayer when a newer style is loading`), for example on the first start after the
-  installation. No change in the host app.
+  installation.
 - **Visible:** `setRouteOptions` keeps the leg to a reached stop and a leg the options do not
-  change; a changed amenity icon is drawn again. See MIGRATION.md section 1.
+  change; a changed amenity icon is drawn again.
+- MapLibre requests to `apiBaseUrl` carry `X-Visitor-Id` and `X-Proximiio-SDK` too. See "Privacy".
+
+No change in the host app's code. MIGRATION.md section 1 lists every change.
 
 #### Added (iOS 1.1.0 to 1.6.0)
 

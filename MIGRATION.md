@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.7.0 uses SDK
-6.0.0-beta.25 and Map 6.0.0-beta.22.
+6.0.0-beta.27 and Map 6.0.0-beta.23.
 
 Each change has a mark:
 
@@ -33,6 +33,15 @@ The SDK and Map versions have no other source break.
 | SDK 6.0.0-beta.25 | The device identifier serves App functionality (the rate limit, the wristband binding) as well as Analytics. | The Play Console Data safety form declares "Device or other IDs" for App functionality and Analytics, not shared and not used for tracking. | **Required** before a Play Store release |
 | Map 6.0.0-beta.22 | `setRouteOptions(options)` keeps the leg walked to a reached stop and a leg the options do not change, without `Rerouted`. Before `start()` it measures the legs again. | Code that waits for `Rerouted` after `setRouteOptions` gets it only for a leg that changed. | **Check** |
 | Map 6.0.0-beta.22 | An amenity whose icon changed is drawn again with the new icon. | | Info |
+| SDK 6.0.0-beta.26 | The router connects a lift, staircase or escalator only to the floors in its `properties.levels`. Routes can change. In the GAD data of 2026-10-21 no route reaches level 0 while path 72013669 does not reach lift b462d813: the routes fail with `NoLevelTransition`. | The venue data gives every level changer its `levels` and a path to it on each of these floors. | **Required** in the venue data |
+| SDK 6.0.0-beta.26 | A ride over several floors is one `LevelChange` and one level-change instruction, from the floor boarded to the floor left. The map draws one floor-change marker per ride. | Code that reads the number of floors from `levelChanges.size` reads the number of rides. | **Check** |
+| SDK 6.0.0-beta.26 | After the relay-api refuses the refresh token, the SDK binds the stored wristband again only when `GET /v1/bindings/current` reports the session active. Without a verdict the session ends with `Ended(SessionLost)`, and the visitor scans the wristband again. | | Info |
+| SDK 6.0.0-beta.27 | The first start moves the SDK's database to a new schema. An older SDK cannot open it. | A test install that goes back to SDK 6.0.0-beta.26 or older clears the app's data first. | **Check** |
+| SDK 6.0.0-beta.27 | `features()` can return a part of the venue on a fresh install until a `loadRouteNetwork()` download is stored. `SyncEvent.entity` carries the canonical name (`Feature`, `Floor`, …). `mapStyle()` returns the stored style. | Call `loadRouteNetwork()` before reading `features()`. Code that compares `SyncEvent.entity` with an alias or a plural compares it with the canonical name. | **Check** |
+| Map 6.0.0-beta.23 | The map background is clear (`MapOptions.backgroundColor` is `Color.TRANSPARENT`, was `null`). The app's view shows behind the map before the style's first frame, and the map draws into a `TextureView`. | `MapOptions(backgroundColor = null)` keeps the earlier look. | **Check** |
+| Map 6.0.0-beta.23 | A map shown again after a fix centres on the visitor at the zoom that shows their whole place and follows at that zoom. Before, it zoomed to `recentreZoom`. | | Info |
+| Map 6.0.0-beta.23 | The session follows `venueDataChanges()`: it redraws the features, amenity icons, floors, places, geofences and the stored style when the SDK's data changes. Camera, floor, route and journey stay. | Remove own `reloadVenueData()` calls for these changes. A running `JourneyNavigator` still needs `routeNetworkChanged()` after a `features` change. | **Check** |
+| Map 6.0.0-beta.23 | MapLibre requests to the API host carry `X-Proximiio-SDK` and `X-Visitor-Id`, as the SDK's requests do. | See the headers row of SDK 6.0.0-beta.25. | Info |
 
 ### Added
 
@@ -43,6 +52,13 @@ All Info.
   `BlueiotBindingPolicy.swapNearMeters`.
 - Map 6.0.0-beta.22: `JourneyNavigator.remove(stopId)`, `replace(stop)`, `update(to)` and
   `routeNetworkChanged()`, `ProximiioMapSession.reloadVenueData()`, `MapOptions.backgroundColor`.
+- SDK 6.0.0-beta.26: `LevelChanger.levels`.
+- SDK 6.0.0-beta.27: `Proximiio.venueDataChanges()` with `VenueDataChange` and `VenueDataKind`,
+  `refreshMapStyle()` and `cachedMapStyle()`. `VenueDataKind` is a class: a `when` over it needs an
+  `else`. `loadRouteNetwork()` sends `If-None-Match` per page: an unchanged venue costs one small
+  request per page.
+- Map 6.0.0-beta.23: `VenueDataSource.venueDataChanges()`, `VenueStyleSource.storedStyleDocument()`
+  and `VenueDataSource.apiVisitorID`, with defaults.
 
 ### Fixed
 
@@ -53,10 +69,15 @@ All Info.
   after `retryAfter`.
 - Map 6.0.0-beta.22: the map no longer crashes when it loads the organisation's style over the cached
   one (`Calling getLayer when a newer style is loading`).
+- SDK 6.0.0-beta.26: a wristband session another phone took over no longer comes back by itself. A
+  route from level 1 to level 4 no longer names level 3 or level 2.
+- SDK 6.0.0-beta.27: a fresh install no longer shows most POIs without icon or title.
+- Map 6.0.0-beta.23: a lift ride over several floors no longer draws a short zigzag next to the lift
+  on the floor it arrives at. Use SDK 6.0.0-beta.26 or later only with Map 6.0.0-beta.23 or later.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.26 and later and Map 6.0.0-beta.23 and later are not used by ProximiioGADKit for
+SDK 6.0.0-beta.28 and later and Map 6.0.0-beta.24 and later are not used by ProximiioGADKit for
 Android 1.7.0. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
@@ -78,7 +99,7 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 
 - Add the library as a git submodule at the tag `1.7.0`, include its build and depend on
   `io.proximi.gadkit:proximiio-gadkit` without a version (README "Adding the library").
-- The library brings SDK `6.0.0-beta.25` and Map `6.0.0-beta.22` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.27` and Map `6.0.0-beta.23` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2. With the Gradle configuration cache
@@ -87,8 +108,10 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 ### Step 2: SDK and Map changes (Required / Check)
 
 Section 1: `eventBatching` with positional arguments and the `BlueiotBindingError` cases
-(**Required**), the headers on the on-premises proxy and the Data safety form (**Required**),
-visitor reporting, `swapNearMeters` and `setRouteOptions` (**Check**).
+(**Required**), the headers on the on-premises proxy, the Data safety form and the level changers'
+`levels` in the venue data (**Required**), visitor reporting, `swapNearMeters`, `setRouteOptions`,
+`levelChanges`, the database schema, `features()`, the clear background and `reloadVenueData()`
+(**Check**).
 
 ### Step 3: Languages (Check)
 
