@@ -847,9 +847,8 @@ From 1.0.0 a minor or patch version does not break the public API.
   to the same versions. No source change. The first start moves the SDK's database to a new schema:
   a test install that goes back to an older SDK clears the app's data first.
 - **Visible:** the SDK router connects a lift, staircase or escalator only to the floors in its
-  `properties.levels` (iOS 1.4.0). Routes can change. In the GAD data of 2026-10-21 no route reaches
-  level 0 while path 72013669 does not reach lift b462d813; the venue data needs the fix, the host
-  app does not.
+  `properties.levels` (iOS 1.4.0). Routes can change: the venue data gives every level changer its
+  `levels` and a path to it on each of these floors. No change in the host app.
 - **Visible:** a ride over several floors is one level change: one instruction and one floor-change
   marker, from the floor boarded to the floor left (iOS 1.4.0).
 - **Visible:** after the relay-api refuses the refresh token, a wristband session the relay-api
