@@ -2,10 +2,54 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    `maven-publish`
 }
 
 group = "io.proximi.gadkit"
 version = providers.gradleProperty("gadkit.version").get()
+
+// The release goes to the repository of the SDK and the map, as in their publishing convention
+// plugins. The credentials come from the environment only, never from a file.
+publishing {
+    repositories {
+        maven {
+            name = "proximiioMaven"
+            url = uri("https://maven.eu.proximi.fi/releases/")
+            credentials {
+                username = providers.environmentVariable("MAVEN_USERNAME").orNull
+                password = providers.environmentVariable("MAVEN_PASSWORD").orNull
+            }
+        }
+    }
+    publications {
+        register<MavenPublication>("release") {
+            artifactId = project.name
+            afterEvaluate { from(components["release"]) }
+            pom {
+                name.set("ProximiioGADKit for Android")
+                description.set("The Guggenheim Abu Dhabi journey map on the Proximi.io SDK and Map")
+                url.set("https://github.com/proximiio/proximiio-gadkit-android")
+                licenses {
+                    license {
+                        name.set("Proprietary")
+                        url.set("https://proximi.io/terms/")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("proximiio")
+                        name.set("Proximi.io")
+                        url.set("https://proximi.io/")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/proximiio/proximiio-gadkit-android")
+                    connection.set("scm:git:https://github.com/proximiio/proximiio-gadkit-android.git")
+                }
+            }
+        }
+    }
+}
 
 android {
     namespace = "io.proximi.gadkit"
@@ -23,6 +67,11 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
     }
 }
 

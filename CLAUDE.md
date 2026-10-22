@@ -13,5 +13,8 @@ is their record of every change.
   line: "Breaking change for Nagarro: …", or "No breaking change".
 - A release moves the `[Unreleased]` entries under `### [x.y.z] — YYYY-MM-DD`. A tag `X.Y.0` has the
   behaviour of the iOS tag `X.Y.0` of `proximiio/proximiio-gadkit-ios`.
+- After the tag is pushed, the user publishes it to Maven from their computer with
+  `scripts/publish.sh`. No GitHub workflow publishes. Never ask for the credentials or run the
+  script with them: the user types them into the script's prompts.
 - Commits name the author only. All text (README, comments, commits) follows the Annina rules:
   `/Volumes/ExtremeSSD/proximiio/proximiio-ios-sdk-v6/docs/site/ANNINA-RULES.md`.

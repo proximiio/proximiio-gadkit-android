@@ -112,13 +112,13 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 
 ### Step 1: Dependencies (Required)
 
-- Add the library as a git submodule at the tag `1.7.0`, include its build and depend on
-  `io.proximi.gadkit:proximiio-gadkit` without a version (README "Adding the library").
+- Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
+  depend on `io.proximi.gadkit:proximiio-gadkit:1.7.0` (README "Adding the library"). No git
+  submodule is needed.
 - The library brings SDK `6.0.0-beta.28` and Map `6.0.0-beta.25` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
-- The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2. With the Gradle configuration cache
-  on, set `kotlin.internal.collectFUSMetrics=false` in `gradle.properties`.
+- The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.
 
 ### Step 2: SDK and Map changes (Required / Check)
 

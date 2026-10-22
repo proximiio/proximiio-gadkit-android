@@ -24,26 +24,20 @@ code to `connectWristband(code)`. The Proximi GAD Android app uses the library t
 
 - Android 8.0 or later (`minSdk` 26), `compileSdk` 37. Kotlin 2.2 and Jetpack Compose.
 - Built and tested with Android Gradle Plugin 8.13, Gradle 8.14 and JDK 17.
-- Read access to this repository. The Proximi.io SDK and Map are on
-  `https://maven.eu.proximi.fi/releases/` (no credentials).
+- The library, the Proximi.io SDK and the Map are on `https://maven.eu.proximi.fi/releases/` (no
+  credentials).
 
 ## Adding the library
 
-Add this repository to the host app as a git submodule at a tag, for example at `gadkit`:
-
-```
-git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.7.0
-```
-
-In the host app's `settings.gradle.kts`, include the library's build and add the Proximi.io
-repository:
+In the host app's `settings.gradle.kts`, add the Proximi.io repository with the groups of the
+library, the SDK and the Map:
 
 ```kotlin
 dependencyResolutionManagement {
     repositories {
         maven("https://maven.eu.proximi.fi/releases/") {
             content {
+                includeGroup("io.proximi.gadkit")
                 includeGroup("io.proximi.sdk")
                 includeGroup("io.proximi.map")
             }
@@ -52,17 +46,26 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-
-includeBuild("gadkit")
 ```
 
-Then depend on the library without a version. Gradle resolves it to the included build:
+Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.7.0")
 }
 ```
+
+The host app can also build the library from its source. Add this repository as a git submodule at
+a tag, for example at `gadkit`:
+
+```
+git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
+git -C gadkit checkout 1.7.0
+```
+
+Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
+Gradle resolves it to the included build.
 
 - The versions are the git tags of this repository. From 1.0.0 a minor or patch version does not
   break the public API. New `ProximiMapEvent` cases come in minor versions; a `when` with `else`
@@ -76,10 +79,11 @@ dependencies {
   `JourneyNavigator` moves to `ProximiMapView` with [MIGRATION.md](MIGRATION.md). It lists the SDK
   and Map changes since SDK 6.0.0-beta.23 and Map 6.0.0-beta.21.
 - The library ships its own R8 consumer rules. The host app needs no rule for it.
-- With the Gradle configuration cache on, set `kotlin.internal.collectFUSMetrics=false` in the host
-  app's `gradle.properties`. Otherwise the Kotlin Gradle plugin registers its build statistics
-  service in both builds, and the configuration fails ("Cannot set the value of a property of type
-  BuildFusService").
+- With the library as an included build and the Gradle configuration cache on, set
+  `kotlin.internal.collectFUSMetrics=false` in the host app's `gradle.properties`. Otherwise the
+  Kotlin Gradle plugin registers its build statistics service in both builds, and the configuration
+  fails ("Cannot set the value of a property of type BuildFusService"). The library from Maven does
+  not need it.
 
 ## Host app setup
 
@@ -824,6 +828,15 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Added
+
+- The library is on Maven: `io.proximi.gadkit:proximiio-gadkit` on
+  `https://maven.eu.proximi.fi/releases/`, the repository of the SDK and the Map, from version
+  1.7.0. A host app no longer needs the git submodule. It adds `includeGroup("io.proximi.gadkit")`
+  to that repository and a version to the dependency (see "Adding the library"). The submodule with
+  `includeBuild` still works. Version 1.7.0 on Maven is built from the commit after the tag `1.7.0`
+  that adds the publication. Its library code is the code of the tag.
 
 ### [1.7.0] — 2026-10-22
 
