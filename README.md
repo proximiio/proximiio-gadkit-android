@@ -69,7 +69,7 @@ dependencies {
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.27` and Map `6.0.0-beta.23` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.27` and Map `6.0.0-beta.24` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - A host app that draws its journey with the map library's `ProximiioMap` and its own
@@ -797,7 +797,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | SDK 6.0.0-beta.27 (as iOS SDK 6.0.0-beta.61) and Map 6.0.0-beta.23 | The open map draws venue data changes at once (see "Venue data changes"); on iOS it does so from the next opening. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | SDK 6.0.0-beta.27 (as iOS SDK 6.0.0-beta.61) and Map 6.0.0-beta.24 | The open map draws venue data changes at once (see "Venue data changes"); on iOS it does so from the next opening. A venue feature in metres does not end the app; on iOS Map 6.0.0-beta.45 it does. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -840,10 +840,10 @@ From 1.0.0 a minor or patch version does not break the public API.
 - [MIGRATION.md](MIGRATION.md): moving from `ProximiioMap` and an own `JourneyNavigator` on SDK
   6.0.0-beta.23 and Map 6.0.0-beta.21 to `ProximiMapView`.
 
-#### Changed (SDK 6.0.0-beta.27, Map 6.0.0-beta.23)
+#### Changed (SDK 6.0.0-beta.27, Map 6.0.0-beta.24)
 
 - **BREAKING:** the library depends on SDK `6.0.0-beta.27` (was `6.0.0-beta.25`) and Map
-  `6.0.0-beta.23` (was `6.0.0-beta.21`). A host app that declares these artifacts itself moves them
+  `6.0.0-beta.24` (was `6.0.0-beta.21`). A host app that declares these artifacts itself moves them
   to the same versions. No source change. The first start moves the SDK's database to a new schema:
   a test install that goes back to an older SDK clears the app's data first.
 - **Visible:** the SDK router connects a lift, staircase or escalator only to the floors in its
@@ -861,6 +861,9 @@ From 1.0.0 a minor or patch version does not break the public API.
 - **Visible:** the map no longer crashes when it loads the organisation's style over the cached one
   (`Calling getLayer when a newer style is loading`), for example on the first start after the
   installation.
+- **Visible:** a venue feature with coordinates in metres, not in degrees, no longer ends the app
+  when the map opens. The map leaves it out of the camera frame and still draws it. Every map from
+  6.0.0-beta.14 to 6.0.0-beta.23 crashes on such a feature once the SDK has stored it.
 - **Visible:** `setRouteOptions` keeps the leg to a reached stop and a leg the options do not
   change; a changed amenity icon is drawn again.
 - MapLibre requests to `apiBaseUrl` carry `X-Visitor-Id` and `X-Proximiio-SDK` too. See "Privacy".
