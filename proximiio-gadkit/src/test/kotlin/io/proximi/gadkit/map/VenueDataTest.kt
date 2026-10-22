@@ -1,18 +1,17 @@
 package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
-import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyStop
 import io.proximi.gadkit.visit.StopKind
 import io.proximi.gadkit.visit.StopState
 import io.proximi.gadkit.visit.VisitPlan
+import io.proximi.sdk.VenueDataKind
 import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioFeature
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
 
 /** Port of ProximiioGADKit `VenueDataTests`. */
 class VenueDataTest {
@@ -84,8 +83,12 @@ class VenueDataTest {
         assertTrue(VenueDataRefresh.changes(old, old.reversed()).isEmpty)
     }
 
+    /** The open map redraws a changed style and amenity catalogue itself. */
     @Test
-    fun theRefreshIntervalIsFiveMinutes() {
-        assertEquals(300.seconds, GadSettings.STANDARD.venueDataRefreshInterval)
+    fun theScreensFollowFeaturesGeofencesFloorsAndPlaces() {
+        assertEquals(
+            setOf(VenueDataKind.features, VenueDataKind.geofences, VenueDataKind.floors, VenueDataKind.places),
+            VenueDataRefresh.WATCHED_KINDS,
+        )
     }
 }

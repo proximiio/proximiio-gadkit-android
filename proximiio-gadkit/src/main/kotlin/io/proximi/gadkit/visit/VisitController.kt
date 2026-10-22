@@ -1,7 +1,6 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.GadSettings
-import io.proximi.gadkit.JourneyUpdate
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenueGeofence
 import io.proximi.gadkit.map.VenueLevel
@@ -23,6 +22,7 @@ import io.proximi.map.core.JourneyRules
 import io.proximi.map.core.JourneyStop
 import io.proximi.map.core.RouteFollowRules
 import io.proximi.map.core.RouteSnapRules
+import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryDestination
 import io.proximi.map.core.MapCoordinate
 import io.proximi.map.live.JourneyNavigator
@@ -247,7 +247,7 @@ internal class VisitController(
     private var pendingTarget: CoreJourney? = null
     private var isApplying = false
 
-    /** Stops whose POI is no longer a place, reported once ([stopsWithoutPlace]). */
+    /** Stops whose POI is no longer a place, reported once ([venueChanged]). */
     private val reportedWithoutPlace = mutableSetOf<String>()
 
     private var eventsJob: Job? = null
@@ -477,23 +477,39 @@ internal class VisitController(
     }
 
     /**
-     * The stops whose POI is no longer a place after a change of the venue data, each once. With
-     * [managesProgress] they are skipped: the library does not use the navigator's `remove` and
-     * `replace` of map 6.0.0-beta.22 yet, as the iOS package 1.7.0. When the journey screen of `ProximiMap` closes, the stored journey drops
-     * these stops and takes the changed places ([VisitPlan.reconciled]). Without [managesProgress]
-     * the stops stay; the host app decides.
+     * Takes a change of the venue data into the open journey, after the journey changes started
+     * before it ([serially]). Returns the stops whose POI is no longer a place, each once.
+     * - A planned stop that is not reached or done takes the title, coordinate, floor and gallery of
+     *   its POI (`JourneyNavigator.replace`). A moved stop being walked to is routed again.
+     * - A stop whose POI is no longer a place is skipped with [managesProgress], so `ProximiMapView`
+     *   writes it to the host app's journey as skipped. Without [managesProgress] it stays; the host
+     *   app decides. When the journey screen of `ProximiMap` closes, the stored journey drops it
+     *   ([VisitPlan.reconciled]).
+     * - With [routeNetworkChanged] (changed features) the legs are routed again
+     *   (`JourneyNavigator.routeNetworkChanged()`). A leg on the line already drawn stays quietly.
      */
-    suspend fun stopsWithoutPlace(places: List<VenuePlace>): List<io.proximi.gadkit.visit.JourneyStop> {
-        val stops = VisitPlan.stopsWithoutPlace(journey, places).filter { it.state != StopState.SKIPPED && it.id !in reportedWithoutPlace }
-        if (stops.isEmpty()) return emptyList()
-        reportedWithoutPlace += stops.map { it.id }
-        if (!managesProgress) return stops
-        for (stop in stops) {
-            FieldLog.log("journey: ${stop.title} is no longer a place · skipped")
-            navigator.skip(stop.id)
+    suspend fun venueChanged(places: List<VenuePlace>, galleries: List<Gallery>, routeNetworkChanged: Boolean): List<io.proximi.gadkit.visit.JourneyStop> {
+        val withoutPlace = VisitPlan.stopsWithoutPlace(journey, places).filter { it.state != StopState.SKIPPED && it.id !in reportedWithoutPlace }
+        reportedWithoutPlace += withoutPlace.map { it.id }
+        val skipped = if (managesProgress) withoutPlace else emptyList()
+        serially {
+            var changed = false
+            val current = journey.stops.associateBy { it.id }
+            for (stop in VisitPlan.reconciled(journey, places, galleries).stops) {
+                if (current[stop.id] == stop) continue
+                if (navigator.replace(stop.toMap())) {
+                    FieldLog.log("journey: ${stop.title} takes the changed place")
+                    changed = true
+                }
+            }
+            for (stop in skipped) {
+                FieldLog.log("journey: ${stop.title} is no longer a place · skipped")
+                if (navigator.skip(stop.id)) changed = true
+            }
+            if (routeNetworkChanged) navigator.routeNetworkChanged()
+            if (changed) save()
         }
-        save()
-        return stops
+        return withoutPlace
     }
 
     suspend fun undoSkip() {
@@ -504,11 +520,10 @@ internal class VisitController(
     }
 
     /**
-     * Takes the host app's journey on the open screen (`ProximiMapView`): stops added, visited,
-     * skipped, reopened and moved. The navigator, its route cache and the camera stay. [target] holds
-     * every stop of the navigator ([io.proximi.gadkit.HostedJourney.canReplace]). Calls run one after
-     * another; a call during another keeps only the latest journey, applied after it. Before the
-     * navigator has started, the latest journey waits for the start.
+     * Takes the host app's journey on the open screen (`ProximiMapView`): stops added, removed,
+     * visited, skipped, reopened and moved. The navigator, its route cache, its event flow and the
+     * camera stay. Calls run one after another; a call during another keeps only the latest journey,
+     * applied after it. Before the navigator has started, the latest journey waits for the start.
      */
     suspend fun apply(target: CoreJourney) {
         pendingTarget = target
@@ -530,44 +545,18 @@ internal class VisitController(
         }
     }
 
-    /** Adds the new stops, reopens, sets the order in one transition, then closes. Each step calls the navigator only for a stop that changes. */
+    /**
+     * Hands the host app's whole journey to the navigator (`JourneyNavigator.update(to)`). The
+     * navigator merges it with the list it got last and its own stops: a detour stays, and a step the
+     * navigator has already made stays. The navigator was created with the host app's list, so the
+     * first call merges against it.
+     */
     private suspend fun performApply(target: CoreJourney) {
-        val existing = navigator.journey.value.stops.mapTo(HashSet()) { it.id }
-        var added = 0
-        for (stop in target.stops) {
-            if (stop.id in existing) continue
-            if (navigator.add(stop.copy(state = StopState.PENDING).toMap())) added++
-        }
-        val changes = JourneyUpdate.stateChanges(journey, target)
-        for (change in changes) if (change.kind == JourneyUpdate.StateChange.Kind.REOPEN) navigator.reopen(change.stopId)
-        val closing = changes.filter { it.kind != JourneyUpdate.StateChange.Kind.REOPEN }
-        val current = navigator.reorderableStops.map { it.id }
-        val active = navigator.activeStop?.id
-        val ordered = JourneyUpdate.order(
-            reorderable = current,
-            activeStopId = active,
-            pending = target.stops.filter { it.state == StopState.PENDING }.map { it.id },
-            closing = closing.mapTo(HashSet()) { it.stopId },
-        )
-        if (ordered != null) {
-            navigator.apply(
-                JourneyOrderProposal(
-                    order = ordered, currentOrder = current, pinnedStopIds = emptyList(),
-                    currentMeters = 0.0, proposedMeters = 0.0, liveStopId = active,
-                ),
-            )
-        }
-        for (change in closing) {
-            when (change.kind) {
-                JourneyUpdate.StateChange.Kind.MARK_DONE -> navigator.markDone(change.stopId)
-                JourneyUpdate.StateChange.Kind.SKIP -> navigator.skip(change.stopId)
-                JourneyUpdate.StateChange.Kind.REOPEN -> Unit
-            }
-        }
+        val taken = navigator.update(to = target.toMap())
         // "Undo skip" belongs to a skip the host app has since changed.
         val skipped = mutableLastSkipped.value
         if (skipped != null && doneStop(skipped)?.state != JourneyStop.State.SKIPPED) mutableLastSkipped.value = null
-        FieldLog.log("journey applied · $added added · ${changes.size} state changes · order ${if (ordered == null) "kept" else "set"}")
+        FieldLog.log("journey applied · ${target.stops.size} stops · ${if (taken) "taken" else "not taken: two stops with one id"}")
     }
 
     /** Makes [stopId] the next stop (EC04a: the visitor picked the artwork they are at). */

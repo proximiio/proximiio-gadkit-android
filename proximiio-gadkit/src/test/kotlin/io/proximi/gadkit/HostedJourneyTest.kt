@@ -25,8 +25,6 @@ class HostedJourneyTest {
 
     private fun stop(id: String, state: ProximiJourney.State = ProximiJourney.State.PENDING) = ProximiJourney.Stop(id, state)
 
-    private fun Journey.withStates(vararg states: StopState) = Journey(stops.mapIndexed { index, stop -> stop.copy(state = states[index]) })
-
     @Test
     fun stopsMatchByCollectionIdOrPoiIdAndKeepTheirStates() {
         val hosted = ProximiJourney(JourneyKind.CURATED, listOf(stop("GAD.2", ProximiJourney.State.VISITED), stop("c", ProximiJourney.State.SKIPPED), stop("GAD.1")))
@@ -63,7 +61,10 @@ class HostedJourneyTest {
         assertEquals(listOf(ProximiJourney.State.VISITED, ProximiJourney.State.PENDING, ProximiJourney.State.SKIPPED), written.stops.map { it.state })
     }
 
-    /** A removed stop, a new kind and a first journey on a map without one start the screen again. */
+    /**
+     * A new kind, a journey without a stop on the map and a first journey on a map without one start
+     * the screen again. Fewer stops are taken in place (`JourneyNavigator.update(to)`).
+     */
     @Test
     fun theOpenScreenTakesAJourneyInPlaceUnlessItCannot() {
         val shown = HostedJourney.of(ProximiJourney.ofArtworks(listOf("GAD.1", "GAD.2")), places)
@@ -71,61 +72,12 @@ class HostedJourneyTest {
         assertTrue(more.canReplace(shown, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
         assertFalse(more.canReplace(shown, JourneyKind.CURATED, JourneyKind.PERSONALISED))
         val fewer = HostedJourney.of(ProximiJourney.ofArtworks(listOf("GAD.1")), places)
-        assertFalse(fewer.canReplace(shown, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
+        assertTrue(fewer.canReplace(shown, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
         val empty = HostedJourney.of(ProximiJourney.ofArtworks(emptyList()), places)
         assertFalse(more.canReplace(empty, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
-    }
-
-    @Test
-    fun stateChangesTakeTheHostAppsStates() {
-        val base = HostedJourney.of(ProximiJourney.ofArtworks(listOf("GAD.1", "GAD.2", "c")), places).journey
-        val current = base.withStates(StopState.ACTIVE, StopState.DONE, StopState.SKIPPED)
-        val target = HostedJourney.of(
-            ProximiJourney(stops = listOf(stop("GAD.1", ProximiJourney.State.VISITED), stop("GAD.2"), stop("c", ProximiJourney.State.SKIPPED))),
-            places,
-        ).journey
-        // Reopens come first.
-        assertEquals(
-            listOf(
-                JourneyUpdate.StateChange("b", JourneyUpdate.StateChange.Kind.REOPEN),
-                JourneyUpdate.StateChange("a", JourneyUpdate.StateChange.Kind.MARK_DONE),
-            ),
-            JourneyUpdate.stateChanges(current, target),
-        )
-        // Active and reached are pending for the host app: nothing to change.
-        val reached = base.withStates(StopState.ACTIVE, StopState.REACHED, StopState.SKIPPED)
-        val pending = HostedJourney.of(ProximiJourney.ofArtworks(listOf("GAD.1", "GAD.2")), places).journey
-        assertTrue(JourneyUpdate.stateChanges(reached, pending).isEmpty())
-    }
-
-    /** The navigator does not skip a done stop: a visited stop the host app skips is reopened first. */
-    @Test
-    fun aVisitedStopTheHostAppSkipsIsReopenedFirst() {
-        val current = HostedJourney.of(ProximiJourney.ofArtworks(listOf("GAD.1", "GAD.2")), places).journey.withStates(StopState.DONE, StopState.SKIPPED)
-        val target = HostedJourney.of(
-            ProximiJourney(stops = listOf(stop("GAD.1", ProximiJourney.State.SKIPPED), stop("GAD.2", ProximiJourney.State.VISITED))),
-            places,
-        ).journey
-        assertEquals(
-            listOf(
-                JourneyUpdate.StateChange("a", JourneyUpdate.StateChange.Kind.REOPEN),
-                JourneyUpdate.StateChange("a", JourneyUpdate.StateChange.Kind.SKIP),
-                JourneyUpdate.StateChange("b", JourneyUpdate.StateChange.Kind.MARK_DONE),
-            ),
-            JourneyUpdate.stateChanges(current, target),
-        )
-    }
-
-    @Test
-    fun theOrderPutsTheHostAppsPendingStopsInItsOrder() {
-        assertNull(JourneyUpdate.order(listOf("a", "b", "c"), "a", listOf("a", "b", "c"), emptySet()))
-        assertEquals(listOf("c", "a", "b"), JourneyUpdate.order(listOf("a", "b", "c"), "a", listOf("c", "a", "b"), emptySet()))
-        // The active stop the host app closes stays first, so the route changes once, to C.
-        assertEquals(listOf("a", "c", "b"), JourneyUpdate.order(listOf("a", "b", "c"), "a", listOf("c", "b"), setOf("a")))
-        // A stop the host app closes that is not active goes after the pending ones.
-        assertEquals(listOf("a", "c", "b"), JourneyUpdate.order(listOf("a", "b", "c"), "a", listOf("a", "c"), setOf("b")))
-        // An id in one list only: the rest keep their order.
-        assertEquals(listOf("b", "a", "x"), JourneyUpdate.order(listOf("a", "x", "b"), "a", listOf("b", "a", "y"), emptySet()))
+        assertFalse(empty.canReplace(shown, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
+        val offTheMap = HostedJourney.of(ProximiJourney.ofArtworks(listOf("GAD.unknown")), places)
+        assertFalse(offTheMap.canReplace(shown, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
     }
 
     @Test

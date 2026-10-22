@@ -290,9 +290,9 @@ The host app:
 - stores the journey and moves it on. The view stores nothing but the accessible routes button.
 
 The view installs the route network from the SDK's feature cache when it opens, or downloads it when
-the cache has no path. While it is on screen it downloads the venue's features every
-`GadSettings.venueDataRefreshInterval` (see "Venue data changes"). It requests no permission and
-posts no notification. Its state survives a recreated activity, for example after a language change.
+the cache has no path. While it is on screen it follows the SDK's `venueDataChanges()` and downloads
+nothing (see "Venue data changes"). It requests no permission and posts no notification. Its state
+survives a recreated activity, for example after a language change.
 
 ### Options
 
@@ -320,19 +320,21 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 
 - The route leads to the first pending stop in the journey's order. In a `PERSONALISED` journey it
   leads to the stop's gallery first (see "Gallery first").
-- The open screen applies a change of `journey` in place: a stop visited, skipped, pending again,
-  added or moved. The map, the camera and the route of an unchanged leg stay. Changes apply one
-  after another; while one applies, only the latest waits.
-- These changes start the screen again (new map session, camera and mode): a removed stop and a new
-  `kind`, because the library does not use the navigator's `remove(stopId)` of map 6.0.0-beta.22 yet
-  (as the iOS package 1.7.0), and the first journey on a map without one, because that map has no
-  navigator.
+- The open screen applies a change of `journey` in place, with the navigator's `update(to)`: a stop
+  visited, skipped, pending again, added, removed or moved. The map, the camera, the navigator and
+  the route of an unchanged leg stay. Changes apply one after another; while one applies, only the
+  latest waits.
+- These changes start the screen again (new map session, navigator, camera and mode): a new `kind`, a
+  journey without a stop on the map, and the first journey on a map without one, because that map
+  has no navigator.
 - A journey without stops, or without a stop on the map, shows the map alone: search, floors and
   "Centre on me", no Map / List toggle and no stop card, in either `mode`. "Go here" on an amenity
   draws the route to it.
 - A stop whose POI is deleted on the backend while the view is open is reported as
-  `StopPlaceDeleted`. Without `PROGRESS` it stays on the screen; the next change of `journey` starts
-  the screen again without it.
+  `StopPlaceDeleted`. Without `PROGRESS` it stays on the screen until the next change of `journey`,
+  which leaves it out.
+- A stop whose POI changes on the backend while the view is open takes the new title, position,
+  floor and gallery (see "Venue data changes").
 - A stop whose id matches no POI, and a second stop of the same POI, are not on the map.
 - Detours to amenities are not stops of `ProximiJourney`.
 
@@ -385,8 +387,9 @@ ProximiMapView(sdk = sdk, journey = journey, onJourneyChange = { journey = it },
 
 - The view calls `onNavigator` before the journey starts. Each time the screen starts again (see
   "ProximiJourney") it calls it with a new navigator. The `events` flow of the previous navigator
-  never completes: cancel its collection. A recreated activity keeps the navigator and does not
-  call `onNavigator` again.
+  never completes: cancel its collection. A change of `journey` that the open screen takes goes to
+  `update(to)` of the same navigator. A recreated activity keeps the navigator and does not call
+  `onNavigator` again.
 - `events` is a shared flow: every collector gets every event after it started collecting. The
   view's own collection takes no events from the host app's.
 - The view sets neither `onCue` nor `cueRules`. `cueRules` is the map library's default
@@ -400,7 +403,7 @@ The view's navigator differs from a navigator with the map library's default rul
 
 | | The view's navigator |
 |---|---|
-| `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies a change of `journey`. |
+| `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies a change of `journey` (`update(to)`). |
 | `FarFromRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (30 m) and `GadSettings.offRouteAfter` (300 s). |
 | Off the route | Without `PROMPTS` the route follows the visitor (`JourneyDeviationPolicy.AUTOMATIC`); with `PROMPTS` the view asks (`ASK_APP`). |
 | `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
@@ -487,24 +490,28 @@ both cases ("gallery first:").
 
 ### Venue data changes
 
-The backend changes POIs, paths, lifts and geofences while the app runs. `ProximiMap` downloads the
-venue's features every `GadSettings.venueDataRefreshInterval` (300 s) in the foreground and when the
-app returns to the foreground; the SDK sync brings geofences and floors. After a change:
+The backend changes POIs, paths, lifts and geofences while the app runs. The SDK's audit sync applies
+the changes every `ProximiioConfiguration.syncInterval` (300 s by default). The screens follow
+`Proximiio.venueDataChanges()` (SDK 6.0.0-beta.27) and download nothing themselves. The SDK names
+changed features only while its store holds the whole feature collection, that is after a
+`loadRouteNetwork()` on this install. After a change:
 
-- Routes computed after the change use the new paths and level changers. The leg on screen and the
-  journey overview keep the old ones until the navigator routes again: the next stop, a skip, or a
-  re-route after the visitor left the route. The library does not call the navigator's
-  `routeNetworkChanged()` of map 6.0.0-beta.22 yet (as the iOS package 1.7.0).
-- The open map draws the new POIs, amenity icons, floors and geofences: the map library follows the
-  SDK's `venueDataChanges()` (map 6.0.0-beta.23). Camera, floor, route and journey stay.
+- The open map draws the new POIs, amenity icons, floors, places and geofences: the map library
+  follows `venueDataChanges()` (map 6.0.0-beta.23). Camera, floor, route and journey stay.
+- The SDK has rebuilt the route network from the changed features. The open journey routes its legs
+  again (`JourneyNavigator.routeNetworkChanged()`); a leg on the line already drawn stays as it is.
 - The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
-- The stored journey follows its POIs. A done stop keeps its title and position. Another stop whose
-  POI was deleted is removed; another stop whose POI changed takes the new title, position, floor and
-  gallery. A journey with no stop left is deleted. `ProximiMapEvent.JourneyChanged` follows.
+- On the open journey screen a stop whose POI changed takes the new title, position, floor and
+  gallery (`JourneyNavigator.replace`), and the leg to it is routed again when it moved. A reached
+  or done stop keeps its values.
 - On the open journey screen of `ProximiMap` (and of `ProximiMapView` with `PROGRESS`), a stop whose
-  POI was deleted is skipped and reported as `StopPlaceDeleted`. The stored journey removes it when
-  the screen closes. A changed POI moves its stop when the screen closes.
+  POI was deleted is skipped and reported as `StopPlaceDeleted`. The stored journey of `ProximiMap`
+  removes it when the screen closes.
+- The stored journey of `ProximiMap` follows its POIs. A done stop keeps its title and position.
+  Another stop whose POI was deleted is removed; another stop whose POI changed takes the new title,
+  position, floor and gallery. A journey with no stop left is deleted.
+  `ProximiMapEvent.JourneyChanged` follows.
 
 ## Wristband
 
@@ -607,7 +614,7 @@ val configuration = GadConfiguration(
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `journeyNotificationMinimumInterval` | 5 s | The shortest gap between two updates of the instruction in the journey notification. |
 | `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name ("You entered this area.", "You left this area."), and the notification permission request once a wristband is connected. The library posts no "next stop" notification; a host app can post one for `ProximiMapEvent.StopNearby`. |
-| `venueDataRefreshInterval` | 300 s | Time between two downloads of the venue's features in the foreground. `Duration.ZERO` turns the downloads off. See "Venue data changes". |
+| `venueDataRefreshInterval` | 300 s | Deprecated, no effect since 1.9.0. The SDK's `ProximiioConfiguration.syncInterval` sets how often changes arrive. See "Venue data changes". |
 
 Times are `kotlin.time.Duration`, distances metres.
 
@@ -802,7 +809,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | SDK 6.0.0-beta.30 (as iOS SDK 6.0.0-beta.63) and Map 6.0.0-beta.26 (as iOS Map 6.0.0-beta.50) | The open map draws venue data changes at once (see "Venue data changes"); on iOS it does so from the next opening. A venue feature in metres or a floor level that is not a number does not end the app; on iOS SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 it does. A geofence exits `geofenceExitDelay` (5 s) after the position leaves it, as in iOS 1.9.0; on iOS 1.7.0 it exits at the first position outside. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.63 and Map 6.0.0-beta.50 | SDK 6.0.0-beta.30 and Map 6.0.0-beta.26 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -842,6 +849,21 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   geofence or privacy zone before the SDK reports the exit, 5 s by default. `ProximiMap` sets it in
   the SDK it starts. `ProximiMapView` runs on the host app's SDK, which has its own
   `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). See "Settings".
+
+#### Changed (iOS 1.8.0)
+
+- **Visible:** the screens follow `Proximiio.venueDataChanges()`. The library no longer downloads
+  the venue's features every 300 s and when the app returns to the foreground. The SDK's audit sync
+  brings the changes (`ProximiioConfiguration.syncInterval`, 300 s by default).
+  `GadSettings.venueDataRefreshInterval` is deprecated and has no effect: a host app that sets it
+  gets a deprecation warning and can remove it.
+- **Visible:** after a change of features the open journey routes its legs again
+  (`JourneyNavigator.routeNetworkChanged()`). A stop whose POI changed takes the new title,
+  position, floor and gallery on the open screen (`replace`), not only when the screen closes.
+- **Visible:** `ProximiMapView` hands every change of `journey` to the navigator's `update(to)`. A
+  stop the host app removes leaves the open screen; the screen no longer starts again and
+  `onNavigator` is not called again. The navigator keeps a detour and the steps it has already
+  made.
 
 #### Changed (SDK 6.0.0-beta.30, Map 6.0.0-beta.26)
 

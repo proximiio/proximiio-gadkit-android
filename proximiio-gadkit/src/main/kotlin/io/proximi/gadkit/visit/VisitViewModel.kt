@@ -37,6 +37,7 @@ import io.proximi.gadkit.map.artworkAreas
 import io.proximi.gadkit.map.GalleryDestination
 import io.proximi.gadkit.map.PlaceFraming
 import io.proximi.gadkit.map.venueGeofences
+import io.proximi.sdk.VenueDataKind
 import io.proximi.sdk.enteredGeofenceIds
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -387,12 +388,14 @@ internal class VisitViewModel(
             snapshotFlow { selectedAmenity ?: amenityToConfirm ?: routedAmenity }.distinctUntilChanged().drop(1).collect(::showAmenity)
         }
         scope.launch {
-            // The venue data changed on the backend: places, galleries and level changers again;
-            // a stop whose POI was deleted is skipped.
+            // The venue data changed on the backend: places, galleries and level changers again; the
+            // open journey takes changed POIs, a stop whose POI was deleted is skipped, and changed
+            // features route the legs again.
             venue.data.version.drop(1).collect {
+                val routeNetworkChanged = VenueDataKind.features in venue.data.changedKinds
                 loadVenue()
                 refreshMapLayers()
-                for (stop in controller.stopsWithoutPlace(places)) onEvent(VisitEvent.StopPlaceDeleted(stop))
+                for (stop in controller.venueChanged(places, galleries, routeNetworkChanged)) onEvent(VisitEvent.StopPlaceDeleted(stop))
             }
         }
         scope.launch {

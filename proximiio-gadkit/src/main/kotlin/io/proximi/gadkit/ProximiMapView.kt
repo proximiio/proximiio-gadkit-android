@@ -131,11 +131,12 @@ public object ProximiMapView {
  *   button of Journey Complete returns to the map, and the system Back stays with the host app.
  * @param onNavigator called on the main thread with the `JourneyNavigator` that draws the journey,
  *   before the journey starts, and again with a new navigator each time the screen starts again (a
- *   new journey kind, a removed stop, the first journey on an empty map). Start collecting
- *   `navigator.events` inside the call, so no event is missed, and cancel the collection of the
- *   previous navigator; set `onCue` and `cueRules` there. The view sets neither. Change the journey
- *   through `journey` only: the view does not see calls such as `skip(stopId)` or `markDone(stopId)`
- *   on the navigator. A recreated activity keeps the navigator and does not call it again.
+ *   new journey kind, a journey without a stop on the map, the first journey on an empty map). Start
+ *   collecting `navigator.events` inside the call, so no event is missed, and cancel the collection
+ *   of the previous navigator; set `onCue` and `cueRules` there. The view sets neither. Any other
+ *   change of `journey` goes to `update(to)` of the same navigator. Change the journey through
+ *   `journey` only: the view does not see calls such as `skip(stopId)` or `markDone(stopId)` on the
+ *   navigator. A recreated activity keeps the navigator and does not call it again.
  */
 @Composable
 public fun ProximiMapView(
@@ -238,7 +239,7 @@ internal class HostedMapModel : ViewModel() {
     private var isStopped = false
 
     /**
-     * Loads the venue and shows [journey]. After [stop], starts the venue data downloads again and
+     * Loads the venue and shows [journey]. After [stop], follows the venue data changes again and
      * shows [journey] on a new screen: the screen of the view that left has ended.
      */
     suspend fun start(context: Context, sdk: Proximiio, settings: GadSettings, options: Set<ProximiMapView.Option>, journey: ProximiJourney, language: String?) {
@@ -249,7 +250,7 @@ internal class HostedMapModel : ViewModel() {
                 this.options = options
                 this.settings = settings
                 venue.settings = settings
-                venue.data.start(settings.venueDataRefreshInterval)
+                venue.data.start()
                 latest = journey
                 show(journey)
             }

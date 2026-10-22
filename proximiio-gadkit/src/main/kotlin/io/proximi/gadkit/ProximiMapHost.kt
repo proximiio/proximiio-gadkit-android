@@ -181,9 +181,10 @@ private fun Cover(map: ProximiMap, presentation: Presentation) {
 
 /**
  * `gad.hostedMap`: [ProximiMapView] on the app's SDK with the default options, as Nagarro's app uses
- * it. This view is the host app: it skips a stop the visitor swiped, and "Visited" marks the first
- * pending stop visited. The lines at the top count the stop states of its journey and list the
- * events of the navigator it got from `onNavigator`, for UI tests.
+ * it. This view is the host app: it skips a stop the visitor swiped, "Visited" marks the first
+ * pending stop visited, and "Remove" removes the last stop. The lines at the top count the stop
+ * states of its journey and list the navigators it got from `onNavigator` and the events of the
+ * last one, for UI tests.
  */
 @Composable
 private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
@@ -193,6 +194,8 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     /** The names of the navigator's events, oldest first. */
     var navigatorEvents by remember { mutableStateOf(emptyList<String>()) }
     var navigatorJob by remember { mutableStateOf<Job?>(null) }
+    /** The navigators `onNavigator` got. The screen starts again with a new one. */
+    var navigators by remember { mutableStateOf(0) }
     fun set(id: String, state: ProximiJourney.State) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
     }
@@ -207,6 +210,7 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                 if (event is ProximiMapEvent.SkipRequested) set(event.stop.id, ProximiJourney.State.SKIPPED)
             },
             onNavigator = { navigator ->
+                navigators += 1
                 navigatorJob?.cancel()
                 navigatorJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     navigator.events.collect { navigatorEvents = navigatorEvents + (it::class.simpleName ?: "?") }
@@ -222,10 +226,15 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                 journey.stops.firstOrNull { it.state == ProximiJourney.State.PENDING }?.let { first ->
                     TextButton(onClick = { set(first.id, ProximiJourney.State.VISITED) }) { Text("Visited", style = MaterialTheme.typography.labelSmall) }
                 }
+                if (journey.stops.size > 1) {
+                    TextButton(onClick = { map.hostedJourney.value = journey.copy(stops = journey.stops.dropLast(1)) }) {
+                        Text("Remove", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 TextButton(onClick = map.presenter::hide) { Text("Close map", style = MaterialTheme.typography.labelSmall) }
             }
             Text(
-                "navigator: ${navigatorEvents.takeLast(6).joinToString(" ")}",
+                "navigator $navigators: ${navigatorEvents.takeLast(6).joinToString(" ")}",
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.testTag("hostedNavigatorEvents"),
             )

@@ -227,7 +227,7 @@ internal class VenueService private constructor(
             }
             val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
             val venue = VenueService(sdk, null, isDebugBuild, settings)
-            venue.data.start(settings.venueDataRefreshInterval)
+            venue.data.start()
             return venue
         }
 
@@ -248,7 +248,7 @@ internal class VenueService private constructor(
             venue.attachBinding()
             // The map session's default cache directory, so the session finds the style.
             venue.cacheMapStyle(context.applicationContext.cacheDir)
-            venue.data.start(configuration.settings.venueDataRefreshInterval)
+            venue.data.start()
             if (FieldLog.isEnabled) venue.logReporting(configuration)
             return venue
         }

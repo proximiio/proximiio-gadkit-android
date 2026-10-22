@@ -2,8 +2,8 @@
 
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
-Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.7.0 uses SDK
-6.0.0-beta.28 and Map 6.0.0-beta.25.
+Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.9.0 uses SDK
+6.0.0-beta.30 and Map 6.0.0-beta.26.
 
 Each change has a mark:
 
@@ -22,7 +22,8 @@ Each change has a mark:
 | SDK 6.0.0-beta.25 | `BlueiotBindingError` has three new cases (relay-api 0.11): `SwapBandsApart(requestID)` (code 18), `SwapAtReception(requestID)` (code 19) and `SigningUnavailable(retryAfter, requestID)` (code 20). Before, the first two arrived as `Unexpected` and the third as `Server(503)`. | A `when` over `BlueiotBindingError` without `else` does not compile. Add the three cases. The SDK's texts: "Hold your current wristband next to the new one and scan again.", "Your wristband isn't reachable. Please swap it at the reception desk." and, for `SigningUnavailable`, a retry after `retryAfter` seconds. | **Required** with an exhaustive `when` |
 | SDK 6.0.0-beta.25 | `BlueiotBindingPolicy` has a new parameter `swapNearMeters` after `bindReceptionRequired`. | A positional `copy` or destructuring of the policy passes the arguments by name. Building one compiles. | **Check** |
 
-The SDK and Map versions have no other source break.
+The SDK and Map versions have no other source break. `ProximiioConfiguration` gains the defaulted
+`geofenceExitDelay`, declared last, in SDK 6.0.0-beta.29; existing calls compile unchanged.
 
 ### Behaviour changes
 
@@ -47,6 +48,10 @@ The SDK and Map versions have no other source break.
 | Map 6.0.0-beta.24 | An `onStyleLoaded` handler that throws a `RuntimeException` no longer ends the app: the map logs it under the tag `ProximiioMap.style` and loads the rest of the style. | Code that relied on the crash looks in the log. | **Check** |
 | Map 6.0.0-beta.24 | The camera frames leave out coordinates outside ±90 / ±180 or not finite. | | Info |
 | Map 6.0.0-beta.25 | A feature with a position outside ±90 / ±180 or not finite is not drawn, hit-tested, framed or centred on; the map logs its id under the tag `ProximiioMap.features`. `MapCanvasCamera.setCenter` ignores such a coordinate, and `ProximiioMapCanvas.point(coordinate)` returns `null` for it, instead of throwing. | | Info |
+| SDK 6.0.0-beta.29 | A geofence or privacy-zone exit comes `geofenceExitDelay` (3 s by default) after the position left it. Enters come at once. A position back inside within the delay emits nothing. Until the exit, `enteredGeofenceIds()` lists the geofence and a privacy zone keeps position reporting suppressed. `stop()` emits every waiting exit. `GeofenceEvent.Exited.dwellTime` runs to the first position outside. | An app that acts on a `geofenceEvents()` exit, for example the end of an artwork's audio, acts 3 s later. `ProximiioConfiguration(geofenceExitDelay = 0.0)` restores the exit at the first position outside. | **Check** |
+| SDK 6.0.0-beta.30 | `journeys()` returns every journey, 500 per request. Before, it returned the API's default page: the 100 most recently edited journeys. | An app that lists journeys gets all of them. | **Check** |
+| SDK 6.0.0-beta.30 | A path, level changer or obstacle whose coordinates are not in degrees is left out of the route network. `features()` keeps it. A level that is not finite, or one beyond about ±2.1e7, is on no floor and has no route. | | Info |
+| Map 6.0.0-beta.26 | Built against SDK 6.0.0-beta.30, which it requires. No map API change and nothing drawn changes. | Take SDK 6.0.0-beta.30 and Map 6.0.0-beta.26 together. | Info |
 
 ### Added
 
@@ -64,6 +69,8 @@ All Info.
   request per page.
 - Map 6.0.0-beta.23: `VenueDataSource.venueDataChanges()`, `VenueStyleSource.storedStyleDocument()`
   and `VenueDataSource.apiVisitorID`, with defaults.
+- SDK 6.0.0-beta.29: `ProximiioConfiguration.geofenceExitDelay` and
+  `ProximiioConfiguration.DEFAULT_GEOFENCE_EXIT_DELAY`.
 
 ### Fixed
 
@@ -89,11 +96,13 @@ All Info.
 - Map 6.0.0-beta.25: a POI, place or journey stop in metres no longer ends the app when the map
   centres on it, and a feature with a floor level that is not a number no longer ends the app
   (`Cannot round NaN value.`).
+- SDK 6.0.0-beta.30: a list page the API cut short no longer loses rows. A `NaN` or huge level no
+  longer throws in the BlueIoT floor numbering.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.29 and later and Map 6.0.0-beta.26 and later are not used by ProximiioGADKit for
-Android 1.7.0. A host app that declares them gets them instead of the versions above.
+SDK 6.0.0-beta.31 and later and Map 6.0.0-beta.27 and later are not used by ProximiioGADKit for
+Android 1.9.0. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -113,9 +122,9 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 ### Step 1: Dependencies (Required)
 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
-  depend on `io.proximi.gadkit:proximiio-gadkit:1.7.0` (README "Adding the library"). No git
+  depend on `io.proximi.gadkit:proximiio-gadkit:1.9.0` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.28` and Map `6.0.0-beta.25` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.30` and Map `6.0.0-beta.26` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.
@@ -126,7 +135,8 @@ Section 1: `eventBatching` with positional arguments and the `BlueiotBindingErro
 (**Required**), the headers on the on-premises proxy, the Data safety form and the level changers'
 `levels` in the venue data (**Required**), visitor reporting, `swapNearMeters`, `setRouteOptions`,
 `levelChanges`, the database schema, `features()`, the error of `loadRouteNetwork()`, the clear
-background, `reloadVenueData()` and `onStyleLoaded` (**Check**).
+background, `reloadVenueData()`, `onStyleLoaded`, the geofence exit delay and `journeys()`
+(**Check**).
 
 ### Step 3: Languages (Check)
 
@@ -206,9 +216,10 @@ inside them stays.
 
 - The view calls `onNavigator` before the journey starts. A collection started inside the call with
   `CoroutineStart.UNDISPATCHED` gets every later event.
-- The view calls it again with a new navigator when the screen starts again: a removed stop, a new
-  `kind`, or the first journey on an empty map. The previous navigator's `events` never completes:
-  the app cancels its collection.
+- The view calls it again with a new navigator when the screen starts again: a new `kind`, a
+  journey without a stop on the map, or the first journey on an empty map. The previous navigator's
+  `events` never completes: the app cancels its collection. Any other change of the journey goes to
+  `update(to)` of the same navigator.
 - A recreated activity keeps the navigator and does not call `onNavigator` again. Collect in a scope
   that outlives the activity, for example `viewModelScope`.
 - The view sets neither `onCue` nor `cueRules`.
@@ -226,7 +237,7 @@ them.
 | `reopen(stopId)` | The stop's state `PENDING` |
 | `add(stop)`, `insert(stop, index)` | Add or insert `ProximiJourney.Stop(id)` |
 | `move(stopId, toIndex)`, `apply(proposal)` | Reorder `stops` |
-| Remove a stop | Remove it from `stops`. The screen starts again (step 6). |
+| Remove a stop | Remove it from `stops` |
 | `detour(stop)`, `cancelDetour()` | No call. The visitor picks an amenity in the view's search and taps "Go here". `onEvent` reports `AmenitySelected`, `DetourStarted` and `DetourEnded`. |
 | `resumeJourney()` | No call. The route follows a visitor who left it. |
 | `setRouteOptions(options)` | The `routeAccessibility` parameter (`RouteAccessibility`) |
@@ -239,7 +250,9 @@ app matches the one its journey uses.
 ### Step 8: SDK streams (Info)
 
 `sdk.geofenceEvents()` and `sdk.positions()` stay as they are. The view collects its own flows and
-takes no events from the app's. The view reports no geofence event.
+takes no events from the app's. The view reports no geofence event. It follows
+`sdk.venueDataChanges()` itself: the open map draws changed venue data, and the journey routes again
+after a change of features.
 
 ### Step 9: The view's navigator (Check)
 
@@ -248,7 +261,7 @@ navigator"):
 
 | | The view's navigator |
 |---|---|
-| `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies the app's change of `journey`. |
+| `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies the app's change of `journey` (`update(to)`). |
 | `FarFromRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (30 m) and `GadSettings.offRouteAfter` (300 s). |
 | `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival. The visitor reaches an artwork by entering its geofence, which the app's `geofenceEvents()` reports. |
 | The cue `APPROACHING_DESTINATION` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery; other legs end at the artwork. |

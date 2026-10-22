@@ -117,14 +117,13 @@ internal data class HostedJourney(
     val unmatched: List<ProximiJourney.Stop>,
 ) {
     /**
-     * Whether the open screen, which shows [shown], can take this journey in place: the same kind, a
-     * stop on the map in both, and every stop of [shown] still in this one. The library does not use
-     * the navigator's `remove` of map 6.0.0-beta.22 yet, and a screen without stops has no started
-     * navigator to add them to. Pure; covered by tests.
+     * Whether the open screen, which shows [shown], can take this journey in place
+     * (`JourneyNavigator.update(to)`): the same kind and a stop on the map in both. A screen without
+     * stops has no started navigator, and a journey without stops shows the map alone. Pure; covered
+     * by tests.
      */
     fun canReplace(shown: HostedJourney, kind: JourneyKind, shownKind: JourneyKind): Boolean =
-        kind == shownKind && shown.journey.stops.isNotEmpty() && journey.stops.isNotEmpty() &&
-            journey.stops.map { it.id }.containsAll(shown.journey.stops.map { it.id })
+        kind == shownKind && shown.journey.stops.isNotEmpty() && journey.stops.isNotEmpty()
 
     /**
      * The host app's journey with the order and states of [journey]. Detours are left out. A reached
@@ -169,62 +168,6 @@ internal data class HostedJourney(
             }
             return HostedJourney(Journey(stops), hostIds, unmatched)
         }
-    }
-}
-
-/**
- * The steps that turn the navigator's journey into the host app's journey on the open screen
- * (`VisitController.apply`). Pure; covered by tests.
- */
-internal object JourneyUpdate {
-    data class StateChange(val stopId: String, val kind: Kind) {
-        enum class Kind { MARK_DONE, SKIP, REOPEN }
-    }
-
-    /**
-     * The state changes that give the stops of [current] the states of [target], reopens first. A
-     * stop of [target] that [current] lacks counts as pending. Pending, active and reached are one
-     * state for the host app. A done stop the host app skips is reopened first: the navigator does
-     * not skip a done stop.
-     */
-    fun stateChanges(current: Journey, target: Journey): List<StateChange> {
-        val states = LinkedHashMap<String, StopState>()
-        for (stop in current.stops) states.putIfAbsent(stop.id, stop.state)
-        val reopens = mutableListOf<StateChange>()
-        val closes = mutableListOf<StateChange>()
-        for (stop in target.stops) {
-            val state = states[stop.id] ?: StopState.PENDING
-            when {
-                stop.state == StopState.DONE && state != StopState.DONE ->
-                    closes += StateChange(stop.id, StateChange.Kind.MARK_DONE)
-                stop.state == StopState.SKIPPED && state != StopState.SKIPPED -> {
-                    if (state == StopState.DONE) reopens += StateChange(stop.id, StateChange.Kind.REOPEN)
-                    closes += StateChange(stop.id, StateChange.Kind.SKIP)
-                }
-                stop.state == StopState.PENDING && (state == StopState.DONE || state == StopState.SKIPPED) ->
-                    reopens += StateChange(stop.id, StateChange.Kind.REOPEN)
-            }
-        }
-        return reopens + closes
-    }
-
-    /**
-     * The order of the navigator's `reorderableStops` for the host app's journey, or `null` when it is
-     * the current order. The host app's pending stops come in its order. The active stop stays first
-     * when the host app closes it, so the route changes once, when it is closed. Stops the host app
-     * closes follow, in their current order.
-     *
-     * @param reorderable the ids of `reorderableStops`, the active stop first.
-     * @param pending the ids of the host app's pending stops, in its order.
-     * @param closing the ids the host app marks visited or skipped.
-     */
-    fun order(reorderable: List<String>, activeStopId: String?, pending: List<String>, closing: Set<String>): List<String>? {
-        val available = reorderable.toSet()
-        val order = mutableListOf<String>()
-        if (activeStopId != null && activeStopId in closing && activeStopId in available) order += activeStopId
-        for (id in pending) if (id in available && id !in order) order += id
-        for (id in reorderable) if (id !in order) order += id
-        return if (order == reorderable) null else order
     }
 }
 
