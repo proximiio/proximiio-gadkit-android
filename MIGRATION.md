@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.7.0 uses SDK
-6.0.0-beta.28 and Map 6.0.0-beta.24.
+6.0.0-beta.28 and Map 6.0.0-beta.25.
 
 Each change has a mark:
 
@@ -45,7 +45,8 @@ The SDK and Map versions have no other source break.
 | SDK 6.0.0-beta.28 | `loadRouteNetwork()` throws `ProximiioError.Underlying` (the cause in `underlyingError`) when the downloaded network cannot be built, not an `IllegalArgumentException`. Transport and decoding failures are still `ProximiioAPIError`. | Code that catches `IllegalArgumentException` from this call catches `ProximiioError.Underlying`. | **Check** |
 | SDK 6.0.0-beta.28 | A sync pass, a position provider or a visitor reporter that throws no longer ends the app: the SDK logs it at `ERROR` in the `Lifecycle` category and goes on with the next event. | | Info |
 | Map 6.0.0-beta.24 | An `onStyleLoaded` handler that throws a `RuntimeException` no longer ends the app: the map logs it under the tag `ProximiioMap.style` and loads the rest of the style. | Code that relied on the crash looks in the log. | **Check** |
-| Map 6.0.0-beta.24 | The camera frames leave out coordinates outside ±90 / ±180 or not finite. The map still draws the feature. | | Info |
+| Map 6.0.0-beta.24 | The camera frames leave out coordinates outside ±90 / ±180 or not finite. | | Info |
+| Map 6.0.0-beta.25 | A feature with a position outside ±90 / ±180 or not finite is not drawn, hit-tested, framed or centred on; the map logs its id under the tag `ProximiioMap.features`. `MapCanvasCamera.setCenter` ignores such a coordinate, and `ProximiioMapCanvas.point(coordinate)` returns `null` for it, instead of throwing. | | Info |
 
 ### Added
 
@@ -85,10 +86,13 @@ All Info.
 - Map 6.0.0-beta.24: a venue feature with coordinates in metres no longer ends the app when the map
   opens (`latitude must be between -90 and 90`). Every map from 6.0.0-beta.14 to 6.0.0-beta.23
   crashes on such a feature once the SDK has stored it.
+- Map 6.0.0-beta.25: a POI, place or journey stop in metres no longer ends the app when the map
+  centres on it, and a feature with a floor level that is not a number no longer ends the app
+  (`Cannot round NaN value.`).
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.29 and later and Map 6.0.0-beta.25 and later are not used by ProximiioGADKit for
+SDK 6.0.0-beta.29 and later and Map 6.0.0-beta.26 and later are not used by ProximiioGADKit for
 Android 1.7.0. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
@@ -110,7 +114,7 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 
 - Add the library as a git submodule at the tag `1.7.0`, include its build and depend on
   `io.proximi.gadkit:proximiio-gadkit` without a version (README "Adding the library").
-- The library brings SDK `6.0.0-beta.28` and Map `6.0.0-beta.24` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.28` and Map `6.0.0-beta.25` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2. With the Gradle configuration cache
