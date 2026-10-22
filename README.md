@@ -825,7 +825,9 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
-Version 1.7.0, with the behaviour of the iOS package 1.7.0 on newer SDK and Map versions (see
+### [1.7.0] — 2026-10-22
+
+The behaviour of the iOS package 1.7.0 on newer SDK and Map versions (see
 "Differences from the iOS package"). It is the first release since 0.14.0:
 the 1.0.0 entries below were never tagged. One entry point, `ProximiMap`, replaces the screens and
 services of 0.14.0 (Nagarro, 2026-10-16: "a single exposed wrapper component that encapsulates all
