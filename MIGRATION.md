@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.7.0 uses SDK
-6.0.0-beta.27 and Map 6.0.0-beta.24.
+6.0.0-beta.28 and Map 6.0.0-beta.24.
 
 Each change has a mark:
 
@@ -42,6 +42,8 @@ The SDK and Map versions have no other source break.
 | Map 6.0.0-beta.23 | A map shown again after a fix centres on the visitor at the zoom that shows their whole place and follows at that zoom. Before, it zoomed to `recentreZoom`. | | Info |
 | Map 6.0.0-beta.23 | The session follows `venueDataChanges()`: it redraws the features, amenity icons, floors, places, geofences and the stored style when the SDK's data changes. Camera, floor, route and journey stay. | Remove own `reloadVenueData()` calls for these changes. A running `JourneyNavigator` still needs `routeNetworkChanged()` after a `features` change. | **Check** |
 | Map 6.0.0-beta.23 | MapLibre requests to the API host carry `X-Proximiio-SDK` and `X-Visitor-Id`, as the SDK's requests do. | See the headers row of SDK 6.0.0-beta.25. | Info |
+| SDK 6.0.0-beta.28 | `loadRouteNetwork()` throws `ProximiioError.Underlying` (the cause in `underlyingError`) when the downloaded network cannot be built, not an `IllegalArgumentException`. Transport and decoding failures are still `ProximiioAPIError`. | Code that catches `IllegalArgumentException` from this call catches `ProximiioError.Underlying`. | **Check** |
+| SDK 6.0.0-beta.28 | A sync pass, a position provider or a visitor reporter that throws no longer ends the app: the SDK logs it at `ERROR` in the `Lifecycle` category and goes on with the next event. | | Info |
 | Map 6.0.0-beta.24 | An `onStyleLoaded` handler that throws a `RuntimeException` no longer ends the app: the map logs it under the tag `ProximiioMap.style` and loads the rest of the style. | Code that relied on the crash looks in the log. | **Check** |
 | Map 6.0.0-beta.24 | The camera frames leave out coordinates outside ±90 / ±180 or not finite. The map still draws the feature. | | Info |
 
@@ -76,13 +78,17 @@ All Info.
 - SDK 6.0.0-beta.27: a fresh install no longer shows most POIs without icon or title.
 - Map 6.0.0-beta.23: a lift ride over several floors no longer draws a short zigzag next to the lift
   on the floor it arrives at. Use SDK 6.0.0-beta.26 or later only with Map 6.0.0-beta.23 or later.
+- SDK 6.0.0-beta.28: a floor level that is not a number (`"NaN"`, `"Infinity"`, a number too large
+  for a `Double`) on a path, level changer, obstacle or floor no longer ends the app; it reads as a
+  level that does not parse. A feature with a number too large for a `Double` is stored without its
+  properties, and the rest of the venue is stored.
 - Map 6.0.0-beta.24: a venue feature with coordinates in metres no longer ends the app when the map
   opens (`latitude must be between -90 and 90`). Every map from 6.0.0-beta.14 to 6.0.0-beta.23
   crashes on such a feature once the SDK has stored it.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.28 and later and Map 6.0.0-beta.25 and later are not used by ProximiioGADKit for
+SDK 6.0.0-beta.29 and later and Map 6.0.0-beta.25 and later are not used by ProximiioGADKit for
 Android 1.7.0. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
@@ -104,7 +110,7 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 
 - Add the library as a git submodule at the tag `1.7.0`, include its build and depend on
   `io.proximi.gadkit:proximiio-gadkit` without a version (README "Adding the library").
-- The library brings SDK `6.0.0-beta.27` and Map `6.0.0-beta.24` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.28` and Map `6.0.0-beta.24` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2. With the Gradle configuration cache
@@ -115,8 +121,8 @@ Android 1.7.0. A host app that declares them gets them instead of the versions a
 Section 1: `eventBatching` with positional arguments and the `BlueiotBindingError` cases
 (**Required**), the headers on the on-premises proxy, the Data safety form and the level changers'
 `levels` in the venue data (**Required**), visitor reporting, `swapNearMeters`, `setRouteOptions`,
-`levelChanges`, the database schema, `features()`, the clear background, `reloadVenueData()` and
-`onStyleLoaded` (**Check**).
+`levelChanges`, the database schema, `features()`, the error of `loadRouteNetwork()`, the clear
+background, `reloadVenueData()` and `onStyleLoaded` (**Check**).
 
 ### Step 3: Languages (Check)
 
