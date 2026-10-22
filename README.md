@@ -52,7 +52,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.7.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.9.0")
 }
 ```
 
@@ -61,7 +61,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.7.0
+git -C gadkit checkout 1.9.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -837,14 +837,20 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
+### [1.9.0] — 2026-10-23
+
+The behaviour of the iOS package 1.9.0, which includes 1.8.0, on SDK 6.0.0-beta.30 and Map
+6.0.0-beta.26 (as iOS SDK 6.0.0-beta.63 and Map 6.0.0-beta.50). There is no Android 1.8.0.
+[MIGRATION.md](MIGRATION.md) lists the SDK and Map changes since SDK 6.0.0-beta.23 and Map
+6.0.0-beta.21.
+
 #### Added
 
 - The library is on Maven: `io.proximi.gadkit:proximiio-gadkit` on
   `https://maven.eu.proximi.fi/releases/`, the repository of the SDK and the Map, from version
-  1.7.0. A host app no longer needs the git submodule. It adds `includeGroup("io.proximi.gadkit")`
+  1.9.0. A host app no longer needs the git submodule. It adds `includeGroup("io.proximi.gadkit")`
   to that repository and a version to the dependency (see "Adding the library"). The submodule with
-  `includeBuild` still works. Version 1.7.0 on Maven is built from the commit after the tag `1.7.0`
-  that adds the publication. Its library code is the code of the tag.
+  `includeBuild` still works.
 - `GadSettings.geofenceExitDelay` (iOS 1.9.0): the time the position stays outside an entered
   geofence or privacy zone before the SDK reports the exit, 5 s by default. `ProximiMap` sets it in
   the SDK it starts. `ProximiMapView` runs on the host app's SDK, which has its own
