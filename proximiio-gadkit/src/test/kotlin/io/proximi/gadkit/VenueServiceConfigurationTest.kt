@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 /** Port of guggenheim-ios `AppEnvironmentTests.theSDKReportsVisitorsToTheConfiguredHostOnly`. */
 class VenueServiceConfigurationTest {
@@ -24,6 +25,13 @@ class VenueServiceConfigurationTest {
         assertFalse(configuration.eventBatching)
         assertEquals("api.proximi.fi", configuration.apiBaseURL.host)
         assertTrue(configuration.fallbackAPIBaseURLs.isEmpty())
+    }
+
+    @Test
+    fun theSDKReportsAGeofenceExitAfterTheSettingsDelay() {
+        assertEquals(5.0, VenueService.configuration(backend, ProximiioServiceOptions()).geofenceExitDelay)
+        val noDelay = backend.copy(settings = GadSettings(geofenceExitDelay = Duration.ZERO))
+        assertEquals(0.0, VenueService.configuration(noDelay, ProximiioServiceOptions()).geofenceExitDelay)
     }
 
     @Test

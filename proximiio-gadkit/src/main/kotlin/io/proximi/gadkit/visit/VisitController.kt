@@ -54,7 +54,10 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  *   therefore also checked against the artwork geofences ([checkArtworkGeofences]). A geofence the
  *   SDK counts the visitor inside ([enteredGeofenceIds]) counts too: the SDK exits a geofence only
  *   beyond 1.2 × its radius, and its event stream does not repeat the geofences entered before the
- *   screen opened (field test 2026-10-19).
+ *   screen opened (field test 2026-10-19). Since SDK 6.0.0-beta.29 the SDK also exits a geofence
+ *   only `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
+ *   [GadSettings.geofenceExitDelay], 5 s; the SDK default is 3 s), so an artwork counts as inside
+ *   up to that long after the visitor left it.
  * - The journey moves to the next artwork 2 s after the arrival.
  * - Artwork legs have no arrival by distance ([artworkGuidanceRules]). An artwork the visitor walks
  *   past without entering its geofence stays unvisited until it is skipped.

@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.time.DurationUnit
 
 /**
  * The started SDK with the wristband binding's position provider attached, as iOS `VenueService`.
@@ -206,6 +207,7 @@ internal class VenueService private constructor(
                 // on in every build. It is the SDK default since 6.0.0-beta.24; it is set here so a
                 // later default does not turn it off.
                 visitorReportingEnabled = true,
+                geofenceExitDelay = configuration.settings.geofenceExitDelay.toDouble(DurationUnit.SECONDS),
             )
 
         /**

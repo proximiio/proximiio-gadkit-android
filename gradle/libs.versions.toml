@@ -7,8 +7,8 @@ compileSdk = "37"
 targetSdk = "36"
 minSdk = "26"
 
-proximiioSdk = "6.0.0-beta.28"
-proximiioMap = "6.0.0-beta.25"
+proximiioSdk = "6.0.0-beta.30"
+proximiioMap = "6.0.0-beta.26"
 
 coroutines = "1.11.0"
 androidxCore = "1.18.0"

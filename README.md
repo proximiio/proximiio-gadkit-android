@@ -72,7 +72,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.28` and Map `6.0.0-beta.25` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.30` and Map `6.0.0-beta.26` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - A host app that draws its journey with the map library's `ProximiioMap` and its own
@@ -545,7 +545,7 @@ scope.launch {
 | `ArrivedAtMuseum` | `isAtMuseum` became `true`. Once per `ProximiMap`. |
 | `WristbandChanged(status)` | The wristband session changed. |
 | `TrackingChanged(health)` | During a journey: the wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`) or came back (`TRACKING`). |
-| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. |
+| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. The exit comes `geofenceExitDelay` (5 s) after the visitor leaves. |
 | `JourneyChanged(journey)` | A new, planned, edited or deleted (`null`) journey, and the progress after the journey screen closed. |
 | `NextStop(stop)` | The route leads to this stop now. |
 | `StopNearby(stop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The library posts no notification for it. |
@@ -591,6 +591,7 @@ val configuration = GadConfiguration(
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
+| `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence or privacy zone before the SDK reports the exit. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.StopNearby`. |
 | `offRouteMeters`, `offRouteAfter` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
@@ -801,7 +802,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | SDK 6.0.0-beta.28 (as iOS SDK 6.0.0-beta.61) and Map 6.0.0-beta.25 (as iOS Map 6.0.0-beta.48) | The open map draws venue data changes at once (see "Venue data changes"); on iOS it does so from the next opening. A venue feature in metres or a floor level that is not a number does not end the app; on iOS SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 it does. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 | SDK 6.0.0-beta.30 (as iOS SDK 6.0.0-beta.63) and Map 6.0.0-beta.26 (as iOS Map 6.0.0-beta.50) | The open map draws venue data changes at once (see "Venue data changes"); on iOS it does so from the next opening. A venue feature in metres or a floor level that is not a number does not end the app; on iOS SDK 6.0.0-beta.60 and Map 6.0.0-beta.45 it does. A geofence exits `geofenceExitDelay` (5 s) after the position leaves it, as in iOS 1.9.0; on iOS 1.7.0 it exits at the first position outside. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -837,6 +838,33 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   to that repository and a version to the dependency (see "Adding the library"). The submodule with
   `includeBuild` still works. Version 1.7.0 on Maven is built from the commit after the tag `1.7.0`
   that adds the publication. Its library code is the code of the tag.
+- `GadSettings.geofenceExitDelay` (iOS 1.9.0): the time the position stays outside an entered
+  geofence or privacy zone before the SDK reports the exit, 5 s by default. `ProximiMap` sets it in
+  the SDK it starts. `ProximiMapView` runs on the host app's SDK, which has its own
+  `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). See "Settings".
+
+#### Changed (SDK 6.0.0-beta.30, Map 6.0.0-beta.26)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.30` (was `6.0.0-beta.28`) and Map
+  `6.0.0-beta.26` (was `6.0.0-beta.25`). The Map requires SDK `6.0.0-beta.30`. A host app that
+  declares these artifacts itself moves them to the same versions. No source change.
+- **Visible:** an entered geofence exits only after the position has stayed outside it for a
+  delay (SDK 6.0.0-beta.29). A return within the delay sends no exit and no new enter. The enter
+  still arrives at once.
+  - `ProximiMap`: 5 s (`GadSettings.geofenceExitDelay`). `ProximiMapView`: the host app's SDK, 3 s
+    by default. `ProximiioConfiguration(geofenceExitDelay = 0.0)` gives the previous behaviour.
+  - `ProximiMapEvent.GeofenceExited` arrives up to the delay after the visitor leaves.
+  - The visit screen shows the gallery name up to the delay longer.
+  - With `GadSettings.outOfOrderDwell` above 0, the time in another artwork's geofence counts up to
+    the delay longer, so a shorter crossing marks that artwork visited out of order. The default of
+    0 does not change.
+- **Visible:** SDK 6.0.0-beta.30 changes, as iOS SDK 6.0.0-beta.63. No host app change.
+  - The route network leaves out paths, level changers and obstacles with a position that is not
+    in degrees, for example in EPSG:3857 metres. `features()` and the map still get them.
+  - A level that is not a finite number, or one too large for a floor key, is on no floor and has
+    no route.
+  - A list page the API cut short no longer loses rows.
+  - `journeys()` lists every journey, not only the 100 most recently edited.
 
 ### [1.7.0] — 2026-10-22
 

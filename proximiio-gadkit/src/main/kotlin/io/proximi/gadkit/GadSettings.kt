@@ -38,6 +38,17 @@ public data class GadSettings(
     /** …for this time. */
     val amenityArrivalDwell: Duration = 5.seconds,
 
+    // Geofences
+
+    /**
+     * Time the position stays outside an entered geofence or privacy zone before the SDK reports the
+     * exit (`ProximiioConfiguration.geofenceExitDelay`, SDK 6.0.0-beta.29, whose default is 3 s). A
+     * position back inside within this time reports nothing. Enters are reported at once.
+     * [ProximiMap] sets it when it starts the SDK; [ProximiMapView] runs on the host app's SDK, which
+     * has its own value. 0 reports the exit at the first position outside.
+     */
+    val geofenceExitDelay: Duration = 5.seconds,
+
     // Notifications
 
     /**
