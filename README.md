@@ -927,6 +927,11 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   "Level N" and a new floor changer, the galleries in the level colour, the Spaces, Highlights and
   Amenities lists and a card for a picked place. It has no position dot, no route, no search and no
   gallery legend. No host app change.
+- **Visible:** the journey map and the Explore Museum map fade out over about 28 dp at every edge,
+  so the background behind the view shows through (Figma map card; PM 2026-10-23), as iOS 1.11.1.
+  The cards and buttons over the map do not fade. Touches on the faded edge still reach the map. No
+  host app change. iOS 1.11.1 also centres the spinner of `ProximiMapView` without `BACKGROUND`;
+  on Android it was already in the middle.
 
 #### Added
 

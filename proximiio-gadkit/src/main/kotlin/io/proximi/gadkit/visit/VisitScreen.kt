@@ -85,6 +85,7 @@ import io.proximi.gadkit.map.FloorChangeOverlay
 import io.proximi.gadkit.map.FloorWithoutPositioningGuide
 import io.proximi.gadkit.map.FollowsVisitorFloor
 import io.proximi.gadkit.map.MapGlassFrame
+import io.proximi.gadkit.map.softEdges
 import io.proximi.gadkit.map.MapIcon
 import io.proximi.gadkit.map.MapListToggle
 import io.proximi.gadkit.map.RoundGlassButton
@@ -247,7 +248,7 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                 MapGlassFrame(Modifier.weight(1f)) {
                     ProximiioMap(
                         session = model.session,
-                        modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop),
+                        modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp),
                         configure = { canvas -> model.layers.attach(canvas) },
                     )
                     // The list covers the map with white: its rows have nothing to blur.

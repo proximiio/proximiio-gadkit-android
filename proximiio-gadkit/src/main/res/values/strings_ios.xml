@@ -60,7 +60,6 @@
     <string name="keep_it">Keep it</string>
     <string name="keep_it_on_your_wrist_the_galleries">Keep it on your wrist - the galleries will pick it up as you walk through.</string>
     <string name="last_stop">LAST STOP</string>
-    <string name="learning_engagement">Learning &amp; Engagement</string>
     <string name="leave_the_tour">Leave the tour</string>
     <string name="leave_the_tour_here">Leave the tour here</string>
     <string name="level_n">Level %d</string>
@@ -70,7 +69,6 @@
     <string name="map">Map</string>
     <string name="men_s_restroom">Men’s restroom</string>
     <string name="museum">Museum</string>
-    <string name="museum_map">Museum Map</string>
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
     <string name="museum_map_2" tools:ignore="MissingTranslation">Museum map</string>
     <string name="museum_shop">Museum Shop</string>
@@ -113,7 +111,6 @@
     <string name="nothing_here_yet">Nothing here yet.</string>
     <string name="off">Off</string>
     <string name="on">On</string>
-    <string name="other">Other</string>
     <string name="paired">Paired</string>
     <string name="permission_denied">permission denied</string>
     <string name="plan_your_visit">Plan your visit</string>
@@ -130,7 +127,6 @@
     <string name="search">Search</string>
     <string name="search_the_museum">Search the museum</string>
     <string name="show_the_route_from_here">Show the route from here</string>
-    <string name="single_artist_gallery">Single Artist Gallery</string>
     <string name="skip">Skip</string>
     <string name="skip_artwork">Skip artwork</string>
     <string name="skip_for_now">Skip for now</string>
@@ -157,7 +153,6 @@
     <string name="the_wristband_session_has_ended_connect_the">The wristband session has ended. Connect the wristband again.</string>
     <string name="the_wristband_stopped_reporting_please_ask_the">The wristband stopped reporting. Please ask the staff.</string>
     <string name="the_wristband_was_returned_thank_you_for">The wristband was returned. Thank you for your visit.</string>
-    <string name="thematic_gallery">Thematic Gallery</string>
     <string name="this_is_not_a_wristband_code_check">This is not a wristband code. Check the code printed on the wristband.</string>
     <string name="this_phone_reports_a_simulated_location_turn">This phone reports a simulated location. Turn it off, or ask at the reception desk.</string>
     <string name="this_usually_takes_a_few_seconds">This usually takes a few seconds.</string>

@@ -93,6 +93,7 @@ import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.map.gadIcon
 import io.proximi.gadkit.map.levelChangers
 import io.proximi.gadkit.map.places
+import io.proximi.gadkit.map.softEdges
 import io.proximi.gadkit.map.venueGeofences
 import io.proximi.map.compose.ProximiioMap
 import io.proximi.map.compose.rememberProximiioMapSession
@@ -237,7 +238,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     Box(modifier.fillMaxSize()) {
         ProximiioMap(
             session = session,
-            modifier = Modifier.fillMaxSize().glassBackdrop(backdrop),
+            modifier = Modifier.fillMaxSize().glassBackdrop(backdrop).softEdges(cornerRadius = 40.dp),
             configure = { canvas -> layers.attach(canvas) },
         )
         ProvideGlassBackdrop(backdrop) {

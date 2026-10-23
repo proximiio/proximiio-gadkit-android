@@ -113,8 +113,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="last_stop">المحطة الأخيرة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="learning_engagement">التعلّم والمشاركة</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="leave_the_tour">إنهاء الجولة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="leave_the_tour_here">إنهاء الجولة هنا</string>
@@ -130,7 +128,6 @@
     <string name="men_s_restroom">دورة مياه الرجال</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="museum">المتحف</string>
-    <string name="museum_map">خريطة المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="museum_shop">متجر المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -188,8 +185,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="on">تشغيل</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="other">أخرى</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="paired">مقترن</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="permission_denied">الكاميرا</string>
@@ -217,8 +212,6 @@
     <string name="search_the_museum">ابحث في المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="show_the_route_from_here">عرض المسار من هنا</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="single_artist_gallery">قاعة فنان واحد</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="skip">تخطي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -271,8 +264,6 @@
     <string name="the_wristband_stopped_reporting_please_ask_the">توقف السوار عن الإرسال. يُرجى التوجه إلى أحد الموظفين.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="the_wristband_was_returned_thank_you_for">تمت إعادة السوار. شكرًا لزيارتك.</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="thematic_gallery">قاعة موضوعية</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="this_is_not_a_wristband_code_check">هذا ليس رمز سوار. تحقق من الرمز المطبوع على السوار.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

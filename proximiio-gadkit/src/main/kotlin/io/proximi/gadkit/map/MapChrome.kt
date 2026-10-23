@@ -30,7 +30,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import kotlin.math.roundToInt
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -313,6 +325,31 @@ internal fun MapGlassFrame(modifier: Modifier = Modifier, content: @Composable B
                 .clearAndSetSemantics {},
         )
     }
+}
+
+/**
+ * Fades the content to transparent over [width] at every edge, so the screen background shows
+ * through (the map card of the Figma map frames; PM 2026-10-23), as iOS `softEdges`. The mask is a
+ * rounded rectangle with [cornerRadius], inset by half of [width] and blurred by half of [width]. It
+ * changes the look only: touches on the faded edge still reach the content.
+ */
+internal fun Modifier.softEdges(cornerRadius: Dp, width: Dp = 28.dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithCache {
+            val mask = softEdgeMask(size, width.toPx(), cornerRadius.toPx())
+            onDrawWithContent {
+                drawContent()
+                drawImage(mask, blendMode = BlendMode.DstIn)
+            }
+        }
+
+/** Opaque inside, clear at the edges. A software canvas: hardware canvases blur no mask before API 28. */
+private fun softEdgeMask(size: Size, width: Float, cornerRadius: Float): ImageBitmap {
+    val bitmap = Bitmap.createBitmap(size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1), Bitmap.Config.ALPHA_8)
+    val inset = width / 2
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { maskFilter = BlurMaskFilter(width / 2, BlurMaskFilter.Blur.NORMAL) }
+    android.graphics.Canvas(bitmap).drawRoundRect(inset, inset, size.width - inset, size.height - inset, cornerRadius, cornerRadius, paint)
+    return bitmap.asImageBitmap()
 }
 
 /** "Map | List" toggle: glass 150 × 50 with the selected item outlined. */
