@@ -1,6 +1,7 @@
 package io.proximi.gadkit.wristband
 
 import io.proximi.sdk.blueiot.binding.BlueiotBindingDiagnostics
+import io.proximi.sdk.blueiot.binding.BlueiotBindingEndReason
 import io.proximi.sdk.blueiot.binding.BlueiotBindingLink
 import io.proximi.sdk.blueiot.binding.BlueiotBindingSession
 import io.proximi.sdk.blueiot.binding.BlueiotBindingSignal
@@ -26,6 +27,24 @@ class BindingLogTest {
                 "signal lost since 2026-10-14T09:31:00Z",
             BindingLog.session(state),
         )
+    }
+
+    @Test
+    fun theSessionLineNamesThePrivacyZone() {
+        val session = BlueiotBindingSession(UUID.randomUUID(), endsAt = start, tokenExpiresAt = start)
+        val state = BlueiotBindingState.Active(session, BlueiotBindingLink.ONLINE, BlueiotBindingSignal.PrivacyZone(start + 60_000))
+        assertEquals(true, BindingLog.session(state)?.endsWith(" · privacy zone since 2026-10-14T09:31:00Z"))
+    }
+
+    @Test
+    fun onlyThePrivacyZoneSignalIsPrivate() {
+        val session = BlueiotBindingSession(UUID.randomUUID(), endsAt = start, tokenExpiresAt = start)
+        val since = start + 60_000
+        assertEquals(since, WristbandSession.privateSince(BlueiotBindingState.Active(session, BlueiotBindingLink.ONLINE, BlueiotBindingSignal.PrivacyZone(since))))
+        assertNull(WristbandSession.privateSince(BlueiotBindingState.Active(session, BlueiotBindingLink.ONLINE, BlueiotBindingSignal.Lost(since))))
+        assertNull(WristbandSession.privateSince(BlueiotBindingState.Active(session, BlueiotBindingLink.ONLINE, BlueiotBindingSignal.Ok)))
+        assertNull(WristbandSession.privateSince(BlueiotBindingState.Ended(BlueiotBindingEndReason.Timeout)))
+        assertNull(WristbandSession.privateSince(null))
     }
 
     @Test

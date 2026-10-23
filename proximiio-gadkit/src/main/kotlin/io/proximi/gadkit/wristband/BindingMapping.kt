@@ -61,11 +61,15 @@ internal fun BlueiotBindingLink.toCore(): BindingLink = when (this) {
     BlueiotBindingLink.RECONNECTING -> BindingLink.RECONNECTING
 }
 
-/** The core state. The active session is left out; the signal becomes `signalLost`. */
+/** The core state. The active session is left out; the signal becomes `signalLost` and `privacyZone`. */
 internal fun BlueiotBindingState.toCore(): BindingState = when (this) {
     BlueiotBindingState.Unbound -> BindingState.Unbound
     BlueiotBindingState.Binding -> BindingState.Binding
-    is BlueiotBindingState.Active -> BindingState.Active(link.toCore(), signalLost = signal is BlueiotBindingSignal.Lost)
+    is BlueiotBindingState.Active -> BindingState.Active(
+        link.toCore(),
+        signalLost = signal is BlueiotBindingSignal.Lost,
+        privacyZone = signal is BlueiotBindingSignal.PrivacyZone,
+    )
     is BlueiotBindingState.Ended -> BindingState.Ended(reason.toCore())
 }
 

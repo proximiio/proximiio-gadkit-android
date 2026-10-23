@@ -107,6 +107,8 @@ internal enum class BindingLink(val rawValue: String) {
 internal sealed interface BindingState {
     data object Unbound : BindingState
     data object Binding : BindingState
-    data class Active(val link: BindingLink, val signalLost: Boolean) : BindingState
+
+    /** [privacyZone]: the band is silent in a privacy zone (relay-api `private`), not lost. */
+    data class Active(val link: BindingLink, val signalLost: Boolean, val privacyZone: Boolean = false) : BindingState
     data class Ended(val reason: BindingEndReason) : BindingState
 }

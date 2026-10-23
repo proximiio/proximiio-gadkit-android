@@ -17,7 +17,8 @@ import java.util.Locale
 internal object BindingLog {
     /**
      * "binding <id> · ends <time> · token expires <time>", plus "signal lost since <time>" while
-     * the venue does not hear the band. `null` without an active session.
+     * the venue does not hear the band, or "privacy zone since <time>" while it is silent in a
+     * privacy zone. `null` without an active session.
      */
     fun session(state: BlueiotBindingState): String? {
         val active = state as? BlueiotBindingState.Active ?: return null
@@ -27,7 +28,11 @@ internal object BindingLog {
             "ends ${iso(session.endsAt)}",
             "token expires ${iso(session.tokenExpiresAt)}",
         )
-        (active.signal as? BlueiotBindingSignal.Lost)?.let { parts += "signal lost since ${iso(it.since)}" }
+        when (val signal = active.signal) {
+            is BlueiotBindingSignal.Lost -> parts += "signal lost since ${iso(signal.since)}"
+            is BlueiotBindingSignal.PrivacyZone -> parts += "privacy zone since ${iso(signal.since)}"
+            else -> Unit
+        }
         return parts.joinToString(" · ")
     }
 

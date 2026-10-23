@@ -228,6 +228,7 @@ public class ProximiMap(
             val store = storeLoad.await()
             val venue = VenueService.start(context, configuration, session.binding)
             this.venue = venue
+            session.forwardPrivacy(venue.sdk)
             // A location answer that came during the start reaches the SDK here.
             venue.sdk.refreshPermissions()
             loadPlaces(venue)

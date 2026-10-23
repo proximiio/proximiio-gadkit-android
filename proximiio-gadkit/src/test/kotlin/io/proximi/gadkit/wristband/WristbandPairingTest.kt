@@ -142,6 +142,8 @@ class WristbandCopyTest {
     fun logLineHoldsNoSessionDetails() {
         assertEquals("ended, TIMEOUT", WristbandCopy.logLine(BindingState.Ended(BindingEndReason.Timeout)))
         assertEquals("unbound", WristbandCopy.logLine(BindingState.Unbound))
+        assertEquals("active, online, privacy zone", WristbandCopy.logLine(BindingState.Active(BindingLink.ONLINE, signalLost = false, privacyZone = true)))
+        assertEquals("active, online, signal lost", WristbandCopy.logLine(BindingState.Active(BindingLink.ONLINE, signalLost = true)))
     }
 
     @Test

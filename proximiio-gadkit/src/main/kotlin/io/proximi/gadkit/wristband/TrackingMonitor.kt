@@ -6,6 +6,7 @@ import io.proximi.sdk.Proximiio
 import io.proximi.sdk.positionProviderConnections
 import io.proximi.sdk.positioningAvailabilityChanges
 import io.proximi.sdk.positions
+import io.proximi.sdk.privacyZoneStateChanges
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,7 +28,9 @@ import io.proximi.gadkit.GadSettings
  * [TrackingHealth] turns it into [TrackingHealth.LOST_PLACE] and, after
  * [GadSettings.trackingStoppedAfter], [TrackingHealth.STOPPED_RESPONDING]; the monitor re-evaluates
  * every [TrackingHealth.REEVALUATE_INTERVAL] so the second follows while nothing else changes. The
- * position stream only feeds [lastFix], for "Probably at …".
+ * position stream only feeds [lastFix], for "Probably at …". In a privacy zone
+ * (`privacyZoneStateChanges()`: the phone's own zone or the relay's `private`) the state is
+ * [TrackingHealth.PRIVACY_ZONE].
  *
  * [start] it when the visit screen appears and [stop] it when it goes, as iOS `onAppear` /
  * `onDisappear`; [scope] is the screen's (a ViewModel's) scope.
@@ -49,6 +52,7 @@ internal class TrackingMonitor(
 
     private var wasEverAvailable = false
     private var unavailableSince: Instant? = null
+    private var isPrivate = false
     private val jobs = mutableListOf<Job>()
 
     fun start() {
@@ -86,6 +90,17 @@ internal class TrackingMonitor(
                 reevaluate()
             }
         }
+        // Privacy zone: the phone's own zone or the relay's `private`.
+        jobs += scope.launch {
+            sdk.privacyZoneStateChanges().collect { state ->
+                FieldLog.log(
+                    "privacy zone: private ${state.isPrivate} · zone ${state.isInPrivacyZone} · " +
+                        "relay ${state.positioningSourcePrivateSince?.let(BindingLog::iso) ?: "-"}",
+                )
+                isPrivate = state.isPrivate
+                reevaluate()
+            }
+        }
         jobs += scope.launch {
             while (true) {
                 delay(TrackingHealth.REEVALUATE_INTERVAL.toMillis())
@@ -104,7 +119,7 @@ internal class TrackingMonitor(
     }
 
     private fun reevaluate() {
-        val health = TrackingHealth.evaluate(wasEverAvailable, unavailableSince, now(), settings)
+        val health = TrackingHealth.evaluate(wasEverAvailable, unavailableSince, now(), settings, isPrivate)
         if (health == mutableHealth.value) return
         FieldLog.log("tracking health: $health")
         mutableHealth.value = health

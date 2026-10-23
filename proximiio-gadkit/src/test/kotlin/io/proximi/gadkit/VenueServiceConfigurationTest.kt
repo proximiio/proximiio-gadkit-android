@@ -35,6 +35,11 @@ class VenueServiceConfigurationTest {
     }
 
     @Test
+    fun theSDKWithholdsPositionsInAPrivacyZone() {
+        assertTrue(VenueService.configuration(backend, ProximiioServiceOptions()).withholdsPositionsInPrivacyZones)
+    }
+
+    @Test
     fun aRelayApiURLWithoutAHostIsRejected() {
         assertFailsWith<IllegalArgumentException> { backend.copy(relayApiBaseUrl = "https://") }
     }

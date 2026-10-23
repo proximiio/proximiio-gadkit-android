@@ -208,6 +208,10 @@ internal class VenueService private constructor(
                 // later default does not turn it off.
                 visitorReportingEnabled = true,
                 geofenceExitDelay = configuration.settings.geofenceExitDelay.toDouble(DurationUnit.SECONDS),
+                // In a privacy zone `positions()` emits no fix and positioning counts as available, so
+                // the map holds a grey dot at the last fix before the zone (SDK 6.0.0-beta.31). The
+                // relay's `private` reaches the SDK through `WristbandSession.forwardPrivacy`.
+                withholdsPositionsInPrivacyZones = true,
             )
 
         /**

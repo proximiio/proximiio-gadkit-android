@@ -72,7 +72,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.30` and Map `6.0.0-beta.26` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.31` and Map `6.0.0-beta.27` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - A host app that draws its journey with the map library's `ProximiioMap` and its own
@@ -285,6 +285,8 @@ The host app:
 - creates and starts the SDK and attaches the wristband's position provider. The view does not
   start, stop or configure the SDK and does not change the wristband session;
 - uses the SDK and Map versions this library depends on (see "Adding the library");
+- turns on the SDK's privacy-zone option and passes the wristband's privacy signal to the SDK (see
+  "Privacy zones");
 - lays the view out and closes it; draws the background and the bottom bar (for example the audio
   guide's controls);
 - stores the journey and moves it on. The view stores nothing but the accessible routes button.
@@ -540,6 +542,40 @@ scope.launch {
 - The library shows no wristband alerts. `ProximiMapEvent.WristbandChanged` and `TrackingChanged`
   let the host app show its own.
 
+## Privacy zones
+
+Privacy zones are drawn in the Proximi portal (Privacy zones), for example over the restrooms and the
+prayer room. These rooms have no positioning anchors, so the wristband falls silent at the zone.
+
+- relay-api (0.17.0 and later) syncs the organization's privacy zones every hour. A band that falls
+  silent with its last position inside a privacy zone, or within the site's `privacy_margin_m` (3 m by
+  default), gets the signal `private` instead of `lost`. While private, relay-api does not close the
+  binding for silence (`TIMEOUT`) or for leaving the venue (`LEFT_VENUE`). The other end reasons stay.
+- The SDK (6.0.0-beta.31) is private (`privacyZoneState()`, `privacyZoneStateChanges()`) while its
+  last fix is inside a privacy zone or the relay says `private`. With
+  `ProximiioConfiguration.withholdsPositionsInPrivacyZones`, `positions()` emits no fix while private,
+  and positioning stays available.
+- The map (6.0.0-beta.27) holds the dot at the last fix before the zone, grey
+  (`PositionStyle.privacy`), with the accuracy ring of that fix. While private the journey reports no
+  off-route, re-route or arrival.
+- The journey screen reports `TrackingChanged(PRIVACY_ZONE)` and no `LOST_PLACE` or
+  `STOPPED_RESPONDING` while private.
+
+`ProximiMap` turns the option on and passes the binding's signal to its SDK. A host app with
+`ProximiMapView` does both on its own SDK:
+
+```kotlin
+val configuration = ProximiioConfiguration.relayOnly(token = token).copy(
+    withholdsPositionsInPrivacyZones = true,
+)
+
+// In a coroutine that follows the wristband binding's states:
+binding.stateChanges().collect { state ->
+    val signal = (state as? BlueiotBindingState.Active)?.signal
+    sdk.setPositioningSourcePrivate(since = (signal as? BlueiotBindingSignal.PrivacyZone)?.since)
+}
+```
+
 ## Events
 
 `ProximiMap` performs every action itself; the events report them. They are sent on the main thread.
@@ -551,7 +587,7 @@ scope.launch {
 | `CuratedTourChangeRequested` | "Edit stops" on Manage journey for a curated tour, after it closed. The host app shows its tour choice. |
 | `ArrivedAtMuseum` | `isAtMuseum` became `true`. Once per `ProximiMap`. |
 | `WristbandChanged(status)` | The wristband session changed. |
-| `TrackingChanged(health)` | During a journey: the wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`) or came back (`TRACKING`). |
+| `TrackingChanged(health)` | During a journey: the wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`), came back (`TRACKING`), or the visitor is in a privacy zone (`PRIVACY_ZONE`, never lost there). |
 | `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. The exit comes `geofenceExitDelay` (5 s) after the visitor leaves. |
 | `JourneyChanged(journey)` | A new, planned, edited or deleted (`null`) journey, and the progress after the journey screen closed. |
 | `NextStop(stop)` | The route leads to this stop now. |
@@ -809,7 +845,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.63 and Map 6.0.0-beta.50 | SDK 6.0.0-beta.30 and Map 6.0.0-beta.26 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.64 and Map 6.0.0-beta.51 | SDK 6.0.0-beta.31 and Map 6.0.0-beta.27 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -836,6 +872,31 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Changed (SDK 6.0.0-beta.31, Map 6.0.0-beta.27)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.31` (was `6.0.0-beta.30`) and Map
+  `6.0.0-beta.27` (was `6.0.0-beta.26`). The Map requires SDK `6.0.0-beta.31`. A host app that
+  declares these artifacts itself moves them to the same versions. The SDK adds
+  `BlueiotBindingSignal.PrivacyZone(since)` and `ProximiioDiagnostics.NoPositionReason.PRIVACY_ZONE`,
+  the Map `PositionStage.PRIVACY_ZONE`: a `when` over them without `else` adds the case.
+- **BREAKING:** new `TrackingHealth.PRIVACY_ZONE`. A `when` over `TrackingHealth` without `else`
+  adds the case.
+- **Visible:** the binding reads relay-api's `private` (a band silent in a privacy zone) as
+  `BlueiotBindingSignal.PrivacyZone(since)`; SDK 6.0.0-beta.30 read it as `Ok`.
+- **Visible:** while the SDK is private, the map holds the dot grey at the last fix before the zone,
+  and the navigator takes no fix: no off-route, re-route, deviation, passed stop or arrival. In
+  `ProximiMapView` this also happens with the SDK option off.
+
+#### Added
+
+- Privacy zones (see "Privacy zones"): `ProximiMap` turns on `withholdsPositionsInPrivacyZones` and
+  passes the wristband binding's `private` signal to the SDK (`setPositioningSourcePrivate`). A host
+  app with `ProximiMapView` does both on its own SDK.
+- **Visible:** `TrackingChanged(PRIVACY_ZONE)` while the visitor is in a privacy zone, instead of
+  `LOST_PLACE` or `STOPPED_RESPONDING`.
+- Field log: "wristband privacy: …", "privacy zone: private … · zone … · relay …", "privacy zone
+  since …" on the binding session line, and "active, <link>, privacy zone" on the state line.
 
 ### [1.9.0] — 2026-10-23
 

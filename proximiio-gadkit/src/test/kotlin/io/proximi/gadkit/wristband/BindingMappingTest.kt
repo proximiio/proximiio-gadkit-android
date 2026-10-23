@@ -106,6 +106,10 @@ class BindingMappingTest {
             BindingState.Active(BindingLink.RECONNECTING, signalLost = true),
             BlueiotBindingState.Active(session, BlueiotBindingLink.RECONNECTING, BlueiotBindingSignal.Lost(1)).toCore(),
         )
+        assertEquals(
+            BindingState.Active(BindingLink.ONLINE, signalLost = false, privacyZone = true),
+            BlueiotBindingState.Active(session, BlueiotBindingLink.ONLINE, BlueiotBindingSignal.PrivacyZone(1)).toCore(),
+        )
         assertEquals(BindingState.Ended(BindingEndReason.UserEnded), BlueiotBindingState.Ended(BlueiotBindingEndReason.UserEnded).toCore())
         BlueiotBindingLink.entries.forEach { assertEquals(it.rawValue, it.toCore().rawValue) }
     }

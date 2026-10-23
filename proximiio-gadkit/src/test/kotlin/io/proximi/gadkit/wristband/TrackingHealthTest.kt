@@ -23,6 +23,14 @@ class TrackingHealthTest {
     }
 
     @Test
+    fun aPrivacyZoneIsNeverLost() {
+        assertEquals(TrackingHealth.PRIVACY_ZONE, TrackingHealth.evaluate(true, now.minusSeconds(3600), now, isPrivate = true))
+        assertEquals(TrackingHealth.PRIVACY_ZONE, TrackingHealth.evaluate(true, null, now, isPrivate = true))
+        assertEquals(TrackingHealth.PRIVACY_ZONE, TrackingHealth.evaluate(false, null, now, isPrivate = true))
+        assertEquals(TrackingHealth.TRACKING, TrackingHealth.evaluate(true, null, now, isPrivate = false))
+    }
+
+    @Test
     fun nearestPlaceIsOnTheSameLevel() {
         val places = listOf(
             VenuePlace(id = "a", title = "Gallery 1", coordinate = Coordinate(24.5000, 54.4000), level = 1.0),

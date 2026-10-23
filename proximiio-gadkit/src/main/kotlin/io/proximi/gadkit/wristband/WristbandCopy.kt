@@ -103,7 +103,11 @@ internal object WristbandCopy {
     internal fun logLine(state: BindingState): String = when (state) {
         BindingState.Unbound -> "unbound"
         BindingState.Binding -> "binding"
-        is BindingState.Active -> if (state.signalLost) "active, ${state.link.rawValue}, signal lost" else "active, ${state.link.rawValue}"
+        is BindingState.Active -> when {
+            state.signalLost -> "active, ${state.link.rawValue}, signal lost"
+            state.privacyZone -> "active, ${state.link.rawValue}, privacy zone"
+            else -> "active, ${state.link.rawValue}"
+        }
         is BindingState.Ended -> "ended, ${state.reason.rawValue}"
     }
 

@@ -8,10 +8,13 @@ import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.wristband.WristbandConnecting
 import io.proximi.gadkit.wristband.WristbandCopy
 import io.proximi.gadkit.wristband.WristbandLocationAsk
+import io.proximi.sdk.Proximiio
 import io.proximi.sdk.blueiot.binding.BlueiotBindingConfiguration
 import io.proximi.sdk.blueiot.binding.BlueiotBindingError
+import io.proximi.sdk.blueiot.binding.BlueiotBindingSignal
 import io.proximi.sdk.blueiot.binding.BlueiotBindingState
 import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
+import io.proximi.sdk.setPositioningSourcePrivate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +55,13 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
 
     private var isRunning = false
 
+    /** The SDK that gets the relay's privacy signal ([forwardPrivacy]). */
+    private var privacySdk: Proximiio? = null
+
+    /** The value last passed to `setPositioningSourcePrivate`, once [hasForwarded]; `null` is "not private". */
+    private var forwardedPrivateSince: Long? = null
+    private var hasForwarded = false
+
     /**
      * Confirms a session the SDK stored at the last launch with the relay-api, and follows the
      * binding state for the life of [scope]. Later calls do nothing.
@@ -63,6 +73,7 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
         scope.launch {
             binding.stateChanges().collect {
                 mutableState.value = it
+                forwardPrivacy()
                 if (FieldLog.isEnabled) {
                     FieldLog.log("wristband: ${WristbandCopy.logLine(it.toCore())}")
                     BindingLog.session(it)?.let { session -> FieldLog.log("wristband session: $session") }
@@ -83,6 +94,28 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
 
     private suspend fun logDiagnostics() {
         FieldLog.log("binding diagnostics: ${BindingLog.diagnostics(binding.diagnostics())}")
+    }
+
+    /**
+     * Passes the relay's privacy signal of every binding state to [sdk]
+     * (`setPositioningSourcePrivate`, SDK 6.0.0-beta.31), starting with the current state. The SDK
+     * cannot see the binding itself: a band without venue coverage in a restroom falls silent at the
+     * door, and only the relay knows that it is in a privacy zone.
+     */
+    internal suspend fun forwardPrivacy(sdk: Proximiio) {
+        privacySdk = sdk
+        hasForwarded = false
+        forwardPrivacy()
+    }
+
+    private suspend fun forwardPrivacy() {
+        val sdk = privacySdk ?: return
+        val since = privateSince(state.value)
+        if (hasForwarded && forwardedPrivateSince == since) return
+        hasForwarded = true
+        forwardedPrivateSince = since
+        FieldLog.log("wristband privacy: ${since?.let { "private since ${BindingLog.iso(it)}" } ?: "not private"}")
+        sdk.setPositioningSourcePrivate(since = since)
     }
 
     /** What to ask for before a bind, or `null` when nothing needs to be asked. */
@@ -126,6 +159,13 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
 
     internal companion object {
         private const val DIAGNOSTICS_INTERVAL_MILLIS = 10_000L
+
+        /**
+         * When the relay saw the band fall silent in a privacy zone (relay clock, epoch
+         * milliseconds), or `null`. Pure; covered by tests.
+         */
+        internal fun privateSince(state: BlueiotBindingState?): Long? =
+            ((state as? BlueiotBindingState.Active)?.signal as? BlueiotBindingSignal.PrivacyZone)?.since
 
         /**
          * The binding configuration for [configuration]. `runsInBackground` keeps the position
