@@ -933,6 +933,11 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   host app change. iOS 1.11.1 also centres the spinner of `ProximiMapView` without `BACKGROUND`;
   on Android it was already in the middle.
 
+#### Fixed (Explore Museum)
+
+- The Explore Museum map shows its floor changer once the museum's levels are loaded, as iOS 1.11.2.
+  Before, a tap right after the map opened showed an empty menu.
+
 #### Added
 
 - Privacy zones (see "Privacy zones"): `ProximiMap` turns on `withholdsPositionsInPrivacyZones` and

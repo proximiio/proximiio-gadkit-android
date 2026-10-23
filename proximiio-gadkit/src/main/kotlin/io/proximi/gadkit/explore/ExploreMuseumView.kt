@@ -299,7 +299,8 @@ private fun Header(level: Double, levels: List<Double>, onPick: (Double) -> Unit
             color = Palette.ink,
         )
         Spacer(Modifier.weight(1f))
-        FloorChanger(level, levels, onPick)
+        // Shown once the museum's levels are known, so its menu is never empty.
+        if (levels.isNotEmpty()) FloorChanger(level, levels, onPick)
     }
 }
 
