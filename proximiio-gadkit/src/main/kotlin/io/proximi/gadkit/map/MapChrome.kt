@@ -268,28 +268,6 @@ internal fun CardGhostButton(text: String, onClick: () -> Unit, modifier: Modifi
     }
 }
 
-/**
- * Gallery categories of the venue style (Figma "Explore Museum" map legend). The colours are those
- * the design uses; the map style on the server draws the rooms.
- */
-@Composable
-internal fun GalleryLegend(modifier: Modifier = Modifier) {
-    val entries: List<Pair<Int, Color>> = listOf(
-        R.string.thematic_gallery to Palette.orange,
-        R.string.single_artist_gallery to Palette.yellow,
-        R.string.other to Palette.lavender,
-        R.string.learning_engagement to Palette.cyan,
-    )
-    Column(modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        entries.forEach { (title, color) ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).background(color, CircleShape))
-                Text(stringResource(title), style = GadTextStyle.BodyExtraSmall.textStyle, color = Palette.ink)
-            }
-        }
-    }
-}
-
 /** Close button of a card, 44 × 44. */
 @Composable
 internal fun CardCloseButton(contentDescription: String, onClick: () -> Unit) {

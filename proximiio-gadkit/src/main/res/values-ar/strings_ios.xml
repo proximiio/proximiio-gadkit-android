@@ -6,6 +6,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="allow_camera_access_in_settings_to_scan">اسمح بالوصول إلى الكاميرا في الإعدادات لمسح سوارك، أو أدخل رمزه.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="amenities">المرافق</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="amenity">مرفق</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="ar_view">عرض الواقع المعزز</string>
@@ -68,6 +70,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="escalator">السلم المتحرك</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="explore">استكشف</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="floor_x">الطابق %s</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="follow_my_floor">اتبع طابقي</string>
@@ -86,6 +90,8 @@
     <string name="head_straight_for_n_m">تابع مباشرةً لمسافة %d م</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="help_desk">مكتب المساعدة</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="highlights">أبرز الأعمال</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="hold_the_qr_code_on_the_back">ضع رمز QR الموجود على ظهر سوارك داخل الإطار</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -122,9 +128,15 @@
     <string name="map">الخريطة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="men_s_restroom">دورة مياه الرجال</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="museum">المتحف</string>
     <string name="museum_map">خريطة المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="museum_shop">متجر المتحف</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="n_amenities">%d مرافق</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="n_levels">%d طوابق</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="n_m">%d م</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -137,6 +149,8 @@
         <item quantity="other">%d دقيقة</item>
     </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="n_spaces">%d مساحات</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <plurals name="n_stops">
         <item quantity="zero">لا محطات</item>
         <item quantity="one">محطة واحدة</item>
@@ -145,6 +159,8 @@
         <item quantity="many">%d محطة</item>
         <item quantity="other">%d محطة</item>
     </plurals>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="n_works">%d أعمال</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="navigating_to_x_adds_a_stop_to">الانتقال إلى %1$s يضيف محطة إلى مسارك نحو %2$s. يتم الاحتفاظ بتقدم رحلتك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -165,6 +181,8 @@
     <string name="none_of_these_artworks_is_on_the">لا يوجد أيٌّ من هذه الأعمال الفنية على خريطة المتحف.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="not_here">لست هنا</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="nothing_here_yet">لا يوجد شيء هنا بعد.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="off">إيقاف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -209,6 +227,8 @@
     <string name="skip_for_now">تخطي في الوقت الحالي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="skip_this_artwork">هل تريد تخطي هذا العمل الفني؟</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="spaces">المساحات</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="stairs">الدرج</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

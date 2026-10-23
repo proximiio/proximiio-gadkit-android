@@ -1,6 +1,6 @@
 # ProximiioGADKit for Android
 
-ProximiioGADKit is an Android library with the museum map, the journey (map and list), the stop
+ProximiioGADKit is an Android library with the Explore Museum map, the journey (map and list), the stop
 picker and Manage journey of the Proximi GAD app (Guggenheim Abu Dhabi), and the wristband binding.
 It is built on the Proximi.io Android SDK and Map. It is the Android counterpart of
 `proximiio/proximiio-gadkit-ios`: an Android tag `X.Y.0` has the behaviour of the iOS tag `X.Y.0`.
@@ -418,7 +418,7 @@ host app's UI. Compose it once, at the root. Nothing opens before `start()` has 
 
 | `ProximiMap.Screen` | Shows | Inside the flow |
 |---|---|---|
-| `MUSEUM_MAP` | The museum map: floors, amenities, the visitor's position, search, a route to a tapped place, the gallery legend. | Back closes it. |
+| `MUSEUM_MAP` | The Explore Museum map, without the visitor's position: "Level N" and the floor changer, the galleries in the level colour, the Spaces, Highlights and Amenities lists, and a card for a picked place (see "Explore Museum"). | Back closes it. |
 | `JOURNEY_READY` | Journey ready (02.10A): the journey's title and summary. Needs a stored journey. | "Start the Journey" (at the museum) opens the journey. "Go to Museum" (away from it) and "Back to Hub" close it. |
 | `JOURNEY` | The journey: map and list, the stop card, guidance from stop to stop, detours to amenities, the journey notification, Journey Complete. Needs a stored journey. | Back on a journey in progress (a stop visited or skipped, not finished) asks "Leave the tour here" first; otherwise it closes. |
 | `PLAN_JOURNEY` | The stop picker ("Plan your visit"). | "Start" stores a personalised journey and opens Journey ready. |
@@ -502,7 +502,7 @@ changed features only while its store holds the whole feature collection, that i
   follows `venueDataChanges()` (map 6.0.0-beta.23). Camera, floor, route and journey stay.
 - The SDK has rebuilt the route network from the changed features. The open journey routes its legs
   again (`JourneyNavigator.routeNetworkChanged()`); a leg on the line already drawn stays as it is.
-- The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
+- The stop picker, the Explore Museum lists, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
 - On the open journey screen a stop whose POI changed takes the new title, position, floor and
   gallery (`JourneyNavigator.replace`), and the leg to it is routed again when it moved. A reached
@@ -575,6 +575,36 @@ binding.stateChanges().collect { state ->
     sdk.setPositioningSourcePrivate(since = (signal as? BlueiotBindingSignal.PrivacyZone)?.since)
 }
 ```
+
+## Explore Museum
+
+`open(Screen.MUSEUM_MAP)` shows the Explore Museum map (Figma "Explore Museum", node 12129:102006).
+The visitor is not at the museum there: the map has no position dot, no route, and its camera does
+not follow.
+
+- At the top: "Level N" and the floor changer (the level in a tile of the level colour). The changer
+  lists the museum's levels. The map opens on the lowest level with a gallery, framed on the museum.
+- The galleries of the shown level are filled with the level colour (`Palette.level`). Artworks
+  have no marker.
+- At the bottom: the list button and the tabs Spaces, Highlights and Amenities. A tab opens its list
+  over the map, grouped by level; the list button opens the last one. A second tap, a drag down on
+  the list's top, or the system Back closes it.
+  - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, the POI
+    with the same `remote_id` the name, the level, the category (its amenity, such as "Thematic
+    Gallery") and the description.
+  - Highlights: the artworks that list the "Highlight" amenity in `included_amenities`, with
+    `metadata.artist_name` and the gallery.
+  - Amenities: restrooms, café, help desk, prayer room and shop. Stairs and lifts are not listed.
+  - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
+    holds the DCT office.
+- A row, or a tap on a gallery or a listed POI on the map, shows its level and a card with its icon,
+  title, lines and level. With a gallery's card open, the other galleries are lighter. An amenity gets
+  the red marker with its icon.
+- The design's About the Building and Collections tabs are not in the library: their content is not in
+  the venue data.
+
+The map of Journey Complete (the map button of its bottom bar) is the museum map with the visitor's
+position, search and routes.
 
 ## Events
 
@@ -682,7 +712,8 @@ the 18 have a gallery POI.
 ## Floors without positioning
 
 A floor in `GadSettings.levelsWithoutPositioning` has no positioning. In stage 1 that is the GAD
-level 0, with the café and the prayer room. A route there, on the journey map and the museum map:
+level 0, with the café and the prayer room. A route there, on the journey map and the museum map of
+Journey Complete:
 
 1. leads to the lift or stairs as usual;
 2. within `levelChangerReachedMeters` of the lift or stairs, shows the lift or stairs view ("Take the
@@ -715,7 +746,8 @@ map.routeAccessibility.value = RouteAccessibility(avoidsStairs = true, avoidsRev
 
 - The GAD venue data on 2026-10-14 has staircases and elevators. It has no escalators, no `door`
   features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
-- The museum map and the journey map have an accessible routes button (a wheelchair, blue while on).
+- The journey map and the museum map of Journey Complete have an accessible routes button (a
+  wheelchair, blue while on).
   While it is on, routes avoid all four (`RouteAccessibility.ACCESSIBLE`), whatever the host app set.
   Its state is kept on the device for both maps and later launches.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
@@ -766,9 +798,9 @@ adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> -
 | `gad.visitKind personalised\|curated` | With `gad.visit`: the kind of journey. Default personalised. |
 | `gad.visitList true` | The journey opens in List mode. |
 | `gad.visitAutoAdvance true` | A reached detour ends 5 m after the visitor leaves it, without "Resume your Journey". |
-| `gad.openMap true` | Opens the museum map. |
-| `gad.routeTo <title>` | The museum map routes to the first place whose title matches, after the first position. |
-| `gad.mapGalleryFills true` | The museum map fills every gallery. |
+| `gad.openMap true` | Opens the Explore Museum map. |
+| `gad.routeTo <title>` | The museum map of Journey Complete routes to the first place whose title matches, after the first position. |
+| `gad.mapGalleryFills true` | The museum map of Journey Complete fills every gallery. |
 | `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
 | `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. |
 
@@ -887,6 +919,14 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 - **Visible:** while the SDK is private, the map holds the dot grey at the last fix before the zone,
   and the navigator takes no fix: no off-route, re-route, deviation, passed stop or arrival. In
   `ProximiMapView` this also happens with the SDK option off.
+
+#### Changed (Explore Museum)
+
+- **Visible:** `open(Screen.MUSEUM_MAP)` shows the Explore Museum map of the PM's screens
+  (2026-10-23), as iOS 1.11.0 (see "Explore Museum"): "Explore Museum" with the back button,
+  "Level N" and a new floor changer, the galleries in the level colour, the Spaces, Highlights and
+  Amenities lists and a card for a picked place. It has no position dot, no route, no search and no
+  gallery legend. No host app change.
 
 #### Added
 

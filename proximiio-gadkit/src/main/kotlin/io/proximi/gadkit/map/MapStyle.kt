@@ -10,7 +10,9 @@ import android.graphics.Bitmap
 import android.content.Context
 import io.proximi.map.core.JourneyStopMarkerStyle
 import io.proximi.map.core.MapColor
+import io.proximi.map.core.PositionAccuracyStyle
 import io.proximi.map.core.PositionHeadingStyle
+import io.proximi.map.core.PositionPrivacyStyle
 import io.proximi.map.core.PositionStyle
 import io.proximi.map.core.PositionTrailStyle
 import io.proximi.map.core.RouteLineStyle
@@ -114,6 +116,25 @@ internal object MapStyle {
             routeLineStyle = if (walkedTrail) routeAhead else route,
             language = language,
             recentreZoom = followZoom,
+        )
+    }
+
+    /**
+     * The Explore Museum map: no position dot and a camera that never follows. The visitor is not
+     * at the museum there (user, 2026-10-23). The dot a privacy zone holds is clear too.
+     */
+    fun exploreOptions(language: String): MapOptions {
+        val options = options(language, routeMarkers = false)
+        val clear = MapColor.hex(0xFFFFFF, alpha = 0.0)
+        val position = options.position
+        return options.copy(
+            camera = MapOptions.Camera.FREE,
+            position = position.copy(
+                dot = position.dot.copy(color = clear, staleColor = clear, strokeColor = clear, shadowOpacity = 0.0),
+                accuracy = PositionAccuracyStyle.None,
+                heading = PositionHeadingStyle.None,
+                privacy = PositionPrivacyStyle(color = clear, showsAccuracy = false),
+            ),
         )
     }
 

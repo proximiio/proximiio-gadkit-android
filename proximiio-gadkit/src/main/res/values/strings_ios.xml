@@ -3,6 +3,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="UnusedResources">
     <string name="accessible_routes">Accessible routes</string>
     <string name="allow_camera_access_in_settings_to_scan">Allow camera access in Settings to scan your wristband, or enter its code.</string>
+    <string name="amenities">Amenities</string>
     <string name="amenity">Amenity</string>
     <string name="ar_view">AR view</string>
     <string name="arrive_in_n_m">Arrive in %d m</string>
@@ -35,6 +36,7 @@
     <string name="enter_the_code_printed_on_the_wristband">Enter the code printed on the wristband.</string>
     <string name="enter_your_wristband_code">Enter your wristband code</string>
     <string name="escalator">escalator</string>
+    <string name="explore">Explore</string>
     <string name="floor_x">Floor %s</string>
     <string name="follow_my_floor">Follow my floor</string>
     <string name="gallery_x">GALLERY · %s</string>
@@ -45,6 +47,7 @@
     <string name="guide_me">Guide Me</string>
     <string name="head_straight_for_n_m">Head straight for %d m</string>
     <string name="help_desk">Help Desk</string>
+    <string name="highlights">Highlights</string>
     <string name="hold_the_qr_code_on_the_back">Hold the QR code on the back of your wristband inside the frame</string>
     <string name="hold_your_current_wristband_next_to_the">Hold your current wristband next to the new one and scan again.</string>
     <string name="i_couldn_t_get_things_started_check">I couldn’t get things started. Check your connection and let’s try again.</string>
@@ -66,19 +69,36 @@
     <string name="looking_for">Looking for</string>
     <string name="map">Map</string>
     <string name="men_s_restroom">Men’s restroom</string>
+    <string name="museum">Museum</string>
     <string name="museum_map">Museum Map</string>
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
     <string name="museum_map_2" tools:ignore="MissingTranslation">Museum map</string>
     <string name="museum_shop">Museum Shop</string>
     <string name="n" translatable="false">%d</string>
+    <plurals name="n_amenities">
+        <item quantity="one">%d amenity</item>
+        <item quantity="other">%d amenities</item>
+    </plurals>
+    <plurals name="n_levels">
+        <item quantity="one">%d level</item>
+        <item quantity="other">%d levels</item>
+    </plurals>
     <string name="n_m">%d m</string>
     <plurals name="n_min">
         <item quantity="one">%d min</item>
         <item quantity="other">%d min</item>
     </plurals>
+    <plurals name="n_spaces">
+        <item quantity="one">%d space</item>
+        <item quantity="other">%d spaces</item>
+    </plurals>
     <plurals name="n_stops">
         <item quantity="one">%d stop</item>
         <item quantity="other">%d stops</item>
+    </plurals>
+    <plurals name="n_works">
+        <item quantity="one">%d work</item>
+        <item quantity="other">%d works</item>
     </plurals>
     <string name="navigating_to_x_adds_a_stop_to">Navigating to %1$s adds a stop to your route to %2$s. Your journey progress is kept.</string>
     <string name="navigating_to_x_adds_a_stop_to_2">Navigating to %s adds a stop to your route. Your journey progress is kept.</string>
@@ -90,6 +110,7 @@
     <string name="no_route_to_this_stop_with_your">No route to this stop with your accessibility settings.</string>
     <string name="none_of_these_artworks_is_on_the">None of these artworks is on the museum map.</string>
     <string name="not_here">Not here</string>
+    <string name="nothing_here_yet">Nothing here yet.</string>
     <string name="off">Off</string>
     <string name="on">On</string>
     <string name="other">Other</string>
@@ -114,6 +135,7 @@
     <string name="skip_artwork">Skip artwork</string>
     <string name="skip_for_now">Skip for now</string>
     <string name="skip_this_artwork">Skip this artwork?</string>
+    <string name="spaces">Spaces</string>
     <string name="stairs">Stairs</string>
     <string name="stairs_2">stairs</string>
     <string name="start">Start</string>

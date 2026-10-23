@@ -50,8 +50,22 @@ internal data class VenuePlace(
      * DCT office.
      */
     internal val placeId: String? = null,
+    /**
+     * `included_amenities`: the amenity ids the POI is also listed under, such as the highlight
+     * amenity ([HIGHLIGHT_AMENITY_ID]).
+     */
+    internal val includedAmenityIds: List<String> = emptyList(),
 ) {
+    /** True for a highlight artwork of the Explore Museum map. */
+    internal val isHighlight: Boolean get() = HIGHLIGHT_AMENITY_ID in includedAmenityIds
+
     internal companion object {
+        /**
+         * The "Highlight" amenity of the GAD data: a highlight artwork lists it in
+         * `included_amenities` (PM, Monday "Explore museum view", 2026-10-15).
+         */
+        internal const val HIGHLIGHT_AMENITY_ID: String = "7405e6e6-d9f6-4146-adda-de6adbf4a8a1:d2eeebf0-1987-4fe8-80d2-842680bdb0dc"
+
         /**
          * The place of a point POI, or `null` for every feature that is not one.
          * [language] is the app's language tag, e.g. `ar` or `en-GB`.
@@ -91,6 +105,7 @@ internal data class VenuePlace(
                 hasAudio = flag(metadata?.get("audio")) || flag(metadata?.get("has_audio")),
                 galleryId = text(metadata?.get("gallery_id")),
                 placeId = text(properties?.get("place_id")),
+                includedAmenityIds = (properties?.get("included_amenities") as? List<*>)?.mapNotNull(::text).orEmpty(),
             )
         }
 

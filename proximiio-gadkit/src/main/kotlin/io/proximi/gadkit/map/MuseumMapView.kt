@@ -75,18 +75,17 @@ import kotlinx.coroutines.withContext
  * The museum map, as iOS `MuseumMapView`: venue style, floors, amenities, the visitor's position
  * and one route. A tap on a place shows [PlaceInfoCard] (or [PlaceDetailSheet] for a place with a
  * photo or a description); "Go here" computes a route from the current position and shows
- * [StopInfoCard]. Layout and controls follow the Figma map frames ("MAP Functionality Approach 02"
- * and "Explore Museum").
+ * [StopInfoCard]. Layout and controls follow the Figma map frames ("MAP Functionality Approach 02").
+ * It is the map of Journey Complete; the Explore Museum map is `ExploreMuseumView`.
  *
  * [initialDestination] is routed to after the first position, e.g. a place picked in "Before You
- * Go". [showsLegend] shows the gallery category legend of the Explore Museum map.
+ * Go".
  */
 @Composable
 internal fun MuseumMapView(
     venue: VenueService,
     modifier: Modifier = Modifier,
     initialDestination: VenuePlace? = null,
-    showsLegend: Boolean = false,
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -327,7 +326,6 @@ internal fun MuseumMapView(
                 }
                 Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                    if (showsLegend && destination == null && selectedPlace == null) GalleryLegend()
                     Spacer(Modifier.weight(1f))
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         GlassSquareButton(
