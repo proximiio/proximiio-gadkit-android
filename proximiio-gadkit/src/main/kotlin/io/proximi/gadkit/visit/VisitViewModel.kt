@@ -147,6 +147,7 @@ internal class VisitViewModel(
         },
         autoAdvance = debug?.visitAutoAdvance == true,
         keepsOrder = kind.keepsOrder,
+        countsOutOfOrder = kind.countsOutOfOrder,
         managesProgress = ProximiMapView.Option.PROGRESS in options,
         deviationPolicy = if (ProximiMapView.Option.PROMPTS in options) JourneyDeviationPolicy.ASK_APP else JourneyDeviationPolicy.AUTOMATIC,
         settings = settings,

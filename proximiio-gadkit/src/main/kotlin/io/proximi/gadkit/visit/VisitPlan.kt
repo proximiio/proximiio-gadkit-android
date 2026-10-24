@@ -221,6 +221,13 @@ public enum class JourneyKind(public val rawValue: String) {
      */
     internal val keepsOrder: Boolean get() = this == CURATED
 
+    /**
+     * Whether an artwork further on counts as visited when the visitor stays at it. A curated tour
+     * ignores it: the artwork stays open (PM, Monday "Curated tours: ignore other artworks",
+     * 2026-10-23). Pure; covered by tests.
+     */
+    internal val countsOutOfOrder: Boolean get() = this == PERSONALISED
+
     internal companion object {
         /** The kind of [rawValue]; [PERSONALISED] for `null` or an unknown value. */
         fun of(rawValue: String?): JourneyKind = entries.firstOrNull { it.rawValue == rawValue } ?: PERSONALISED

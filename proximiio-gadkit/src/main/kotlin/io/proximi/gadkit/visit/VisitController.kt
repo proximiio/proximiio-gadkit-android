@@ -64,6 +64,8 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * - Out of order: a visitor inside the geofence of another open artwork for
  *   [GadSettings.outOfOrderDwell] (0 while testing) marks it visited (PM review 2026-10-12).
  * - After an out-of-order visit, the stops still ahead are ordered again from the visitor.
+ * - A curated tour ignores such an artwork: it stays open ([countsOutOfOrder]; PM, Monday "Curated
+ *   tours: ignore other artworks", 2026-10-23).
  * - An amenity has no geofence. A detour is reached within 5–10 m for 5 s ([detourGuidanceRules],
  *   [GadSettings]).
  * - After a reached detour, the journey continues only after "Resume your Journey" ([rules]).
@@ -114,6 +116,11 @@ internal class VisitController(
      * journey whose progress the host app manages.
      */
     keepsOrder: Boolean = false,
+    /**
+     * Whether an artwork further on that the visitor stays at counts as visited
+     * ([JourneyKind.countsOutOfOrder]). Off in a curated tour: only the active artwork is visited.
+     */
+    private val countsOutOfOrder: Boolean = true,
     /**
      * [io.proximi.gadkit.ProximiMapView.Option.PROGRESS]: artwork geofences mark stops visited, the
      * journey is ordered, and a stop whose POI is deleted is skipped. Off, only [apply] changes the
@@ -332,8 +339,9 @@ internal class VisitController(
      * Checks the fix against the geofences of the open artworks on the visitor's floor, and against
      * [enteredGeofenceIds]. Inside the active artwork's geofence: the arrival, which also covers a
      * leg that starts inside it, where the SDK sends no enter event. Inside another open artwork's
-     * geofence for [GadSettings.outOfOrderDwell]: that artwork is visited out of order. During a
-     * detour to an amenity no artwork counts (PM review 2026-10-12).
+     * geofence for [GadSettings.outOfOrderDwell]: that artwork is visited out of order, except in a
+     * curated tour ([countsOutOfOrder]). During a detour to an amenity no artwork counts (PM review
+     * 2026-10-12).
      */
     fun checkArtworkGeofences() {
         // Before the start the journey is still being ordered.
@@ -355,7 +363,7 @@ internal class VisitController(
             val stopLevel = stop.floor?.level
             if (!VenueLevel.matches(stopLevel, level)) continue
             if (areas.none { it.id in enteredGeofenceIds || it.contains(point) }) continue
-            if (stop.id == activeId) artworkGeofenceEntered(remoteId) else inside += stop.id
+            if (stop.id == activeId) artworkGeofenceEntered(remoteId) else if (countsOutOfOrder) inside += stop.id
         }
         for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) markOutOfOrder(id)
     }

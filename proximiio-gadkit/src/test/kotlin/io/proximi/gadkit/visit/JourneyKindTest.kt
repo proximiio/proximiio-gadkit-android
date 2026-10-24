@@ -14,6 +14,7 @@ class JourneyKindTest {
         assertTrue(JourneyKind.PERSONALISED.listsGalleries)
         assertTrue(JourneyKind.PERSONALISED.allowsSkip)
         assertFalse(JourneyKind.PERSONALISED.keepsOrder)
+        assertTrue(JourneyKind.PERSONALISED.countsOutOfOrder)
     }
 
     @Test
@@ -22,6 +23,7 @@ class JourneyKindTest {
         assertFalse(JourneyKind.CURATED.listsGalleries)
         assertFalse(JourneyKind.CURATED.allowsSkip)
         assertTrue(JourneyKind.CURATED.keepsOrder)
+        assertFalse(JourneyKind.CURATED.countsOutOfOrder)
     }
 
     @Test

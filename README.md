@@ -306,7 +306,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `BOTTOM_BAR` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `BACKGROUND` | The library's background image around the map card. | Transparent. |
 | `PROMPTS` | "Skip this artwork?" ("Skip artwork" reports `StopSkipped`; the stop is skipped with `PROGRESS`, else the host app skips it), "You've left your route" (the route stays until "Show the route from here"), "Probably at …", "Change your route?", "Leave the tour here" (with `onClose`) and Journey Complete. | No prompt. A swipe reports `SkipRequested`; the route follows a visitor who left it and `OffRoute` reports it; an uncertain position reports `PositionUncertain`; "Go here" on an amenity starts the detour; `JourneyFinished` reports the end. |
-| `PROGRESS` | The view moves the journey on and reports it through `onJourneyChange`: an artwork is visited when the visitor enters its geofence (`ArtworkReached`) or stays at it out of order (`ArtworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and reports no journey. |
+| `PROGRESS` | The view moves the journey on and reports it through `onJourneyChange`: an artwork is visited when the visitor enters its geofence (`ArtworkReached`) or, in a personalised journey, stays at it out of order (`ArtworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and reports no journey. |
 | `JOURNEY_NOTIFICATION` | The ongoing journey notification (iOS `.liveActivity`). It needs the notification permission; the view asks for it. | No journey notification. |
 
 ### ProximiJourney
@@ -466,7 +466,8 @@ curators is `JourneyKind.CURATED` (Figma "Personalised" and "Guided"):
 | Route and stop card | Lead to the gallery of the next artwork until the visitor is in it, then to the artwork (see "Gallery first"). | Lead to the artwork. |
 | List | Stops under gallery headers. | Stops without headers. |
 | Skip | The visitor can skip an artwork, also one no accessible route reaches. | No skip. |
-| Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. An artwork visited out of order is marked visited; the rest keep their order. |
+| Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. |
+| Another artwork | An artwork further on that the visitor stays at counts as visited (`ArtworkVisitedOutOfOrder`). | Ignored: only the next artwork counts. An artwork the visitor passes stays open. |
 
 The map and the background are the same for both.
 
@@ -625,7 +626,7 @@ position, search and routes.
 | `PositionUncertain(stop)` | `ProximiMapView` without `PROMPTS`: the position is uncertain near the active stop, where the prompt would ask "Probably at …". At most once per `locationQuestionQuietPeriod`. |
 | `StopPlaceDeleted(stop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. See "Venue data changes". |
 | `ArtworkReached(stop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, stood in its area, or opened the journey inside it: the stop is done and the route leads to the next stop. `GeofenceEntered` arrives at the enter. |
-| `ArtworkVisitedOutOfOrder(stop)` | The visitor stayed at an artwork further down the journey. It counts as visited. In a personalised journey the stops ahead are ordered again; a curated tour keeps its order. |
+| `ArtworkVisitedOutOfOrder(stop)` | Personalised journeys only: the visitor stayed at an artwork further down the journey. It counts as visited, and the stops ahead are ordered again. A curated tour ignores such an artwork. |
 | `SkipRequested`, `StopSkipped`, `SkipCancelled`, `SkipUndone` (`stop`) | A swipe on a stop in the list (or its "Skip" TalkBack action), "Skip artwork", "Keep it", "Undo skip". |
 | `AmenitySelected(stop)` | An amenity picked on the map. A card shows it with "Go here"; the amenity gets the red marker with its white icon, and the map shows the visitor and the amenity (on another floor: the amenity's floor around it). |
 | `DetourStarted(stop)`, `DetourEnded(stop, completed)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
@@ -662,7 +663,7 @@ val configuration = GadConfiguration(
 | `trackingLostAfter` | 110 s | Time without positioning before `ProximiMapEvent.TrackingChanged(LOST_PLACE)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
 | `trackingStoppedAfter` | 170 s | Time without positioning before `TrackingChanged(STOPPED_RESPONDING)` (about 3 min). |
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
-| `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
+| `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence or privacy zone before the SDK reports the exit. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.StopNearby`. |
@@ -932,6 +933,14 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   The cards and buttons over the map do not fade. Touches on the faded edge still reach the map. No
   host app change. iOS 1.11.1 also centres the spinner of `ProximiMapView` without `BACKGROUND`;
   on Android it was already in the middle.
+
+#### Changed (curated tours)
+
+- **Visible:** a curated tour ignores the artworks further on (PM, Monday "Curated tours: ignore other
+  artworks", 2026-10-23), as iOS 1.12.0. Only the next artwork counts as visited; an artwork the
+  visitor passes or stays at out of order stays open, and no `ArtworkVisitedOutOfOrder` is sent.
+  Personalised journeys are unchanged. Applies to `ProximiMap` and to `ProximiMapView` with
+  `PROGRESS`. No host app change.
 
 #### Fixed (Explore Museum)
 
