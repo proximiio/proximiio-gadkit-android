@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.key
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.material3.ripple
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.FilterQuality
@@ -348,7 +350,7 @@ private fun FloorChanger(level: Double, levels: List<Double>, onPick: (Double) -
         Column(
             Modifier
                 .glassSurface(RoundedCornerShape(14.dp), GlassStrength.Frosted)
-                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { expanded = true }
+                .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Button) { expanded = true }
                 .semantics { contentDescription = description }
                 .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 4.dp)
                 .testTag("exploreFloorChanger"),
@@ -399,7 +401,8 @@ private fun TabBar(panel: ExplorePanel?, onToggle: (ExplorePanel) -> Unit) {
                         .weight(1f)
                         .fillMaxHeight()
                         .then(if (isSelected) Modifier.border(1.dp, Palette.ink, RoundedCornerShape(10.dp)) else Modifier)
-                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onToggle(ExplorePanel.TabList(item)) }
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Tab) { onToggle(ExplorePanel.TabList(item)) }
                         .semantics { selected = isSelected },
                     contentAlignment = Alignment.Center,
                 ) {

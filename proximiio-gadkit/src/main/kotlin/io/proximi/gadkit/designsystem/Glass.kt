@@ -2,7 +2,6 @@ package io.proximi.gadkit.designsystem
 
 import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -14,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -34,15 +32,20 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
+/**
+ * Where a glass surface is. Since 1.14.0 every strength draws the same frosted glass: "Android:
+ * frosted surface with a light shadow" (Figma "Glass review: iOS 26, iOS 27 and Android", node
+ * 16349:60996, 2026-10-24), as iOS 26 draws Apple's Regular glass for every strength.
+ */
 @ProximiGadAppApi
 public enum class GlassStrength {
-    /** Buttons, cards and bars over the coloured backgrounds. iOS 26: `Glass.regular`. */
+    /** Buttons, cards and bars over the coloured backgrounds. */
     Regular,
 
-    /** Button Small and chips: the gradient at 20 %. iOS 26: `Glass.clear`. */
+    /** Button Small and chips. */
     Light,
 
-    /** Cards, rows and buttons over the map and the journey list: frosted, nearly white. iOS 26: `Glass.regular` tinted white 35 %. */
+    /** Cards, rows and buttons over the map and the journey list. */
     Frosted,
 }
 
@@ -78,39 +81,26 @@ public fun ProvideGlassBackdrop(backdrop: GlassBackdrop?, content: @Composable (
     CompositionLocalProvider(LocalGlassBackdrop provides backdrop, content = content)
 }
 
-/** The Figma fill: #E6E6E6 → clear → #E6E6E6, diagonal. */
-private fun figmaGradient(alpha: Float) = Brush.linearGradient(
-    0f to Palette.glassEdge.copy(alpha = alpha),
-    0.5f to Color.White.copy(alpha = 0.01f * alpha),
-    1f to Palette.glassEdge.copy(alpha = alpha),
-)
+/** The white over the blurred backdrop (Figma: white 60 % on a 10 px background blur). */
+private const val GLASS_TINT = 0.6f
+
+/** The white of a glass surface without a backdrop to blur. */
+private const val GLASS_FALLBACK = 0.85f
 
 /**
- * The look of one strength. [tint] is the white over the blurred backdrop, [blur] the blur radius,
- * [fallback] the white without a backdrop, [gradient] the opacity of the Figma gradient.
- */
-private class GlassLook(val blur: Dp, val tint: Float, val fallback: Float, val gradient: Float)
-
-private val GlassStrength.look: GlassLook
-    get() = when (this) {
-        GlassStrength.Regular -> GlassLook(blur = 24.dp, tint = 0.45f, fallback = 0.35f, gradient = 0.55f)
-        GlassStrength.Light -> GlassLook(blur = 10.dp, tint = 0.12f, fallback = 0.2f, gradient = 0.2f)
-        GlassStrength.Frosted -> GlassLook(blur = 24.dp, tint = 0.7f, fallback = 0.85f, gradient = 0.5f)
-    }
-
-/**
- * The design's glass surface, as iOS `GlassSurface`: Figma GLASS effect, the diagonal gradient,
- * a 1.5 dp white stroke and a shadow of x 0, y 3, blur 10, black 15 %. Under [ProvideGlassBackdrop]
- * the surface blurs the backdrop; without one it is translucent white.
+ * The glass surface of the Android design, as iOS `GlassSurface`: "frosted surface with a light
+ * shadow" (Figma "Glass review: iOS 26, iOS 27 and Android", node 16349:60996, 2026-10-24): white
+ * 60 % over the blurred backdrop and a shadow of y 1, blur 3, black 12 %, without the earlier
+ * gradient and white stroke. Under [ProvideGlassBackdrop] the surface blurs the backdrop; without
+ * one it is nearly white. [strength] does not change the look since 1.14.0.
  */
 @ProximiGadAppApi
 public fun Modifier.glassSurface(
     shape: Shape = RoundedCornerShape(12.dp),
-    strength: GlassStrength = GlassStrength.Regular,
+    @Suppress("UNUSED_PARAMETER") strength: GlassStrength = GlassStrength.Regular,
     shadow: Boolean = true,
 ): Modifier = composed {
     val backdrop = LocalGlassBackdrop.current
-    val look = strength.look
     Modifier
         .then(if (shadow) Modifier.glassShadow(shape) else Modifier)
         .clip(shape)
@@ -120,26 +110,24 @@ public fun Modifier.glassSurface(
                     backdrop.haze,
                     HazeStyle(
                         backgroundColor = Palette.white,
-                        tint = HazeTint(Color.White.copy(alpha = look.tint)),
-                        blurRadius = look.blur,
+                        tint = HazeTint(Color.White.copy(alpha = GLASS_TINT)),
+                        blurRadius = 20.dp,
                         noiseFactor = 0f,
-                        fallbackTint = HazeTint(Color.White.copy(alpha = look.fallback)),
+                        fallbackTint = HazeTint(Color.White.copy(alpha = GLASS_FALLBACK)),
                     ),
                 )
             } else {
-                Modifier.background(Color.White.copy(alpha = look.fallback))
+                Modifier.background(Color.White.copy(alpha = GLASS_FALLBACK))
             },
         )
-        .background(figmaGradient(look.gradient))
-        .border(1.5.dp, Palette.white, shape)
 }
 
 /**
- * The Figma drop shadow (y 3, blur 10, black 15 %), drawn outside [shape] only, so a translucent
- * surface does not show it through. Framework shadow layers need API 28 for shapes; API 26–27
- * draw no shadow.
+ * A drop shadow, by default the light shadow of the Android glass (y 1, blur 3, black 12 %), drawn
+ * outside [shape] only, so a translucent surface does not show it through. Framework shadow layers
+ * need API 28 for shapes; API 26–27 draw no shadow.
  */
-internal fun Modifier.glassShadow(shape: Shape, color: Color = Color.Black.copy(alpha = 0.15f), offsetY: Dp = 3.dp, blur: Dp = 10.dp): Modifier =
+internal fun Modifier.glassShadow(shape: Shape, color: Color = Color.Black.copy(alpha = 0.12f), offsetY: Dp = 1.dp, blur: Dp = 3.dp): Modifier =
     drawBehind {
         val path = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawBehind)) }
         // Figma blur is twice the Gaussian sigma; a framework shadow radius r has sigma 0.57735 r + 0.5.

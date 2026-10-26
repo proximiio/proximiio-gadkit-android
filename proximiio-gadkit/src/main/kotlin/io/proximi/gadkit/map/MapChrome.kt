@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -44,7 +43,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import kotlin.math.roundToInt
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -64,6 +62,14 @@ import io.proximi.gadkit.designsystem.GadTextStyle
 import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.designsystem.glassSurface
+import io.proximi.gadkit.designsystem.GlassButtonBox
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
+import androidx.compose.material3.ripple
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -93,18 +99,17 @@ internal fun GlassSquareButton(
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    Box(
+    GlassButtonBox(
+        onClick,
         modifier
             .size(50.dp)
-            .alpha(if (enabled) 1f else Palette.DISABLED_OPACITY)
-            .then(if (isSelected) Modifier.border(1.5.dp, Palette.ink, ControlShape) else Modifier)
-            .glassSurface(ControlShape, GlassStrength.Frosted)
-            .clickable(remember { MutableInteractionSource() }, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics {
                 if (contentDescription != null) this.contentDescription = contentDescription
                 selected = isSelected
             },
-        contentAlignment = Alignment.Center,
+        shape = ControlShape,
+        enabled = enabled,
+        isSelected = isSelected,
     ) { content() }
 }
 
@@ -125,7 +130,7 @@ internal fun AccessibleRoutesButton(isOn: Boolean, onToggle: (Boolean) -> Unit) 
             .toggleable(
                 value = isOn,
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+                indication = ripple(),
                 role = Role.Switch,
                 onValueChange = onToggle,
             )
@@ -169,9 +174,9 @@ internal fun AmenityChip(
     Row(
         modifier
             .defaultMinSize(minHeight = 32.dp)
-            .then(if (selected) Modifier.border(1.5.dp, Palette.ink, ControlShape) else Modifier)
             .glassSurface(ControlShape, strength)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
+            .then(if (selected) Modifier.border(1.dp, Palette.ink, ControlShape) else Modifier)
+            .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected }
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -279,16 +284,10 @@ internal fun PlaceInfoCard(
     }
 }
 
-/** Ghost button stretched to half the card, 50 dp high ("Go here", "Close"). */
+/** Glass button stretched to half the card, 50 dp high ("Go here", "Close"). */
 @Composable
 internal fun CardGhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .defaultMinSize(minHeight = 50.dp)
-            .border(1.5.dp, Palette.ink, ControlShape)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
+    GlassButtonBox(onClick, modifier.defaultMinSize(minHeight = 50.dp), shape = ControlShape) {
         Text(text, style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
     }
 }
@@ -400,30 +399,40 @@ internal object MapLoading {
         isBusy || (featureCount == 0 && lastError == null && !hasTimedOut)
 }
 
-/** "Map | List" toggle: glass 150 × 50 with the selected item outlined. */
+/**
+ * "Map | List" toggle: the system's segmented button (Material 3 `SegmentedButton`) on glass,
+ * 150 × 50, the selected half outlined in ink (Figma "Glass review", "System controls",
+ * 2026-10-24).
+ */
 @Composable
 internal fun MapListToggle(showsList: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(
+    SingleChoiceSegmentedButtonRow(
         modifier
             .size(width = 150.dp, height = 50.dp)
             .glassSurface(ControlShape, GlassStrength.Frosted)
             .padding(5.dp),
     ) {
-        ToggleItem(stringResource(R.string.map), selected = !showsList, Modifier.weight(1f)) { onChange(false) }
-        ToggleItem(stringResource(R.string.list), selected = showsList, Modifier.weight(1f)) { onChange(true) }
+        ToggleItem(stringResource(R.string.map), selected = !showsList) { onChange(false) }
+        ToggleItem(stringResource(R.string.list), selected = showsList) { onChange(true) }
     }
 }
 
 @Composable
-private fun ToggleItem(title: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(10.dp)
-    Box(
-        modifier
-            .fillMaxHeight()
-            .then(if (selected) Modifier.border(1.5.dp, Palette.ink, shape) else Modifier)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab, onClick = onClick)
-            .semantics { this.selected = selected },
-        contentAlignment = Alignment.Center,
+private fun SingleChoiceSegmentedButtonRowScope.ToggleItem(title: String, selected: Boolean, onClick: () -> Unit) {
+    SegmentedButton(
+        selected = selected,
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.weight(1f).fillMaxHeight(),
+        colors = SegmentedButtonDefaults.colors(
+            activeContainerColor = Palette.white.copy(alpha = 0.3f),
+            activeContentColor = Palette.ink,
+            inactiveContainerColor = Color.Transparent,
+            inactiveContentColor = Palette.ink,
+        ),
+        border = BorderStroke(1.dp, if (selected) Palette.ink else Color.Transparent),
+        contentPadding = PaddingValues(0.dp),
+        icon = {},
     ) {
         Text(title, style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
     }
@@ -450,15 +459,9 @@ internal fun BottomGlassBar(modifier: Modifier = Modifier, leading: @Composable 
 /** Round glass button of the bottom bar, 60 dp. */
 @Composable
 internal fun RoundGlassButton(onClick: () -> Unit, contentDescription: String, content: @Composable () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    Box(
-        Modifier
-            .size(60.dp)
-            .scale(if (pressed) 0.92f else 1f)
-            .glassSurface(CircleShape)
-            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick)
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
+    GlassButtonBox(
+        onClick,
+        Modifier.size(60.dp).semantics { this.contentDescription = contentDescription },
+        shape = CircleShape,
     ) { content() }
 }

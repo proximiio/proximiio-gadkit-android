@@ -941,6 +941,19 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   The journey map also keeps it while the first leg is routed; the stop card shows an arrow there
   (PM, Monday "Spinner on map loading center", 2026-10-26).
 
+#### Changed (iOS 1.14.0)
+
+- **Visible:** the library's glass is the Android glass of the Figma "Glass review: iOS 26, iOS 27
+  and Android" (node 16349:60996, 2026-10-24; Nagarro and RPR, 2026-10-26: the app leans on native
+  Android components): a frosted surface, white 60 % over the blurred backdrop, with a light shadow,
+  without the earlier gradient and white edge. Every `GlassStrength` draws it.
+- **Visible:** the buttons are glass: `GhostButton` and the "Go here" and "Close" buttons of the map
+  cards are no longer outlined. A selected button or chip has a 1 dp ink outline; a disabled one is
+  at 40 %. The system ripple draws the pressed state; the buttons no longer shrink.
+- **Visible:** the Map / List toggle of the journey map is the Material 3 segmented button.
+- **Visible:** the Explore Museum lists fade out above the tab bar, so the rows do not show through
+  its glass.
+
 #### Removed (iOS 1.13.0)
 
 - **Visible:** "Undo skip" in the journey list (PM, Monday "Undo skip removed", 2026-10-23).

@@ -1,56 +1,69 @@
 package io.proximi.gadkit.designsystem
 
 import io.proximi.gadkit.ProximiGadAppApi
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 
+// The buttons of the design (Figma "Glass review: iOS 26, iOS 27 and Android", node 16349:60996,
+// 2026-10-24), as iOS `Buttons.swift`:
+//
+// | Button | Figma component | Shape |
+// |---|---|---|
+// | `PrimaryButton` | Button Primary Large | glass, 60 dp high, full width, Body Medium |
+// | `GhostButton` | Button Ghost Medium | glass, 40 dp high, Body Medium |
+// | `SmallButton` | Button Small | glass, 32 dp high, Body Small |
+// | `IconGlassButton` | Button_medium | glass, 40 × 40 dp |
+// | `TextActionButton` | "Skip for now", "Carry on" | Body Small, underlined |
+//
+// The glass is the frosted surface with a light shadow (`glassSurface`). The system ripple draws
+// the pressed state; selected is a 1 dp ink outline; disabled is 40 % opacity.
+
 private val ButtonShape = RoundedCornerShape(12.dp)
 
-/** Shared press handling: no ripple, a scale on press as on iOS. */
+/**
+ * [content] on glass in [shape], as iOS `GlassButton`. The ripple draws the pressed state inside
+ * the shape. [modifier] sizes the button; [content] lies inside the glass.
+ */
 @Composable
-private fun PressableBox(
+internal fun GlassButtonBox(
     onClick: () -> Unit,
-    enabled: Boolean,
-    pressedScale: Float,
-    pressedAlpha: Float,
-    modifier: Modifier,
-    content: @Composable (Modifier) -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape = ButtonShape,
+    enabled: Boolean = true,
+    isSelected: Boolean = false,
+    role: Role = Role.Button,
+    content: @Composable BoxScope.() -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, tween(150), label = "press")
-    val alpha = when {
-        !enabled -> Palette.DISABLED_OPACITY
-        pressed -> pressedAlpha
-        else -> 1f
-    }
-    content(
+    Box(
         modifier
-            .scale(scale)
-            .alpha(alpha)
-            .clickable(interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
+            .alpha(if (enabled) 1f else Palette.DISABLED_OPACITY)
+            .glassSurface(shape)
+            .then(if (isSelected) Modifier.border(1.dp, Palette.ink, shape) else Modifier)
+            .clickable(remember { MutableInteractionSource() }, indication = ripple(), enabled = enabled, role = role, onClick = onClick),
+        contentAlignment = Alignment.Center,
+        content = content,
     )
 }
 
@@ -58,34 +71,36 @@ private fun PressableBox(
 @Composable
 @ProximiGadAppApi
 public fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    PressableBox(onClick, enabled, 0.95f, 1f, modifier) { m ->
-        Box(
-            // The padding only shows with large text: the title then wraps inside the button.
-            m.fillMaxWidth().defaultMinSize(minHeight = 60.dp).glassSurface(ButtonShape, shadow = enabled).padding(horizontal = 20.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text, style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
-        }
+    GlassButtonBox(onClick, modifier.fillMaxWidth().defaultMinSize(minHeight = 60.dp), enabled = enabled) {
+        // The padding only shows with large text: the title then wraps inside the button.
+        Text(
+            text,
+            Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            style = GadTextStyle.BodyMedium.textStyle,
+            color = Palette.ink,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
-/** Outlined button, 40 dp. */
+/** Figma "Button Ghost Medium": glass, 40 dp. Before 1.14.0 an outlined button. */
 @Composable
 @ProximiGadAppApi
 public fun GhostButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    PressableBox(onClick, enabled, 1f, 0.6f, modifier) { m ->
-        Box(
-            m.defaultMinSize(minHeight = 40.dp).border(1.5.dp, Palette.ink, ButtonShape).padding(horizontal = 30.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text, style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
-        }
+    GlassButtonBox(onClick, modifier.defaultMinSize(minHeight = 40.dp), enabled = enabled) {
+        Text(
+            text,
+            Modifier.padding(horizontal = 30.dp, vertical = 6.dp),
+            style = GadTextStyle.BodyMedium.textStyle,
+            color = Palette.ink,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
 /**
- * Figma "Button Small" and chips, 32 dp; a selected chip has an ink outline. [strength] is the
- * glass, [GlassStrength.Light] by default.
+ * Figma "Button Small" and chips, 32 dp; a selected chip has a 1 dp ink outline. [strength] does
+ * not change the look since 1.14.0 (`glassSurface`).
  */
 @Composable
 @ProximiGadAppApi
@@ -94,19 +109,10 @@ public fun SmallButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
-    strength: GlassStrength = GlassStrength.Light,
+    @Suppress("UNUSED_PARAMETER") strength: GlassStrength = GlassStrength.Light,
 ) {
-    PressableBox(onClick, true, 0.95f, 1f, modifier) { m ->
-        Box(
-            m.defaultMinSize(minHeight = 32.dp)
-                // Before the glass: a border earlier in the chain draws over the glass's white edge.
-                .then(if (selected) Modifier.border(1.5.dp, Palette.ink, ButtonShape) else Modifier)
-                .glassSurface(ButtonShape, strength)
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text, style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
-        }
+    GlassButtonBox(onClick, modifier.defaultMinSize(minHeight = 32.dp), isSelected = selected) {
+        Text(text, Modifier.padding(horizontal = 16.dp), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
     }
 }
 
@@ -114,22 +120,26 @@ public fun SmallButton(
 @Composable
 @ProximiGadAppApi
 public fun IconGlassButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable () -> Unit) {
-    PressableBox(onClick, enabled, 0.92f, 1f, modifier) { m ->
-        Box(m.size(40.dp).glassSurface(ButtonShape, shadow = enabled), contentAlignment = Alignment.Center) { content() }
-    }
+    GlassButtonBox(onClick, modifier.size(40.dp), enabled = enabled) { content() }
 }
 
-/** Underlined text action, 44 dp touch height. */
+/** Underlined text action, 44 dp touch height. Pressed, it is at 60 %. */
 @Composable
 @ProximiGadAppApi
 public fun TextActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    PressableBox(onClick, true, 1f, 0.6f, modifier) { m ->
-        Box(m.defaultMinSize(minHeight = 44.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text,
-                style = GadTextStyle.BodySmallRegular.textStyle.copy(textDecoration = TextDecoration.Underline),
-                color = Palette.ink,
-            )
-        }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Box(
+        modifier
+            .defaultMinSize(minHeight = 44.dp)
+            .alpha(if (pressed) 0.6f else 1f)
+            .clickable(interaction, indication = null, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            style = GadTextStyle.BodySmallRegular.textStyle.copy(textDecoration = TextDecoration.Underline),
+            color = Palette.ink,
+        )
     }
 }
