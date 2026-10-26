@@ -44,8 +44,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import io.proximi.gadkit.visit.Journey as CoreJourney
 
 /**
- * Owns the `JourneyNavigator` of a visit, persists the journey, and implements skip and undo, as
- * iOS `VisitController`.
+ * Owns the `JourneyNavigator` of a visit, persists the journey, and implements skip, as iOS
+ * `VisitController`.
  *
  * Arrival and progress:
  * - Arrival at an artwork is the enter event of the active artwork's geofence
@@ -86,7 +86,7 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * Without [managesProgress] ([io.proximi.gadkit.ProximiMapView.Option.PROGRESS]) the host app moves
  * the journey on: no arrival by geofence, no ordering, and [apply] takes the host app's changes.
  *
- * Skip, undo and the EC04 pick edit the running navigator (`skip`, `reopen`, `activate`), so its
+ * Skip and the EC04 pick edit the running navigator (`skip`, `activate`), so its
  * route cache, event streams and deviation state are kept. The arrival, out of order, gallery first
  * and "Resume your Journey" each read the journey before they change it, so they run one after
  * another ([serially]).
@@ -228,11 +228,6 @@ internal class VisitController(
 
     /** Out-of-order artworks being marked visited. */
     private val markingOutOfOrder = mutableSetOf<String>()
-
-    private val mutableLastSkipped = MutableStateFlow<String?>(null)
-
-    /** The last skipped stop, for "Undo skip". Cleared by the next skip or by undo. */
-    val lastSkippedStopId: StateFlow<String?> = mutableLastSkipped.asStateFlow()
 
     private val mutableOffRoute = MutableStateFlow(false)
 
@@ -480,7 +475,6 @@ internal class VisitController(
 
     suspend fun skip(stopId: String) {
         if (!navigator.skip(stopId)) return
-        mutableLastSkipped.value = stopId
         save()
     }
 
@@ -520,13 +514,6 @@ internal class VisitController(
         return withoutPlace
     }
 
-    suspend fun undoSkip() {
-        val id = mutableLastSkipped.value ?: return
-        mutableLastSkipped.value = null
-        navigator.reopen(id)
-        save()
-    }
-
     /**
      * Takes the host app's journey on the open screen (`ProximiMapView`): stops added, removed,
      * visited, skipped, reopened and moved. The navigator, its route cache, its event flow and the
@@ -561,9 +548,6 @@ internal class VisitController(
      */
     private suspend fun performApply(target: CoreJourney) {
         val taken = navigator.update(to = target.toMap())
-        // "Undo skip" belongs to a skip the host app has since changed.
-        val skipped = mutableLastSkipped.value
-        if (skipped != null && doneStop(skipped)?.state != JourneyStop.State.SKIPPED) mutableLastSkipped.value = null
         FieldLog.log("journey applied · ${target.stops.size} stops · ${if (taken) "taken" else "not taken: two stops with one id"}")
     }
 

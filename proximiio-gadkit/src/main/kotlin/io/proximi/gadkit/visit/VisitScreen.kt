@@ -12,6 +12,7 @@ import io.proximi.gadkit.DebugLaunch
 import io.proximi.gadkit.map.AccessibleRoutes
 import io.proximi.gadkit.map.AccessibleRoutesButton
 import io.proximi.gadkit.map.LocalRouteAccessibility
+import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
 import io.proximi.gadkit.IncomingJourney
@@ -42,7 +43,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,6 +85,7 @@ import io.proximi.gadkit.map.FloorChangeOverlay
 import io.proximi.gadkit.map.FloorWithoutPositioningGuide
 import io.proximi.gadkit.map.FollowsVisitorFloor
 import io.proximi.gadkit.map.MapGlassFrame
+import io.proximi.gadkit.map.MapLoadingSpinner
 import io.proximi.gadkit.map.softEdges
 import io.proximi.gadkit.map.MapIcon
 import io.proximi.gadkit.map.MapListToggle
@@ -249,7 +250,10 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                     ProximiioMap(
                         session = model.session,
                         modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp),
-                        configure = { canvas -> model.layers.attach(canvas) },
+                        configure = { canvas ->
+                            model.layers.attach(canvas)
+                            MapStyle.applyZoomLimits(model.settings, canvas)
+                        },
                     )
                     // The list covers the map with white: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
@@ -281,6 +285,15 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                     )
                 }
             }
+        }
+        // While the map draws the venue and, with stops, until the first leg is routed (PM, Monday
+        // "Spinner on map loading center", 2026-10-26). The stop card shows "Your journey" meanwhile.
+        ProvideGlassBackdrop(mapBackdrop) {
+            MapLoadingSpinner(
+                model.session,
+                model.settings.mapLoadingTimeout,
+                isBusy = model.hasStops && model.progress.activeStop == null && !model.progress.isFinished,
+            )
         }
         val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
         FollowsVisitorFloor(model.session, model.venue, isPaused = floorPhase != FloorWithoutPositioningGuide.Phase.Idle)
@@ -448,7 +461,7 @@ private fun VisitCard(model: VisitViewModel) {
         remaining = remaining,
         icon = {
             when {
-                state == VisitCardState.Starting -> CircularProgressIndicator(Modifier.size(18.dp), color = Palette.ink, strokeWidth = 2.dp)
+                state == VisitCardState.Starting -> MapIcon(R.drawable.ic_map_straight, size = 16)
                 state == VisitCardState.Finished -> MapIcon(R.drawable.ic_checkmark, size = 16)
                 number != null && VisitCardText.showsStopNumber(state, galleryAhead) -> Text("$number", style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
                 galleryAhead != null -> MapIcon(R.drawable.ic_gallery, size = 18)

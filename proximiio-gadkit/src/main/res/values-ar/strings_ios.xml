@@ -72,9 +72,13 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="explore">استكشف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="facilities">الخدمات</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="floor_x">الطابق %s</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="follow_my_floor">اتبع طابقي</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="galleries">القاعات</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="gallery_x">القاعة · %s</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -124,6 +128,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="looking_for">جارٍ البحث عن</string>
     <string name="map">الخريطة</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="map_legend">مفتاح الخريطة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="men_s_restroom">دورة مياه الرجال</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -301,8 +307,6 @@
     <string name="turn_left_in_n_m">انعطف يسارًا بعد %d م</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="turn_right_in_n_m">انعطف يمينًا بعد %d م</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="undo_skip">تراجع عن التخطي</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="visited">تمت زيارته</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

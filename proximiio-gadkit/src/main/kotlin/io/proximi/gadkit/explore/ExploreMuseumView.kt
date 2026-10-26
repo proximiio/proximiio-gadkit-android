@@ -1,6 +1,23 @@
 package io.proximi.gadkit.explore
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.key
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import io.proximi.gadkit.map.AmenityKind
+import io.proximi.map.live.AmenityIcon
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -87,6 +104,7 @@ import io.proximi.gadkit.map.GuidanceText
 import io.proximi.gadkit.map.JourneyMapLayers
 import io.proximi.gadkit.map.MapIcon
 import io.proximi.gadkit.map.MapLanguage
+import io.proximi.gadkit.map.MapLoadingSpinner
 import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.map.PlaceFraming
 import io.proximi.gadkit.map.VenueLevel
@@ -112,11 +130,18 @@ internal enum class ExploreTab(val title: Int) {
     AMENITIES(R.string.amenities),
 }
 
+/** What the panel over the lower part of the map shows. */
+internal sealed interface ExplorePanel {
+    data class TabList(val tab: ExploreTab) : ExplorePanel
+    data object Legend : ExplorePanel
+}
+
 /**
  * The Explore Museum map (Figma "Explore Museum", node 12129:102006; PM screens 2026-10-23), as
- * iOS `ExploreMuseumView`. "Level N" and the floor changer are at the top. The list button and the
- * Spaces, Highlights and Amenities tabs are at the bottom. A tab opens its list over the map
- * ([ExploreCatalog]). A row, or a tap on a gallery or a POI, shows its floor and its card. The
+ * iOS `ExploreMuseumView`. "Level N" and the floor changer are at the top. The legend button and
+ * the Spaces, Highlights and Amenities tabs are at the bottom. A tab opens its list over the map
+ * ([ExploreCatalog]); the legend button opens the map legend (PM, Monday "Explore Museum: Map legend
+ * missing", 2026-10-23). A row, or a tap on a gallery or a POI, shows its floor and its card. The
  * galleries of the shown floor are filled with the level colour; while a gallery's card is open, the
  * other galleries are lighter.
  *
@@ -130,7 +155,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     val resources = LocalResources.current
     val language = MapLanguage.forAppLanguage(LocalConfiguration.current.locales[0]?.language)
     val settings = remember { venue.settings }
-    val session = rememberProximiioMapSession(venue.sdk, MapStyle.exploreOptions(language))
+    val session = rememberProximiioMapSession(venue.sdk, MapStyle.exploreOptions(language, settings))
     remember(session) { MapStyle.useAmenityIcons(session, context) }
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }
 
@@ -139,10 +164,10 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
 
     var catalog by remember { mutableStateOf(ExploreCatalog()) }
     var level by remember { mutableStateOf(0.0) }
-    // The open list, or `null` for the map alone.
-    var tab by remember { mutableStateOf<ExploreTab?>(null) }
-    // The list the list button opens.
-    var lastTab by remember { mutableStateOf(ExploreTab.SPACES) }
+    // The open list or the legend, or `null` for the map alone.
+    var panel by remember { mutableStateOf<ExplorePanel?>(null) }
+    // The amenities' icons from the venue data, by amenity id.
+    var amenityIcons by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
     // The place whose card is open.
     var selected by remember { mutableStateOf<ExploreItem?>(null) }
     var hasFramed by remember { mutableStateOf(false) }
@@ -157,15 +182,23 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
      */
     suspend fun load(): Unit = withContext(Dispatchers.Main.immediate) {
         val places = venue.places(language)
-        val categories = try {
-            venue.sdk.amenities().mapNotNull { amenity -> amenity.title?.let { amenity.id to it } }.toMap()
+        val amenities = try {
+            venue.sdk.amenities().distinctBy { it.id }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            emptyMap()
+            emptyList()
         }
-        catalog = ExploreCatalog.of(places, Gallery.destinations(venue.venueGeofences(), places), categories)
+        amenityIcons = withContext(Dispatchers.Default) {
+            amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it.asImageBitmap() } }.toMap()
+        }
+        val categories = amenities.mapNotNull { amenity -> amenity.title?.let { amenity.id to it } }.toMap()
         val levelChangers = venue.levelChangers()
+        val changerTypes = levelChangers.map { it.featureType }.toSet()
+        val changerTitles = mapOf("elevator" to R.string.elevator, "staircase" to R.string.stairs)
+            .filterKeys { it in changerTypes }
+            .mapValues { (_, title) -> resources.getString(title) }
+        catalog = ExploreCatalog.of(places, Gallery.destinations(venue.venueGeofences(), places), categories, changerTitles)
         layers.updateLevelChangers(levelChangers)
         // The artworks are not drawn: the galleries and the Highlights list show them.
         session.hiddenFeatureIds = levelChangers.map { it.id }.toSet() + places.filter { it.isArtwork }.map { it.id }
@@ -178,9 +211,9 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         if (selected?.let { VenueLevel.same(it.level, newLevel) } == false) selected = null
     }
 
-    /** Closes the list, shows [item]'s floor, frames it and opens its card. */
+    /** Closes the panel, shows [item]'s floor, frames it and opens its card. */
     fun show(item: ExploreItem) {
-        tab = null
+        panel = null
         show(item.level)
         selected = item
         val bounds = PlaceFraming.bounds(item.framedPoints, settings.amenityFramingMinimumMeters) ?: return
@@ -225,64 +258,59 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         // A tap on a POI of the lists or inside a gallery opens its card; elsewhere it closes the card.
         session.onFeatureTap = { identifiers, coordinate ->
             val all = currentCatalog.all
-            tab = null
+            panel = null
             selected = identifiers.firstNotNullOfOrNull { id -> all.firstOrNull { it.id == id } }
                 ?: currentCatalog.space(Coordinate(coordinate.latitude, coordinate.longitude), currentLevel)
         }
         onDispose { session.onFeatureTap = null }
     }
 
-    BackHandler(enabled = tab != null) { tab = null }
+    /** Opens [target], or closes it when it is open. */
+    fun toggle(target: ExplorePanel) {
+        if (panel == target) {
+            panel = null
+        } else {
+            selected = null
+            panel = target
+        }
+    }
+
+    BackHandler(enabled = panel != null) { panel = null }
 
     val backdrop = rememberGlassBackdrop()
     Box(modifier.fillMaxSize()) {
         ProximiioMap(
             session = session,
             modifier = Modifier.fillMaxSize().glassBackdrop(backdrop).softEdges(cornerRadius = 40.dp),
-            configure = { canvas -> layers.attach(canvas) },
+            configure = { canvas ->
+                layers.attach(canvas)
+                MapStyle.applyZoomLimits(settings, canvas)
+            },
         )
         ProvideGlassBackdrop(backdrop) {
+            MapLoadingSpinner(session, settings.mapLoadingTimeout)
             Header(level, catalog.levels, onPick = ::show)
             AnimatedVisibility(
-                visible = tab != null,
+                visible = panel != null,
                 enter = slideInVertically(tween(250)) { it },
                 exit = slideOutVertically(tween(250)) { it },
             ) {
-                // Keeps the closing list on screen while it slides out.
-                val shown = remember { mutableStateOf(tab ?: lastTab) }
-                tab?.let { shown.value = it }
-                ListPanel(shown.value, catalog, onPick = ::show, onClose = { tab = null })
+                // Keeps the closing panel on screen while it slides out.
+                val shown = remember { mutableStateOf(panel ?: ExplorePanel.Legend) }
+                panel?.let { shown.value = it }
+                Panel(shown.value, catalog, amenityIcons, onPick = ::show, onClose = { panel = null })
             }
             Column(
                 Modifier.fillMaxSize().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
             ) {
                 val card = selected
-                AnimatedVisibility(visible = tab == null && card != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+                AnimatedVisibility(visible = panel == null && card != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
                     val shown = remember { mutableStateOf(card) }
                     card?.let { shown.value = it }
-                    shown.value?.let { ExploreCard(it, onClose = { selected = null }) }
+                    shown.value?.let { ExploreCard(it, amenityIcons, onClose = { selected = null }) }
                 }
-                TabBar(
-                    tab = tab,
-                    onList = {
-                        if (tab == null) {
-                            selected = null
-                            tab = lastTab
-                        } else {
-                            tab = null
-                        }
-                    },
-                    onTab = { item ->
-                        if (tab == item) {
-                            tab = null
-                        } else {
-                            selected = null
-                            tab = item
-                            lastTab = item
-                        }
-                    },
-                )
+                TabBar(panel, onToggle = ::toggle)
             }
         }
     }
@@ -346,11 +374,15 @@ private fun FloorChanger(level: Double, levels: List<Double>, onPick: (Double) -
     }
 }
 
-/** The list button and the Spaces, Highlights and Amenities tabs. */
+/** The legend button and the Spaces, Highlights and Amenities tabs. */
 @Composable
-private fun TabBar(tab: ExploreTab?, onList: () -> Unit, onTab: (ExploreTab) -> Unit) {
+private fun TabBar(panel: ExplorePanel?, onToggle: (ExplorePanel) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        GlassSquareButton(onClick = onList, contentDescription = stringResource(R.string.list), isSelected = tab != null) {
+        GlassSquareButton(
+            onClick = { onToggle(ExplorePanel.Legend) },
+            contentDescription = stringResource(R.string.map_legend),
+            isSelected = panel == ExplorePanel.Legend,
+        ) {
             MapIcon(R.drawable.ic_list, size = 20)
         }
         Row(
@@ -361,13 +393,13 @@ private fun TabBar(tab: ExploreTab?, onList: () -> Unit, onTab: (ExploreTab) -> 
                 .padding(5.dp),
         ) {
             ExploreTab.entries.forEach { item ->
-                val isSelected = tab == item
+                val isSelected = panel == ExplorePanel.TabList(item)
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .then(if (isSelected) Modifier.border(1.5.dp, Palette.ink, RoundedCornerShape(10.dp)) else Modifier)
-                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onTab(item) }
+                        .then(if (isSelected) Modifier.border(1.dp, Palette.ink, RoundedCornerShape(10.dp)) else Modifier)
+                        .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onToggle(ExplorePanel.TabList(item)) }
                         .semantics { selected = isSelected },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -378,30 +410,18 @@ private fun TabBar(tab: ExploreTab?, onList: () -> Unit, onTab: (ExploreTab) -> 
     }
 }
 
-/** The list of [tab] over the lower part of the map. Dragging its top edge down closes it. */
+/** A list or the legend over the lower part of the map. Dragging its top edge down closes it. */
 @Composable
-private fun ListPanel(tab: ExploreTab, catalog: ExploreCatalog, onPick: (ExploreItem) -> Unit, onClose: () -> Unit) {
-    val items = when (tab) {
-        ExploreTab.SPACES -> catalog.spaces
-        ExploreTab.HIGHLIGHTS -> catalog.highlights
-        ExploreTab.AMENITIES -> catalog.amenities
-    }
-    val count = items.size
-    val levelCount = items.map { it.level.roundToInt() }.distinct().size
-    val levels = pluralStringResource(R.plurals.n_levels, levelCount, levelCount)
-    // "8 spaces · 4 levels", "6 works", "12 amenities · 5 levels".
-    val summary = when (tab) {
-        ExploreTab.SPACES -> pluralStringResource(R.plurals.n_spaces, count, count) + " · " + levels
-        ExploreTab.HIGHLIGHTS -> pluralStringResource(R.plurals.n_works, count, count)
-        ExploreTab.AMENITIES -> pluralStringResource(R.plurals.n_amenities, count, count) + " · " + levels
-    }
+private fun Panel(panel: ExplorePanel, catalog: ExploreCatalog, icons: Map<String, ImageBitmap>, onPick: (ExploreItem) -> Unit, onClose: () -> Unit) {
     val closeDistance = with(LocalDensity.current) { 60.dp.toPx() }
+    // The tab bar: the navigation bar, 16 dp, the bar's 50 dp and 6 dp.
+    val tabBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 72.dp
     BoxWithConstraints(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(maxHeight * 0.72f)
+                .height(maxHeight * if (panel == ExplorePanel.Legend) 0.62f else 0.72f)
                 .glassSurface(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp), GlassStrength.Frosted)
                 .testTag("explorePanel"),
         ) {
@@ -421,63 +441,169 @@ private fun ListPanel(tab: ExploreTab, catalog: ExploreCatalog, onPick: (Explore
             ) {
                 Box(Modifier.width(44.dp).height(5.dp).background(Palette.ink.copy(alpha = 0.25f), CircleShape))
                 Row(Modifier.fillMaxWidth()) {
-                    Text(stringResource(tab.title), Modifier.alignByBaseline(), style = GadTextStyle.CardTitle.textStyle, color = Palette.ink)
+                    val title = when (panel) {
+                        is ExplorePanel.TabList -> stringResource(panel.tab.title)
+                        ExplorePanel.Legend -> stringResource(R.string.map_legend)
+                    }
+                    Text(title, Modifier.alignByBaseline(), style = GadTextStyle.CardTitle.textStyle, color = Palette.ink)
                     Spacer(Modifier.weight(1f))
-                    Text(summary, Modifier.alignByBaseline(), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+                    if (panel is ExplorePanel.TabList) {
+                        Text(summary(panel.tab, catalog), Modifier.alignByBaseline(), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+                    }
                 }
             }
-            val groups = ExploreCatalog.byLevel(items)
-            LazyColumn(
-                Modifier.fillMaxWidth().weight(1f),
-                // Clear of the tab bar.
-                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 110.dp),
-            ) {
-                if (groups.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.nothing_here_yet),
-                            Modifier.padding(top = 20.dp),
-                            style = GadTextStyle.BodySmallRegular.textStyle,
-                            color = Palette.ink,
-                        )
-                    }
-                }
-                groups.forEach { group ->
-                    item(key = "level-${group.level}") {
-                        Text(
-                            stringResource(R.string.level_n, group.level.roundToInt()).uppercase(),
-                            Modifier.padding(top = 20.dp, bottom = 4.dp),
-                            style = GadTextStyle.Caption.textStyle.copy(letterSpacing = 1.5.sp),
-                            color = Palette.ink,
-                        )
-                    }
-                    items(group.items, key = { it.id }) { item ->
-                        Column {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onPick(item) }
-                                    .padding(vertical = 14.dp)
-                                    .testTag("exploreRow"),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            ) {
-                                if (item.kind != ExploreItem.Kind.Highlight) ExploreIcon(item)
-                                ExploreText(item, Modifier.weight(1f))
-                                Text(GuidanceText.floorLabel(item.level), style = GadTextStyle.BodyBold.textStyle, color = Palette.ink)
-                            }
-                            HorizontalDivider(thickness = 1.dp, color = Palette.ink.copy(alpha = 0.12f))
-                        }
-                    }
+            // Each panel scrolls on its own: a list opened after another starts at its top.
+            key(panel) {
+                val content = Modifier.fillMaxWidth().weight(1f).fadesOut(above = tabBarHeight)
+                when (panel) {
+                    is ExplorePanel.TabList -> TabList(items(panel.tab, catalog), icons, onPick, content)
+                    ExplorePanel.Legend -> Legend(catalog, icons, content)
                 }
             }
         }
     }
 }
 
+private fun items(tab: ExploreTab, catalog: ExploreCatalog): List<ExploreItem> = when (tab) {
+    ExploreTab.SPACES -> catalog.spaces
+    ExploreTab.HIGHLIGHTS -> catalog.highlights
+    ExploreTab.AMENITIES -> catalog.amenities
+}
+
+/** "8 spaces · 4 levels", "6 works", "12 amenities · 5 levels". */
+@Composable
+private fun summary(tab: ExploreTab, catalog: ExploreCatalog): String {
+    val items = items(tab, catalog)
+    val count = items.size
+    val levelCount = items.map { it.level.roundToInt() }.distinct().size
+    val levels = pluralStringResource(R.plurals.n_levels, levelCount, levelCount)
+    return when (tab) {
+        ExploreTab.SPACES -> pluralStringResource(R.plurals.n_spaces, count, count) + " · " + levels
+        ExploreTab.HIGHLIGHTS -> pluralStringResource(R.plurals.n_works, count, count)
+        ExploreTab.AMENITIES -> pluralStringResource(R.plurals.n_amenities, count, count) + " · " + levels
+    }
+}
+
+/**
+ * Fades the content out toward [above] dp from its bottom and leaves that part clear: the rows do
+ * not show through the glass of the tab bar.
+ */
+private fun Modifier.fadesOut(above: Dp, fade: Dp = 30.dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            if (size.height <= 0f) return@drawWithContent
+            val end = ((size.height - above.toPx()) / size.height).coerceIn(0f, 1f)
+            val start = ((size.height - above.toPx() - fade.toPx()) / size.height).coerceIn(0f, end)
+            drawRect(
+                Brush.verticalGradient(0f to Color.Black, start to Color.Black, end to Color.Transparent, 1f to Color.Transparent),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+
+/** The rows of a list, by level. */
+@Composable
+private fun TabList(items: List<ExploreItem>, icons: Map<String, ImageBitmap>, onPick: (ExploreItem) -> Unit, modifier: Modifier) {
+    val groups = ExploreCatalog.byLevel(items)
+    LazyColumn(
+        modifier,
+        // Clear of the tab bar.
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 110.dp),
+    ) {
+        if (groups.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.nothing_here_yet),
+                    Modifier.padding(top = 20.dp),
+                    style = GadTextStyle.BodySmallRegular.textStyle,
+                    color = Palette.ink,
+                )
+            }
+        }
+        groups.forEach { group ->
+            item(key = "level-${group.level}") {
+                Text(
+                    stringResource(R.string.level_n, group.level.roundToInt()).uppercase(),
+                    Modifier.padding(top = 20.dp, bottom = 4.dp),
+                    style = GadTextStyle.Caption.textStyle.copy(letterSpacing = 1.5.sp),
+                    color = Palette.ink,
+                )
+            }
+            items(group.items, key = { it.id }) { item ->
+                Column {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button) { onPick(item) }
+                            .padding(vertical = 14.dp)
+                            .testTag("exploreRow"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        if (item.kind != ExploreItem.Kind.Highlight) ExploreIcon(item, icons)
+                        ExploreText(item, Modifier.weight(1f))
+                        Text(GuidanceText.floorLabel(item.level), style = GadTextStyle.BodyBold.textStyle, color = Palette.ink)
+                    }
+                    HorizontalDivider(thickness = 1.dp, color = Palette.ink.copy(alpha = 0.12f))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The map legend of the PM's screen: the facilities and the galleries the museum's POIs use, with
+ * their map icons.
+ */
+@Composable
+private fun Legend(catalog: ExploreCatalog, icons: Map<String, ImageBitmap>, modifier: Modifier) {
+    Row(
+        modifier
+            .verticalScroll(rememberScrollState())
+            // Clear of the tab bar.
+            .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 110.dp)
+            .testTag("exploreLegend"),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        LegendColumn(stringResource(R.string.facilities), catalog.legendFacilities, icons, Modifier.weight(1f))
+        LegendColumn(stringResource(R.string.galleries), catalog.legendGalleries, icons, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun LegendColumn(title: String, entries: List<ExploreLegendEntry>, icons: Map<String, ImageBitmap>, modifier: Modifier) {
+    Column(modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(title, style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+        entries.forEach { entry ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LegendGlyph(entry, icons)
+                Text(entry.title, style = GadTextStyle.BodySmallBold.textStyle, color = Palette.ink)
+            }
+        }
+    }
+}
+
+/**
+ * The legend's glyph of an amenity, 30 dp: the design's glyph of its kind, else its icon in the
+ * venue data, else a symbol for a gallery category.
+ */
+@Composable
+private fun LegendGlyph(entry: ExploreLegendEntry, icons: Map<String, ImageBitmap>) {
+    val kind = AmenityKind.kind(entry.amenityId, entry.title)
+    val icon = icons[entry.amenityId]
+    Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+        when {
+            kind != null -> MapIcon(kind.gadIcon.glyph, size = 22)
+            icon != null -> Image(icon, contentDescription = null, Modifier.fillMaxSize(), filterQuality = FilterQuality.High)
+            else -> MapIcon(symbolIcon(ExploreItem.symbol(entry.title)), size = 24)
+        }
+    }
+}
+
 /** The card of a place on the map: the icon, the title and its lines, the level and a close button. */
 @Composable
-private fun ExploreCard(item: ExploreItem, onClose: () -> Unit) {
+private fun ExploreCard(item: ExploreItem, icons: Map<String, ImageBitmap>, onClose: () -> Unit) {
     val close = stringResource(R.string.close)
     Box(
         Modifier
@@ -492,7 +618,7 @@ private fun ExploreCard(item: ExploreItem, onClose: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            if (item.kind != ExploreItem.Kind.Highlight) ExploreIcon(item)
+            if (item.kind != ExploreItem.Kind.Highlight) ExploreIcon(item, icons)
             ExploreText(item, Modifier.weight(1f))
             Text(GuidanceText.floorLabel(item.level), style = GadTextStyle.BodyBold.textStyle, color = Palette.ink)
         }
@@ -523,9 +649,13 @@ private fun ExploreText(item: ExploreItem, modifier: Modifier = Modifier) {
     }
 }
 
-/** The icon in a white circle: the amenity's icon, or a symbol for the gallery's category. */
+/**
+ * The icon in a white circle: the design's glyph of an amenity kind, else the icon of the POI's
+ * amenity in the venue data (the icon the map draws), else a symbol for the gallery's category.
+ */
 @Composable
-private fun ExploreIcon(item: ExploreItem) {
+private fun ExploreIcon(item: ExploreItem, icons: Map<String, ImageBitmap>) {
+    val icon = item.amenityId?.let { icons[it] }
     Box(
         Modifier
             .size(44.dp)
@@ -533,8 +663,11 @@ private fun ExploreIcon(item: ExploreItem) {
             .background(Palette.white, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        when (val kind = item.kind) {
-            is ExploreItem.Kind.Amenity -> MapIcon(kind.kind.gadIcon.glyph, size = 22)
+        val kind = item.kind
+        when {
+            kind is ExploreItem.Kind.Amenity -> MapIcon(kind.kind.gadIcon.glyph, size = 22)
+            // The data's icon is a 30 px marker, a white circle with the glyph: it fills the circle.
+            icon != null -> Image(icon, contentDescription = null, Modifier.fillMaxSize(), filterQuality = FilterQuality.High)
             else -> MapIcon(symbolIcon(ExploreItem.symbol(item.category)), size = 18)
         }
     }

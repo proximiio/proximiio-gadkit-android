@@ -182,6 +182,8 @@ public sealed interface ProximiMapEvent {
 
     public data class SkipCancelled(public val stop: ProximiStop) : ProximiMapEvent
 
+    /** Not sent since 1.14.0: the list has no "Undo skip" (PM, Monday "Undo skip removed", 2026-10-23). */
+    @Deprecated("Not sent since 1.14.0: the list has no Undo skip.")
     public data class SkipUndone(public val stop: ProximiStop) : ProximiMapEvent
 
     /** The visitor picked an amenity on the map. A card shows it with "Go here". */
@@ -204,7 +206,7 @@ public sealed interface ProximiMapEvent {
 
     /**
      * Every stop is visited or skipped. [ProximiMap], and [ProximiMapView] with
-     * [ProximiMapView.Option.PROMPTS], show Journey Complete.
+     * [ProximiMapView.Option.JOURNEY_COMPLETE], show Journey Complete.
      */
     public data object JourneyFinished : ProximiMapEvent
 

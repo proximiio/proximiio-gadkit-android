@@ -73,6 +73,25 @@ public data class GadSettings(
 
     /** Zoom of "Centre on me" and of the first position. */
     val followZoom: Double = 21.0,
+    /**
+     * The farthest the visitor can zoom out, or `null` for the map library's limit. MapLibre zoom
+     * levels; the maps apply it once their canvas exists.
+     */
+    val minimumZoom: Double? = null,
+    /** The farthest the visitor can zoom in, or `null` for the map library's limit. */
+    val maximumZoom: Double? = null,
+    /**
+     * `false` draws the position dot on each fix. `true` slides it toward each fix (the map
+     * library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
+     * 2026-10-23).
+     */
+    val smoothsPosition: Boolean = false,
+    /**
+     * The longest time the maps show their spinner while the map library draws the venue. The
+     * spinner goes when the venue's features are on the map, when the map reports an error, or
+     * after this time.
+     */
+    val mapLoadingTimeout: Duration = 20.seconds,
 
     // Lift
 
@@ -132,6 +151,11 @@ public data class GadSettings(
      * notification of the journey ([stopNearbyMeters]) does not depend on it.
      */
     val postsGeofenceNotifications: Boolean = true,
+    /**
+     * With [postsGeofenceNotifications]: `false` posts no geofence notification, while the
+     * notification permission is still asked for.
+     */
+    val notifiesGeofenceEvents: Boolean = true,
 
     // Venue data
 

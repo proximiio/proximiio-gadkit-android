@@ -28,9 +28,6 @@ internal sealed interface VisitEvent {
     /** The visitor answered "Keep it". The stop stays in the journey. */
     data class SkipCancelled(val stop: JourneyStop) : VisitEvent
 
-    /** The visitor tapped "Undo skip". The stop is back in the journey. */
-    data class SkipUndone(val stop: JourneyStop) : VisitEvent
-
     /** The visitor picked an amenity on the map. A card shows it with "Go here". */
     data class AmenitySelected(val place: VenuePlace) : VisitEvent
 

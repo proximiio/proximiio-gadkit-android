@@ -64,6 +64,19 @@ import io.proximi.gadkit.designsystem.GadTextStyle
 import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.designsystem.glassSurface
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.proximi.map.live.ProximiioMapSession
+import kotlin.time.Duration
+import kotlinx.coroutines.delay
 
 // The map screen controls of the design ("MAP Functionality Approach 02", nodes 10889:108085 and
 // 10889:110275), as iOS `MapChrome.swift`.
@@ -350,6 +363,41 @@ private fun softEdgeMask(size: Size, width: Float, cornerRadius: Float): ImageBi
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { maskFilter = BlurMaskFilter(width / 2, BlurMaskFilter.Blur.NORMAL) }
     android.graphics.Canvas(bitmap).drawRoundRect(inset, inset, size.width - inset, size.height - inset, cornerRadius, cornerRadius, paint)
     return bitmap.asImageBitmap()
+}
+
+/**
+ * The spinner in the middle of a map while the map library draws the venue (PM, Monday "Spinner on
+ * map loading center", 2026-10-26), as iOS `MapLoadingSpinner`. [isBusy] keeps it while the screen
+ * has more to do, such as routing the first leg of a journey. [timeout] is
+ * `GadSettings.mapLoadingTimeout`. Touches pass through to the map.
+ */
+@Composable
+internal fun MapLoadingSpinner(session: ProximiioMapSession, timeout: Duration, modifier: Modifier = Modifier, isBusy: Boolean = false) {
+    val featureCount by session.featureCount.collectAsStateWithLifecycle()
+    val lastError by session.lastError.collectAsStateWithLifecycle()
+    var hasTimedOut by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(timeout)
+        hasTimedOut = true
+    }
+    val isShown = MapLoading.isShown(featureCount, lastError, hasTimedOut, isBusy)
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(isShown, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+            Box(Modifier.glassSurface(RoundedCornerShape(16.dp), GlassStrength.Frosted).padding(24.dp).testTag("mapLoadingSpinner")) {
+                CircularProgressIndicator(Modifier.size(36.dp), color = Palette.ink, strokeWidth = 3.dp)
+            }
+        }
+    }
+}
+
+/** When [MapLoadingSpinner] shows. */
+internal object MapLoading {
+    /**
+     * Until the venue's features are on the map, the map reports an error or the timeout passes,
+     * and while [isBusy]. Pure; covered by tests.
+     */
+    fun isShown(featureCount: Int, lastError: String?, hasTimedOut: Boolean, isBusy: Boolean): Boolean =
+        isBusy || (featureCount == 0 && lastError == null && !hasTimedOut)
 }
 
 /** "Map | List" toggle: glass 150 × 50 with the selected item outlined. */

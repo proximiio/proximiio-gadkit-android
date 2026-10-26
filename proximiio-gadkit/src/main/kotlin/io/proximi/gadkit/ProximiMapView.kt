@@ -82,7 +82,7 @@ public object ProximiMapView {
 
         /**
          * The view's own prompts: "Skip this artwork?", "You've left your route", "Probably at …",
-         * "Change your route?", "Leave the tour here" and Journey Complete. Without them the view
+         * "Change your route?" and "Leave the tour here". Without them the view
          * reports [ProximiMapEvent.SkipRequested], [ProximiMapEvent.OffRoute],
          * [ProximiMapEvent.PositionUncertain] and [ProximiMapEvent.JourneyFinished] and shows
          * nothing, the route follows the visitor who left it, and "Go here" on an amenity starts the
@@ -101,6 +101,13 @@ public object ProximiMapView {
 
         /** The ongoing journey notification with the next instruction, iOS `.liveActivity`. */
         JOURNEY_NOTIFICATION,
+
+        /**
+         * Journey Complete when the last stop is done. Without it the view reports
+         * [ProximiMapEvent.JourneyFinished] and shows nothing (Nagarro, Monday "Journey finished
+         * view", 2026-10-26).
+         */
+        JOURNEY_COMPLETE,
         ;
 
         public companion object {

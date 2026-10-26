@@ -240,7 +240,7 @@ public class ProximiMap(
                 if (venue.sdk.positions().firstOrNull() != null) arrival.positionReceived()
             }
             mainScope.launch { venue.sdk.geofenceEvents().collect { event -> event(event)?.let(::emit) } }
-            if (configuration.settings.postsGeofenceNotifications) {
+            if (configuration.settings.postsGeofenceNotifications && configuration.settings.notifiesGeofenceEvents) {
                 mainScope.launch { GeofenceNotifier(context).run(venue.sdk) }
             }
             mutableJourney.value = summary(store.load(), store.loadMeta(), ::standardMeta)
@@ -677,7 +677,6 @@ public class ProximiMap(
                 is VisitEvent.SkipRequested -> ProximiMapEvent.SkipRequested(stop(event.stop))
                 is VisitEvent.StopSkipped -> ProximiMapEvent.StopSkipped(stop(event.stop))
                 is VisitEvent.SkipCancelled -> ProximiMapEvent.SkipCancelled(stop(event.stop))
-                is VisitEvent.SkipUndone -> ProximiMapEvent.SkipUndone(stop(event.stop))
                 is VisitEvent.AmenitySelected -> ProximiMapEvent.AmenitySelected(place(event.place))
                 is VisitEvent.DetourStarted -> ProximiMapEvent.DetourStarted(place(event.place))
                 VisitEvent.JourneyResumed -> ProximiMapEvent.JourneyResumed

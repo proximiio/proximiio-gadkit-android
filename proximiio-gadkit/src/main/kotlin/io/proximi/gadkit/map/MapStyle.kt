@@ -12,12 +12,15 @@ import io.proximi.map.core.JourneyStopMarkerStyle
 import io.proximi.map.core.MapColor
 import io.proximi.map.core.PositionAccuracyStyle
 import io.proximi.map.core.PositionHeadingStyle
+import io.proximi.gadkit.GadSettings
 import io.proximi.map.core.PositionPrivacyStyle
+import io.proximi.map.core.PositionSmoothing
 import io.proximi.map.core.PositionStyle
 import io.proximi.map.core.PositionTrailStyle
 import io.proximi.map.core.RouteLineStyle
 import io.proximi.map.core.RouteMarkerStyle
 import io.proximi.map.kit.MapCanvasChrome
+import io.proximi.map.kit.ProximiioMapCanvas
 import io.proximi.map.live.MapOptions
 
 /**
@@ -75,18 +78,20 @@ internal object MapStyle {
      * `.followWithHeading` with `heading = .compass`. The compass reads the rotation-vector sensor
      * and needs no permission; before its first reading the map uses the walking direction.
      *
-     * "Centre on me" and the first position zoom to [RECENTRE_ZOOM] (PM review 2026-10-12: the
-     * library default is too far out). The map stays top-down: tilting is off.
+     * "Centre on me" and the first position zoom to `GadSettings.followZoom` (PM review 2026-10-12:
+     * the library default is too far out). The map stays top-down: tilting is off.
      *
      * The dot is 30 dp across, the size of a journey stop marker, with a white arrow inside it
-     * turned to the heading (PM review 2026-10-12).
+     * turned to the heading (PM review 2026-10-12). It is drawn on each fix unless
+     * `GadSettings.smoothsPosition` is on.
      *
      * `fallbackStyleUrl` is `null`. With the default, a failed style load makes the map fetch
      * demotiles.maplibre.org, which a production build must not contact.
      */
-    fun options(language: String, routeMarkers: Boolean = true, walkedTrail: Boolean = false, followZoom: Double = RECENTRE_ZOOM): MapOptions {
+    fun options(language: String, routeMarkers: Boolean = true, walkedTrail: Boolean = false, settings: GadSettings = GadSettings.STANDARD): MapOptions {
         val venue = PositionStyle.VENUE
         val position = venue.copy(
+            smoothing = if (settings.smoothsPosition) PositionSmoothing.ADAPTIVE else PositionSmoothing.NONE,
             dot = venue.dot.copy(color = location, radiusDp = 15.0),
             // The library sizes the arrow at about 1.1 × the dot radius.
             heading = PositionHeadingStyle.Arrow(lengthDp = 16.5),
@@ -115,16 +120,29 @@ internal object MapStyle {
             chrome = MapCanvasChrome(showsAttribution = false, allowsTilting = false),
             routeLineStyle = if (walkedTrail) routeAhead else route,
             language = language,
-            recentreZoom = followZoom,
+            recentreZoom = settings.followZoom,
         )
+    }
+
+    /**
+     * Applies `GadSettings.minimumZoom` and `maximumZoom` to the map of [canvas] once MapLibre hands
+     * it over. The map library has no zoom limit of its own; MapLibre keeps the camera inside these
+     * levels.
+     */
+    fun applyZoomLimits(settings: GadSettings, canvas: ProximiioMapCanvas) {
+        if (settings.minimumZoom == null && settings.maximumZoom == null) return
+        canvas.onStyleLoaded { map, _ ->
+            settings.minimumZoom?.let(map::setMinZoomPreference)
+            settings.maximumZoom?.let(map::setMaxZoomPreference)
+        }
     }
 
     /**
      * The Explore Museum map: no position dot and a camera that never follows. The visitor is not
      * at the museum there (user, 2026-10-23). The dot a privacy zone holds is clear too.
      */
-    fun exploreOptions(language: String): MapOptions {
-        val options = options(language, routeMarkers = false)
+    fun exploreOptions(language: String, settings: GadSettings = GadSettings.STANDARD): MapOptions {
+        val options = options(language, routeMarkers = false, settings = settings)
         val clear = MapColor.hex(0xFFFFFF, alpha = 0.0)
         val position = options.position
         return options.copy(

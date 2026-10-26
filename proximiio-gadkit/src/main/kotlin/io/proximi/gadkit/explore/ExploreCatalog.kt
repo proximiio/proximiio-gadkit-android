@@ -17,6 +17,10 @@ import kotlin.math.roundToLong
  *   "Thematic Gallery") and the description (`Gallery.destinations`).
  * - Highlights: the artworks that list the highlight amenity in `included_amenities`.
  * - Amenities: the POIs of an `AmenityKind` other than stairs and lifts.
+ * - The map legend: each amenity a museum POI uses, other than artworks. Galleries are the amenities
+ *   of the spaces and the amenities named "… Gallery", "… Exhibition" or "Learning …"; the others are
+ *   facilities, with "Elevator" and "Stairs" when the venue has lifts or staircases
+ *   (`LevelChangerPlace`, features of their own, not POIs).
  *
  * The GAD organisation also holds the DCT office. Only the POIs with the `place_id` of the gallery
  * POIs are listed.
@@ -36,6 +40,8 @@ internal data class ExploreItem(
     val gallery: Gallery? = null,
     /** A space's category, the title of its POI's amenity. */
     val category: String? = null,
+    /** The POI's amenity, for its icon in the venue data. */
+    val amenityId: String? = null,
 ) {
     sealed interface Kind {
         data object Space : Kind
@@ -67,11 +73,16 @@ internal data class ExploreItem(
     }
 }
 
+/** An amenity of the map legend. */
+internal data class ExploreLegendEntry(val amenityId: String, val title: String)
+
 /** The Explore Museum lists of the museum. */
 internal data class ExploreCatalog(
     val spaces: List<ExploreItem> = emptyList(),
     val highlights: List<ExploreItem> = emptyList(),
     val amenities: List<ExploreItem> = emptyList(),
+    val legendGalleries: List<ExploreLegendEntry> = emptyList(),
+    val legendFacilities: List<ExploreLegendEntry> = emptyList(),
 ) {
     /** The levels with a space, a highlight or an amenity, lowest first. */
     val levels: List<Double> get() = (spaces + amenities + highlights).map { rounded(it.level) }.distinct().sorted()
@@ -86,8 +97,17 @@ internal data class ExploreCatalog(
     data class LevelGroup(val level: Double, val items: List<ExploreItem>)
 
     companion object {
-        /** [categories] maps an amenity id to its title. Pure; covered by tests. */
-        fun of(places: List<VenuePlace>, destinations: Map<String, GalleryDestination>, categories: Map<String, String>): ExploreCatalog {
+        /**
+         * [categories] maps an amenity id to its title. [levelChangerTitles] names the venue's kinds
+         * of lift and staircase by feature type (`elevator`, `staircase`), in the app's language.
+         * Pure; covered by tests.
+         */
+        fun of(
+            places: List<VenuePlace>,
+            destinations: Map<String, GalleryDestination>,
+            categories: Map<String, String>,
+            levelChangerTitles: Map<String, String> = emptyMap(),
+        ): ExploreCatalog {
             val byId = LinkedHashMap<String, VenuePlace>().apply { places.forEach { putIfAbsent(it.id, it) } }
             val museum = museumPlaceId(destinations, byId)
             val inMuseum = { place: VenuePlace -> museum == null || place.placeId == museum }
@@ -100,6 +120,7 @@ internal data class ExploreCatalog(
                     id = poi.id, kind = ExploreItem.Kind.Space, title = destination.gallery.name,
                     lines = if (line.isEmpty()) emptyList() else listOf(line), level = poi.level,
                     coordinate = destination.entry, gallery = destination.gallery, category = category,
+                    amenityId = poi.amenityId,
                 )
             }.sortedWith(ORDER)
 
@@ -116,10 +137,20 @@ internal data class ExploreCatalog(
                 if (place.isArtwork || !inMuseum(place)) return@mapNotNull null
                 val kind = AmenityKind.entries.firstOrNull { it.matches(place) } ?: return@mapNotNull null
                 if (kind == AmenityKind.STAIRS || kind == AmenityKind.ELEVATOR) return@mapNotNull null
-                ExploreItem(place.id, ExploreItem.Kind.Amenity(kind), place.title, emptyList(), place.level, place.coordinate)
+                ExploreItem(place.id, ExploreItem.Kind.Amenity(kind), place.title, emptyList(), place.level, place.coordinate, amenityId = place.amenityId)
             }.sortedWith(ORDER)
 
-            return ExploreCatalog(spaces, highlights, amenities)
+            val galleryAmenities = spaces.mapNotNull { it.amenityId }.toSet()
+            val used = places.filter { !it.isArtwork && inMuseum(it) }.mapNotNull { it.amenityId }.toSet()
+            val entries = used.mapNotNull { id -> categories[id]?.let { ExploreLegendEntry(id, it) } }.sortedWith(LEGEND_ORDER)
+            val isGallery = { entry: ExploreLegendEntry -> entry.amenityId in galleryAmenities || GALLERY_TITLE.containsMatchIn(entry.title) }
+            val titles = entries.map { it.title.lowercase() }.toSet()
+            val changers = listOf("elevator", "staircase").mapNotNull { type ->
+                levelChangerTitles[type]?.takeIf { it.lowercase() !in titles }?.let { ExploreLegendEntry("level-changer-$type", it) }
+            }
+            val facilities = (entries.filterNot(isGallery) + changers).sortedWith(LEGEND_ORDER)
+
+            return ExploreCatalog(spaces, highlights, amenities, entries.filter(isGallery), facilities)
         }
 
         /** [items] by level, lowest first. Pure; covered by tests. */
@@ -135,6 +166,11 @@ internal data class ExploreCatalog(
 
         /** Level, then title. */
         private val ORDER: Comparator<ExploreItem> = compareBy<ExploreItem> { it.level }.thenBy(StandardTitleOrder) { it.title }
+
+        private val LEGEND_ORDER: Comparator<ExploreLegendEntry> = compareBy(StandardTitleOrder) { it.title }
+
+        /** The title of an amenity the legend counts as a gallery. */
+        private val GALLERY_TITLE = Regex("gallery|exhibition|learning", RegexOption.IGNORE_CASE)
 
         private fun rounded(level: Double): Double = level.roundToLong().toDouble()
     }

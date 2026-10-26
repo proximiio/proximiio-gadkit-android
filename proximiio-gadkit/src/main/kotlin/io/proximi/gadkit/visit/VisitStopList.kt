@@ -48,7 +48,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.proximi.gadkit.R
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.visit.JourneyStop
@@ -58,7 +57,6 @@ import io.proximi.gadkit.designsystem.Emphasis
 import io.proximi.gadkit.designsystem.GadTextStyle
 import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.Palette
-import io.proximi.gadkit.designsystem.SmallButton
 import io.proximi.gadkit.designsystem.StopNumberBadge
 import io.proximi.gadkit.designsystem.glassSurface
 import kotlin.math.roundToInt
@@ -70,8 +68,9 @@ import androidx.compose.ui.semantics.contentDescription
 /**
  * The journey as a list (Figma "Personalized Journey list"), as iOS `VisitStopList`. Stops are
  * numbered in visit order and grouped under their gallery; visited stops are dimmed; swiping
- * towards the start edge offers Skip; a skipped stop is hidden and the list renumbers. "Undo skip"
- * restores the last skipped stop. A curated tour has no gallery headers and no skip.
+ * towards the start edge offers Skip; a skipped stop is hidden and the list renumbers. There is no
+ * undo (PM, Monday "Undo skip removed", 2026-10-23). A curated tour has no gallery headers and no
+ * skip.
  *
  * The gallery of a stop is the artwork's `metadata.gallery_id` named by the gallery geofence, else
  * the gallery outline it lies in. A stop with neither is under its level ("Level 4"), so it does
@@ -80,7 +79,6 @@ import androidx.compose.ui.semantics.contentDescription
 @Composable
 internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier) {
     val journey = model.progress.journey
-    val lastSkipped by model.controller.lastSkippedStopId.collectAsStateWithLifecycle()
     val numbers = VisitPlan.numbers(journey)
     val allowsSkip = model.kind.allowsSkip
     // Places by id, for the artist, the badges and the gallery id of a stop.
@@ -128,9 +126,6 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                     }
                 }
             }
-        }
-        if (allowsSkip && lastSkipped != null) {
-            item(key = "undo") { SmallButton(stringResource(R.string.undo_skip), model::undoSkip, Modifier.padding(top = 6.dp)) }
         }
         if (allowsSkip) {
             item(key = "hint") {

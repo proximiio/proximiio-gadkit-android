@@ -132,9 +132,9 @@ internal class VisitViewModel(
     private var language = MapLanguage.forAppLanguage(application.resources.configuration.locales[0]?.language)
 
     /** The host app's times and distances, read once when the screen opens. */
-    private val settings = venue.settings
+    val settings = venue.settings
 
-    val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false, followZoom = settings.followZoom))
+    val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false, settings = settings))
         .also { MapStyle.useAmenityIcons(it, application) }
     val controller = VisitController(
         session,
@@ -355,7 +355,7 @@ internal class VisitViewModel(
                     destinationId = navigator.detourStop?.id ?: navigator.activeStop?.id,
                 )
                 if (progress.activeStop?.id != activeBefore) checkArrival()
-                if (progress.isFinished && !wasFinished && ProximiMapView.Option.PROMPTS in options) isShowingWrapUp = true
+                if (progress.isFinished && !wasFinished && ProximiMapView.Option.JOURNEY_COMPLETE in options) isShowingWrapUp = true
                 controller.save()
                 refreshMapLayers()
                 refreshConnector()
@@ -695,12 +695,6 @@ internal class VisitViewModel(
         val stop = stopToSkip ?: return
         stopToSkip = null
         onEvent(VisitEvent.SkipCancelled(stop))
-    }
-
-    fun undoSkip() {
-        val id = controller.lastSkippedStopId.value
-        progress.journey.stops.firstOrNull { it.id == id }?.let { onEvent(VisitEvent.SkipUndone(it)) }
-        scope.launch { controller.undoSkip() }
     }
 
     /**

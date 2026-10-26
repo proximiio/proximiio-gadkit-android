@@ -17,7 +17,8 @@ import io.proximi.sdk.geofencing.GeofenceEvent
  *
  * Android needs the `POST_NOTIFICATIONS` permission on API 33 and later. `ProximiMapHost` requests
  * it once a wristband is connected, because geofence events need positions from the band. Without
- * it nothing is shown. `ProximiMap` runs it while `GadSettings.postsGeofenceNotifications` is on.
+ * it nothing is shown. `ProximiMap` runs it while `GadSettings.postsGeofenceNotifications` and
+ * `notifiesGeofenceEvents` are on.
  */
 internal class GeofenceNotifier(context: Context) {
     private val context = context.applicationContext

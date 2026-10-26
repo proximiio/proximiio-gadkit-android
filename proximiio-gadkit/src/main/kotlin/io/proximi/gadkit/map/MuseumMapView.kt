@@ -93,7 +93,7 @@ internal fun MuseumMapView(
     val language = MapLanguage.forAppLanguage(LocalConfiguration.current.locales[0]?.language)
     // The host app's times and distances, read once when the screen opens.
     val settings = remember { venue.settings }
-    val session = rememberProximiioMapSession(venue.sdk, MapStyle.options(language, followZoom = settings.followZoom))
+    val session = rememberProximiioMapSession(venue.sdk, MapStyle.options(language, settings = settings))
     remember(session) { MapStyle.useAmenityIcons(session, context) }
     // The labels and floor names follow a language change without a style reload.
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }
@@ -291,9 +291,13 @@ internal fun MuseumMapView(
         ProximiioMap(
             session = session,
             modifier = Modifier.fillMaxSize().glassBackdrop(backdrop),
-            configure = { canvas -> layers.attach(canvas) },
+            configure = { canvas ->
+                layers.attach(canvas)
+                MapStyle.applyZoomLimits(settings, canvas)
+            },
         )
         ProvideGlassBackdrop(backdrop) {
+            MapLoadingSpinner(session, settings.mapLoadingTimeout)
             Column(
                 Modifier
                     .fillMaxSize()

@@ -99,4 +99,29 @@ class ExploreCatalogTest {
         assertEquals(ExploreItem.Symbol.STAR, ExploreItem.symbol("Learning & Engagement"))
         assertEquals(ExploreItem.Symbol.COLUMNS, ExploreItem.symbol(null))
     }
+
+    @Test
+    fun theLegendSplitsGalleriesFromFacilitiesAndLeavesOutOtherBuildings() {
+        val places = listOf(
+            place("p303", "G303 Language", level = 3.0, amenity = THEMATIC),
+            place("perf", "Performance hall", level = 1.0, amenity = "org:performance"),
+            place("lift", "Elevator 1", level = 1.0, amenity = "org:elevator"),
+            place("wc", "Women's Restroom", level = 2.0, amenity = "org:women"),
+            place("dctShop", "DCT shop", level = 1.0, amenity = "org:shop", placeId = OFFICE),
+            place("art", "Untitled", level = 1.0, amenity = "org:artwork").copy(isArtwork = true),
+        )
+        val catalog = ExploreCatalog.of(
+            places,
+            mapOf("g303" to destination("g303", "G303 Language", 3.0, "p303")),
+            mapOf(
+                THEMATIC to "Thematic Gallery", "org:performance" to "Performance Gallery", "org:elevator" to "Elevator",
+                "org:women" to "Women's Restroom", "org:shop" to "Shop", "org:artwork" to "Artwork",
+            ),
+            levelChangerTitles = mapOf("elevator" to "Elevator", "staircase" to "Stairs"),
+        )
+        assertEquals(listOf("Performance Gallery", "Thematic Gallery"), catalog.legendGalleries.map { it.title })
+        // The POI "Elevator" names the lift already; the staircases add "Stairs".
+        assertEquals(listOf("Elevator", "Stairs", "Women's Restroom"), catalog.legendFacilities.map { it.title })
+        assertEquals(THEMATIC, catalog.spaces.first().amenityId)
+    }
 }

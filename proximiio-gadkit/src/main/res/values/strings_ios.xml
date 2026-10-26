@@ -37,8 +37,10 @@
     <string name="enter_your_wristband_code">Enter your wristband code</string>
     <string name="escalator">escalator</string>
     <string name="explore">Explore</string>
+    <string name="facilities">Facilities</string>
     <string name="floor_x">Floor %s</string>
     <string name="follow_my_floor">Follow my floor</string>
+    <string name="galleries">Galleries</string>
     <string name="gallery_x">GALLERY · %s</string>
     <string name="go_here">Go here</string>
     <string name="go_to_level_n">Go to level %d</string>
@@ -67,6 +69,7 @@
     <string name="list">List</string>
     <string name="looking_for">Looking for</string>
     <string name="map">Map</string>
+    <string name="map_legend">Map legend</string>
     <string name="men_s_restroom">Men’s restroom</string>
     <string name="museum">Museum</string>
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
@@ -171,7 +174,6 @@
     <string name="try_again">Try again</string>
     <string name="turn_left_in_n_m">Turn left in %d m</string>
     <string name="turn_right_in_n_m">Turn right in %d m</string>
-    <string name="undo_skip">Undo skip</string>
     <string name="visited">Visited</string>
     <string name="waiting_for_your_position">Waiting for your position.</string>
     <string name="we_couldn_t_connect">We couldn’t connect</string>

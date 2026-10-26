@@ -1,6 +1,9 @@
 package io.proximi.gadkit
 
+import io.proximi.gadkit.map.MapLoading
+import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.visit.StopNearbyDetector
+import io.proximi.map.core.PositionSmoothing
 import io.proximi.gadkit.wristband.TrackingHealth
 import java.time.Instant
 import kotlin.test.Test
@@ -23,6 +26,29 @@ class GadSettingsTest {
         assertEquals(5.0, GadSettings.STANDARD.levelChangerReachedMeters)
         assertEquals(1800.seconds, GadSettings.STANDARD.floorWithoutPositioningMaximum)
         assertTrue(GadSettings.STANDARD.postsGeofenceNotifications)
+        assertTrue(GadSettings.STANDARD.notifiesGeofenceEvents)
+        assertFalse(GadSettings.STANDARD.smoothsPosition)
+        assertEquals(null, GadSettings.STANDARD.minimumZoom)
+        assertEquals(null, GadSettings.STANDARD.maximumZoom)
+    }
+
+    @Test
+    fun theMapDrawsTheDotOnEachFixUnlessItSmooths() {
+        assertEquals(PositionSmoothing.NONE, MapStyle.options("en").position.smoothing)
+        assertEquals(PositionSmoothing.ADAPTIVE, MapStyle.options("en", settings = GadSettings(smoothsPosition = true)).position.smoothing)
+        assertEquals(PositionSmoothing.NONE, MapStyle.exploreOptions("en").position.smoothing)
+        assertEquals(30.0, MapStyle.options("en", settings = GadSettings(followZoom = 30.0)).recentreZoom)
+    }
+
+    /** Port of `DesignSystemTests.theMapSpinnerStaysUntilTheVenueIsDrawn`. */
+    @Test
+    fun theMapSpinnerStaysUntilTheVenueIsDrawn() {
+        assertTrue(MapLoading.isShown(featureCount = 0, lastError = null, hasTimedOut = false, isBusy = false))
+        assertFalse(MapLoading.isShown(featureCount = 120, lastError = null, hasTimedOut = false, isBusy = false))
+        assertFalse(MapLoading.isShown(featureCount = 0, lastError = "style", hasTimedOut = false, isBusy = false))
+        assertFalse(MapLoading.isShown(featureCount = 0, lastError = null, hasTimedOut = true, isBusy = false))
+        assertTrue(MapLoading.isShown(featureCount = 120, lastError = null, hasTimedOut = true, isBusy = true))
+        assertEquals(20.seconds, GadSettings.STANDARD.mapLoadingTimeout)
     }
 
     @Test
