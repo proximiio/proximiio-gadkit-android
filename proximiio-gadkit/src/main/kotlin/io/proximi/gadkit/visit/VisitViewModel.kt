@@ -77,6 +77,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import io.proximi.gadkit.map.MapDiagnostics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import io.proximi.map.live.AmenityIcon
@@ -401,6 +402,7 @@ internal class VisitViewModel(
         scope.launch { monitor.health.drop(1).collect { onEvent(VisitEvent.TrackingChanged(it)) } }
         // No dot while a privacy zone holds it (`MapStyle.hidingPosition`).
         scope.launch { monitor.health.collect(::applyPositionStyle) }
+        scope.launch { MapDiagnostics.follow(session, "journey", scope) }
         scope.launch { floorGuide.phase.drop(1).collect(::floorGuidePhaseChanged) }
         scope.launch { snapshotFlow { visitorGallery?.id }.distinctUntilChanged().collect { applyFollowZoom() } }
         scope.launch {

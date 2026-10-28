@@ -1,5 +1,10 @@
 package io.proximi.gadkit.map
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.selection.selectableGroup
@@ -345,6 +350,34 @@ internal fun AmenityKind.title(): String = UiText.Resource(titleKey).mapText()
 private val FrameShape = RoundedCornerShape(50.dp)
 
 /**
+ * The handle area at the top of [MapGlassFrame], 44 dp: the map does not pan there (PM, Monday "More
+ * space for the pull down functionality", 2026-10-26). A drag down calls [onPullDown]; `null` takes the
+ * touches and does nothing. Place it over the map and under the map's controls.
+ */
+@Composable
+internal fun MapHandleArea(onPullDown: (() -> Unit)?) {
+    val pullDistance = with(LocalDensity.current) { 60.dp.toPx() }
+    val currentPullDown by rememberUpdatedState(onPullDown)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .pointerInput(Unit) {
+                var dragged = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { dragged = 0f },
+                    onDragEnd = { if (dragged > pullDistance) currentPullDown?.invoke() },
+                ) { change, amount ->
+                    change.consume()
+                    dragged += amount
+                }
+            }
+            // Taps and other gestures there do not reach the map either.
+            .pointerInput(Unit) { detectTapGestures {} },
+    )
+}
+
+/**
  * The map in a glass card with 50 dp corners, 10 dp from the screen edges, a white 1 dp edge and
  * a drag handle at the top. [content] is drawn clipped to the card: the map, then its overlays.
  */
@@ -366,12 +399,6 @@ internal fun MapGlassFrame(modifier: Modifier = Modifier, content: @Composable B
 }
 
 /**
- * Fades the content to transparent over [width] at every edge, so the screen background shows
- * through (the map card of the Figma map frames; PM 2026-10-23), as iOS `softEdges`. The mask is a
- * rounded rectangle with [cornerRadius], inset by half of [width] and blurred by half of [width]. It
- * changes the look only: touches on the faded edge still reach the content.
- */
-/**
  * Fades the content in over [top] from its top and out over [bottom] to its bottom: the journey map
  * under the controls at the top and the card at the bottom (RPR, Monday "Map fade at top & bottom",
  * 2026-10-28). It changes the look only.
@@ -389,6 +416,12 @@ internal fun Modifier.verticalFades(top: Dp, bottom: Dp): Modifier =
             )
         }
 
+/**
+ * Fades the content to transparent over [width] at every edge, so the screen background shows
+ * through (the map card of the Figma map frames; PM 2026-10-23), as iOS `softEdges`. The mask is a
+ * rounded rectangle with [cornerRadius], inset by half of [width] and blurred by half of [width]. It
+ * changes the look only: touches on the faded edge still reach the content.
+ */
 internal fun Modifier.softEdges(cornerRadius: Dp, width: Dp = 28.dp): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithCache {

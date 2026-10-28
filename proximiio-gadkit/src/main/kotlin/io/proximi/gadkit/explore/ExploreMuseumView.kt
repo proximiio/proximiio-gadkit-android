@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
+import io.proximi.gadkit.map.MapDiagnostics
 import io.proximi.gadkit.map.galleryDestinations
 import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.AmenityKind
@@ -270,6 +271,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         }
     }
     LaunchedEffect(session, language) { venue.data.version.drop(1).collect { load() } }
+    LaunchedEffect(session) { MapDiagnostics.follow(session, "explore", this) }
 
     // A floor picked on the map itself.
     LaunchedEffect(session) {

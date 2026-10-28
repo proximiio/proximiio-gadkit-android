@@ -95,6 +95,7 @@ internal fun MuseumMapView(
     val settings = remember { venue.settings }
     val session = rememberProximiioMapSession(venue.sdk, MapStyle.options(language, settings = settings))
     remember(session) { MapStyle.useAmenityIcons(session, context) }
+    LaunchedEffect(session) { MapDiagnostics.follow(session, "museum", this) }
     // The labels and floor names follow a language change without a style reload.
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }
 

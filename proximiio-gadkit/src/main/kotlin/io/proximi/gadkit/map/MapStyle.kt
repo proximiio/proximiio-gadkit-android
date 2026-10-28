@@ -243,6 +243,8 @@ internal object MapStyle {
      * red with a white 2 dp ring and white number; visited and walked-past stops white with a red
      * 2 dp ring; pending white with a `#EEEDED` 1 dp ring. 30 dp, number 14 in GuggenheimSansDisplay
      * Medium. A detour is red with the amenity's icon and no number. Skipped stops have no marker.
+     * The markers, the detour included, are drawn over the visitor's dot (RPR, Monday "Stop markers.",
+     * 2026-10-28; map 6.0.0-beta.31).
      */
     val journeyStops: JourneyStopMarkerStyle = run {
         val ink = MapColor.hex(0x2B2B2B)
@@ -260,6 +262,7 @@ internal object MapStyle {
             labelFontSize = 14.0,
             labelWeight = JourneyStopMarkerStyle.LabelWeight.MEDIUM,
             labelFontName = "guggenheim_sans_display_medium",
+            drawsAbovePosition = true,
         )
     }
 

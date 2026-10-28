@@ -1,6 +1,7 @@
 package io.proximi.gadkit
 
 import android.content.Context
+import io.proximi.gadkit.map.MapDiagnostics
 import io.proximi.gadkit.map.GeofenceNotifier
 import io.proximi.gadkit.map.LocalNotice
 import io.proximi.gadkit.map.LocalNotices
@@ -228,6 +229,7 @@ public class ProximiMap(
     }
 
     private suspend fun performStart() {
+        val startedAt = System.nanoTime()
         mutableStatus.value = Status.Starting
         runSession()
         try {
@@ -263,7 +265,7 @@ public class ProximiMap(
             }
             mutableJourney.value = summary(store.load(), store.loadMeta(), ::standardMeta)
             mutableStatus.value = Status.Ready
-            FieldLog.log("map: ready · ${places.value.size} places")
+            FieldLog.log("map: ready · ${places.value.size} places · start ${MapDiagnostics.Timing.text(MapDiagnostics.seconds(startedAt))}")
             if (stopped == null && venue.isDebugBuild) mainScope.launch { runDebugLaunch(venue, launchOptions.await()) }
         } catch (error: CancellationException) {
             throw error
@@ -488,6 +490,8 @@ public class ProximiMap(
      * [Screen.MANAGE_JOURNEY] open only with a stored journey.
      */
     public fun open(screen: Screen) {
+        // The field log's map timing counts from here too (MapDiagnostics).
+        MapDiagnostics.openedAtNanos = System.nanoTime()
         val store = store
         val journey = store?.load()
         if (!canOpen(screen, status.value, hasJourney = journey != null)) {

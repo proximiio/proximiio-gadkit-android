@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.34` and Map `6.0.0-beta.30` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.34` and Map `6.0.0-beta.31` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -984,7 +984,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 | SDK 6.0.0-beta.34 and Map 6.0.0-beta.30 | The same SDK changes. Map 6.0.0-beta.30 has the changes of the iOS map up to 6.0.0-beta.55; the stop markers over the dot and `venueDrawing` of iOS 6.0.0-beta.56 come with a later Android map. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 | SDK 6.0.0-beta.34 and Map 6.0.0-beta.31 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1063,6 +1063,15 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   size on the phone and in MapTap: 120 px at 0.2 is 24 dp. Before, an icon was drawn at the screen's
   density, about a third of that. The design's amenity markers and the Explore Museum gallery
   circles take the data icon's pixel size (PM, 2026-10-27).
+- **Visible:** the journey map draws the stop numbers, the detour included, over the visitor's dot
+  (`drawsAbovePosition`, Map 6.0.0-beta.31; RPR, Monday "Stop markers.", 2026-10-28).
+- **Visible:** the top 44 dp of the journey map card do not pan the map; with `BOTTOM_BAR` and
+  `onClose` a drag down there is Back (PM, Monday "More space for the pull down functionality",
+  2026-10-26).
+- Field log: the state of each map when it changes, checked every second ("map state journey:
+  features … · dropped … · style … · L1 · zoom … · camera ready …", with the style's missing fonts);
+  the time of `start()` ("map: ready · … · start 4.92 s") and of each map until it draws the venue
+  ("map timing journey: … · drawn 1.80 s, 2.82 s after open()"; `venueDrawing`).
 - **Visible:** the journey map's Map / List control is two buttons on glass, 150 × 50 dp with 16 dp
   corners; the selected part is white at 60 % with a 1.5 dp ink outline (PM, Monday "Native
   elements", 2026-10-28). It replaces the Material segmented button of 1.15.0.
@@ -1128,10 +1137,10 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   a detour keeps its marker. The POI of the gallery the visitor is in is not drawn (PM, Monday
   "Navigation to a gallery", 2026-10-26 and 2026-10-27).
 
-#### Changed (SDK 6.0.0-beta.34, Map 6.0.0-beta.30; iOS 1.15.0, 1.16.0)
+#### Changed (SDK 6.0.0-beta.34, Map 6.0.0-beta.31; iOS 1.15.0, 1.16.0, 1.20.0)
 
 - **BREAKING:** the library depends on SDK `6.0.0-beta.34` (was `6.0.0-beta.31`) and Map
-  `6.0.0-beta.30` (was `6.0.0-beta.27`). A host app that declares them itself moves to the same
+  `6.0.0-beta.31` (was `6.0.0-beta.27`). A host app that declares them itself moves to the same
   versions. MIGRATION.md section 1 lists the SDK and Map changes; the host app of `ProximiMapView`
   installs the cached route network when it starts offline (SDK 6.0.0-beta.33).
 - **Visible:** `ProximiMap.start()` works without a connection on a phone where the API accepted the

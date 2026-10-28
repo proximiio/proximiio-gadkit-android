@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.MapHandleArea
 import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.glassSurface
 import androidx.compose.ui.platform.testTag
@@ -285,6 +286,9 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                             model.layers.attach(canvas)
                         },
                     )
+                    // The top 44 dp do not pan the map; with the bottom bar and `onClose` a drag down there
+                    // is Back (PM, Monday "More space for the pull down functionality", 2026-10-26).
+                    MapHandleArea(onPullDown = if (ProximiMapView.Option.BOTTOM_BAR in model.options && hasBack) model::requestClose else null)
                     // The list covers the map with white: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
                     // "Rerouting you…" fades the map (PM, Monday "Rerouting calculation view", 2026-10-26).
