@@ -4,9 +4,13 @@ import kotlin.math.roundToInt
 import io.proximi.sdk.core.model.ProximiioAmenity
 import io.proximi.map.live.ProximiioMapSession
 import io.proximi.map.live.AmenityIcon
-import androidx.core.graphics.drawable.toBitmap
 import androidx.core.content.ContextCompat
 import android.graphics.Bitmap
+import android.util.DisplayMetrics
+import android.graphics.RectF
+import android.graphics.Paint
+import android.graphics.Color
+import android.graphics.Canvas
 import android.content.Context
 import io.proximi.map.core.JourneyStopMarkerStyle
 import io.proximi.map.core.MapColor
@@ -36,28 +40,88 @@ import io.proximi.map.live.MapOptions
  * The gradient runs per floor: on the floor after a lift, it starts at the lift.
  */
 internal object MapStyle {
-    /** The size of the design's amenity markers, the stop markers and the position arrow. */
-    private const val AMENITY_MARKER_DP = 30
-
-    /** Draws amenities with the design's icons ([amenityImage]). Set it before the session loads the venue. */
-    fun useAmenityIcons(session: ProximiioMapSession, context: Context) {
+    /**
+     * Draws amenities with the design's icons ([amenityImage]); with [galleryIcons] the icons of the
+     * Explore Museum map ([exploreAmenityImage]). Set it before the session loads the venue.
+     */
+    fun useAmenityIcons(session: ProximiioMapSession, context: Context, galleryIcons: Boolean = false) {
         val appContext = context.applicationContext
-        session.amenityImageDecoder = { amenityImage(it, appContext) }
+        session.amenityImageDecoder = if (galleryIcons) {
+            { exploreAmenityImage(it, appContext) }
+        } else {
+            { amenityImage(it, appContext) }
+        }
     }
 
     /**
-     * The map icon of an amenity. A kind the design draws ([AmenityKind]) gets its 30 dp marker,
-     * the size of the stop markers and the position arrow (PM 2026-10-14, "Amenity icons larger"):
-     * the data's icons are 30 px, which the map library draws at about 10 dp. Other amenities, such
-     * as artworks and gallery labels, keep their icon.
+     * The map icon of an amenity, one dp per pixel of the venue data's icon, as the portal and
+     * MapTap draw it (MapLibre GL JS registers an image at pixel ratio 1). The style's `icon-size`
+     * then gives the same size here and in MapTap: 120 px at 0.2 is 24 dp (PM, 2026-10-27: the
+     * gallery icons were 8 pt at 0.2 on iOS, with the icon at the screen's density).
+     *
+     * A kind the design draws ([AmenityKind]) gets its marker (PM 2026-10-14, "Amenity icons larger")
+     * at the size of the data's icon it replaces. Other amenities, such as artworks and galleries, keep
+     * their icon.
      */
     fun amenityImage(amenity: ProximiioAmenity, context: Context): Bitmap? {
+        val icon = dataIcon(amenity)
         val marker = AmenityKind.kind(amenity.id, amenity.title)?.gadIcon?.marker
         if (marker != null) {
-            val size = (AMENITY_MARKER_DP * context.resources.displayMetrics.density).roundToInt()
-            ContextCompat.getDrawable(context, marker)?.let { return it.toBitmap(size, size) }
+            val drawable = ContextCompat.getDrawable(context, marker)
+            if (drawable != null) {
+                val (width, height) = styleIconSize(icon?.width, icon?.height)
+                return render(context, width, height) { canvas, density ->
+                    drawable.setBounds(0, 0, (width * density).roundToInt(), (height * density).roundToInt())
+                    drawable.draw(canvas)
+                }
+            }
         }
-        return amenity.icon?.let(AmenityIcon::rasterImage)
+        return icon
+    }
+
+    /**
+     * The map icon of an amenity on the Explore Museum map. A gallery's icon from the venue data on a
+     * circle of white at 30 % with a white border, the icon at 22/30 of the circle (PM, Monday "Explore
+     * museum view: default map view", 2026-10-26). The circle has the data icon's size in dp, as
+     * [amenityImage]. A kind the design draws gets its marker.
+     */
+    fun exploreAmenityImage(amenity: ProximiioAmenity, context: Context): Bitmap? {
+        if (AmenityKind.kind(amenity.id, amenity.title) != null) return amenityImage(amenity, context)
+        val icon = dataIcon(amenity) ?: return null
+        val side = maxOf(icon.width, icon.height)
+        return render(context, side, side) { canvas, density ->
+            val unit = side * density / 30f
+            val bounds = side * density
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(77, 255, 255, 255) }
+            canvas.drawCircle(bounds / 2, bounds / 2, bounds / 2 - unit / 2, fill)
+            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = unit
+            }
+            canvas.drawCircle(bounds / 2, bounds / 2, bounds / 2 - unit / 2, stroke)
+            canvas.drawBitmap(icon, null, RectF(4 * unit, 4 * unit, 26 * unit, 26 * unit), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        }
+    }
+
+    /** The venue data's raster icon of [amenity] at one dp per pixel (pixel ratio 1), or `null`. */
+    private fun dataIcon(amenity: ProximiioAmenity): Bitmap? =
+        amenity.icon?.let(AmenityIcon::rasterImage)?.also { it.density = DisplayMetrics.DENSITY_DEFAULT }
+
+    /**
+     * The size in dp of a map icon made from the data's icon of [width] × [height] pixels: its size
+     * in pixels, 120 × 120 without one (the venue data's icons on 2026-10-27). Pure; covered by tests.
+     */
+    fun styleIconSize(width: Int?, height: Int?): Pair<Int, Int> =
+        if (width == null || height == null) 120 to 120 else width to height
+
+    /** A bitmap of [widthDp] × [heightDp] at the screen's density; [draw] gets the canvas in pixels and the density. */
+    private fun render(context: Context, widthDp: Int, heightDp: Int, draw: (Canvas, Float) -> Unit): Bitmap {
+        val metrics = context.resources.displayMetrics
+        val bitmap = Bitmap.createBitmap((widthDp * metrics.density).roundToInt().coerceAtLeast(1), (heightDp * metrics.density).roundToInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        bitmap.density = metrics.densityDpi
+        draw(Canvas(bitmap), metrics.density)
+        return bitmap
     }
 
     val location: MapColor = MapColor.hex(0x3F69FF)

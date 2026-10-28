@@ -1056,6 +1056,13 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 - **Visible:** the stop card's icon: while the leg ends at a gallery, the icon of the gallery POI's
   amenity; while the next stop is on another floor, the lift or stairs of the next level change from
   the visitor's floor (PM, Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27).
+- **Visible:** the map icons from the venue data are one dp per pixel, as MapTap and the portal draw
+  them (MapLibre GL JS registers an image at pixel ratio 1), so the style's `icon-size` gives the same
+  size on the phone and in MapTap: 120 px at 0.2 is 24 dp. Before, an icon was drawn at the screen's
+  density, about a third of that. The design's amenity markers and the Explore Museum gallery
+  circles take the data icon's pixel size (PM, 2026-10-27).
+- **Visible:** on the Explore Museum map a gallery's icon is the data icon on a white circle at 30 %
+  with a white border (PM, Monday "Explore museum view: default map view", 2026-10-26).
 - **Visible:** a place matches an amenity kind by its amenity, not by its title: the prayer room
   shortcut led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend views",
   2026-10-28). The search shortcuts, the Explore Museum amenities, the legend, the detour icon and the

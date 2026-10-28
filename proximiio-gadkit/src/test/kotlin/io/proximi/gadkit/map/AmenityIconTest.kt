@@ -45,4 +45,12 @@ class AmenityIconTest {
             assertTrue(fills.drop(1).all { it == "#FF2B2B2B" }, marker.name)
         }
     }
+
+    /** PM, 2026-10-27: a map icon is the data icon's pixel size in dp; without an icon 120 × 120, the venue data's icons. */
+    @Test
+    fun aMapIconTakesTheDataIconsPixelSize() {
+        assertEquals(120 to 120, MapStyle.styleIconSize(null, null))
+        assertEquals(30 to 30, MapStyle.styleIconSize(30, 30))
+        assertEquals(120 to 60, MapStyle.styleIconSize(120, 60))
+    }
 }
