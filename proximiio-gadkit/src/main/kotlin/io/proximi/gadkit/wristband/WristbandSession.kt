@@ -137,8 +137,10 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
      */
     override suspend fun bind(label: String) {
         try {
-            binding.bind(tagID = label)
+            val session = binding.bind(tagID = label)
+            FieldLog.log("wristband bind: ${BindingLog.bind(label, session.bindingID)}")
         } catch (error: BlueiotBindingError) {
+            FieldLog.log("wristband bind: ${BindingLog.bind(label, error)}")
             throw error.toCore()
         }
     }

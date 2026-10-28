@@ -69,4 +69,12 @@ class BindingLogTest {
             BindingLog.diagnostics(diagnostics),
         )
     }
+
+    /** The bind line names the band as scanned and the relay's binding (relay-api, 2026-10-28). */
+    @Test
+    fun bindLineNamesTheBandAndTheBinding() {
+        val id = java.util.UUID.fromString("594694A5-83FA-432D-B1A4-7641E885231D")
+        assertEquals("tag GAD-0042 · binding 594694a5-83fa-432d-b1a4-7641e885231d", BindingLog.bind("GAD-0042", id))
+        assertEquals(true, BindingLog.bind("GAD-0042", IllegalStateException("tag not available")).startsWith("tag GAD-0042 · failed: "))
+    }
 }

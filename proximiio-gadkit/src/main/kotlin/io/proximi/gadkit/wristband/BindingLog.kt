@@ -8,13 +8,21 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
- * Field log text for the wristband binding, as iOS `BindingLog`: the session of an active state
- * and the binding client's diagnostics. The session line holds the relay's binding id, which the
- * relay-api logs also hold. No line holds a tag id or a token.
+ * Field log text for the wristband binding, as iOS `BindingLog`: the bind, the session of an active
+ * state and the binding client's diagnostics. The bind and session lines hold the relay's binding id,
+ * which the relay-api logs also hold. The bind line holds the band's label as scanned, so the relay
+ * team can look up the band without asking the tester (relay-api, 2026-10-28). No line holds a
+ * visitor id or a token.
  *
  * Times are ISO 8601 in UTC, to the second.
  */
 internal object BindingLog {
+    /** "tag <label> · binding <id>" after a bind. */
+    fun bind(label: String, bindingId: java.util.UUID): String = "tag $label · binding ${bindingId.toString().lowercase(Locale.ROOT)}"
+
+    /** "tag <label> · failed: <error>" after a refused or failed bind. */
+    fun bind(label: String, error: Throwable): String = "tag $label · failed: $error"
+
     /**
      * "binding <id> · ends <time> · token expires <time>", plus "signal lost since <time>" while
      * the venue does not hear the band, or "privacy zone since <time>" while it is silent in a

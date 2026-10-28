@@ -1068,6 +1068,9 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 - **Visible:** the top 44 dp of the journey map card do not pan the map; with `BOTTOM_BAR` and
   `onClose` a drag down there is Back (PM, Monday "More space for the pull down functionality",
   2026-10-26).
+- Field log: each wristband bind names the band as scanned and the relay's binding ("wristband bind:
+  tag <label> · binding <id>", or "· failed: <error>"), so the relay team can look up the band without
+  asking the tester (relay-api, 2026-10-28; iOS 1.20.1).
 - Field log: the state of each map when it changes, checked every second ("map state journey:
   features … · dropped … · style … · L1 · zoom … · camera ready …", with the style's missing fonts);
   the time of `start()` ("map: ready · … · start 4.92 s") and of each map until it draws the venue
