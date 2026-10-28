@@ -64,11 +64,15 @@ import kotlinx.coroutines.launch
  * 2. Within [GadSettings.levelChangerReachedMeters] of the lift or stairs of a ride that ends on a
  *    floor in [GadSettings.levelsWithoutPositioning], the screen shows the lift or stairs view for
  *    [GadSettings.levelChangeViewDuration] ([FloorChangeView]; a tap ends it).
- * 3. The map shows that floor with the rest of the route. It does not follow the visitor there.
+ * 3. The map shows that floor without the route: the destination is highlighted (PM, Monday "POIs
+ *    on floors with no positioning", 2026-10-26). It does not follow the visitor there.
+ * 4. "Resume your Journey" there starts the way back ([returnFromFloor]): the map stays on that floor
+ *    without a route and highlights the lift or stairs to the next stop's floor, nearest the
+ *    destination the visitor went to. The first new fix ends it.
  *
- * The phase on that floor ends when the destination changes ("Resume your Journey", another stop),
- * on "Centre on me" or the floor button, or after [GadSettings.floorWithoutPositioningMaximum]. The
- * same destination then gets no second view.
+ * The phase on that floor ends when the destination changes (another stop), on "Centre on me" or the
+ * floor button, or after [GadSettings.floorWithoutPositioningMaximum]. The same destination then gets
+ * no second view.
  *
  * [FloorChangeView] shows the lift or stairs icon until RPR's animation exists (Monday
  * "Elevator/Staircase view"). Main thread only; [scope] runs the timers and calls [onEnter] and
@@ -96,6 +100,9 @@ internal class FloorWithoutPositioningGuide(
 
         /** The map shows the floor without positioning. */
         data class OnFloor(val change: Change) : Phase
+
+        /** The way back from the floor without positioning, until a new fix. */
+        data class Returning(val change: Change) : Phase
     }
 
     private val mutablePhase = MutableStateFlow<Phase>(Phase.Idle)
@@ -113,12 +120,20 @@ internal class FloorWithoutPositioningGuide(
     private var finishedDestinationId: String? = null
     private var timer: Job? = null
 
+    /** When the way back started: a fix after it ends the phase. */
+    private var returningSince: Long? = null
+
     /** `true` from the lift or stairs view until the map follows the visitor again. */
     val isActive: Boolean get() = phase.value != Phase.Idle
 
     /** Feeds a fix. [markers]: the route's level changes; [destinationId]: the leg's destination. */
     fun update(coordinate: Coordinate?, level: Double?, markers: List<LevelChangeMarker>, destinationId: String?) {
         if (destinationId != this.destinationId) {
+            // On the way back the destination is the next stop.
+            if (phase.value is Phase.Returning) {
+                this.destinationId = destinationId
+                return
+            }
             leave()
             this.destinationId = destinationId
             finishedDestinationId = null
@@ -148,17 +163,39 @@ internal class FloorWithoutPositioningGuide(
         }
     }
 
+    /** "Resume your Journey" on the floor without positioning: the way back starts. */
+    fun returnFromFloor() {
+        val change = (phase.value as? Phase.OnFloor)?.change ?: return
+        mutablePhase.value = Phase.Returning(change)
+        returningSince = System.currentTimeMillis()
+        FieldLog.log("floor without positioning: way back from L${change.level}")
+    }
+
+    /** A fix after the way back started ends it: the map follows the visitor again. */
+    fun positionReceived(timestampMillis: Long) {
+        val since = returningSince ?: return
+        if (phase.value !is Phase.Returning || timestampMillis <= since) return
+        FieldLog.log("floor without positioning: a fix again")
+        leave()
+    }
+
     /** The map follows the visitor again. The destination gets no second view. */
     fun leave() {
         timer?.cancel()
         timer = null
+        returningSince = null
         val previous = phase.value
         if (previous == Phase.Idle) return
         mutablePhase.value = Phase.Idle
         finishedDestinationId = destinationId
-        if (previous is Phase.OnFloor) {
+        val change = when (previous) {
+            is Phase.OnFloor -> previous.change
+            is Phase.Returning -> previous.change
+            else -> null
+        }
+        if (change != null) {
             FieldLog.log("floor without positioning: following the visitor again")
-            onLeave?.invoke(previous.change)
+            onLeave?.invoke(change)
         }
     }
 
@@ -177,6 +214,15 @@ internal class FloorWithoutPositioningGuide(
             if (coordinate.distanceTo(marker.coordinate) > settings.levelChangerReachedMeters) return null
             return Change(end, marker.featureType, marker.coordinate)
         }
+
+        /**
+         * The lift or stairs on [level] nearest [origin] that also serves [target], for the way back.
+         * Pure; covered by tests.
+         */
+        fun exitChanger(origin: Coordinate, level: Int, target: Int, changers: List<LevelChangerPlace>): LevelChangerPlace? =
+            changers
+                .filter { it.serves(level.toDouble()) && it.serves(target.toDouble()) }
+                .minByOrNull { origin.distanceTo(it.coordinate) }
 
         /**
          * Shows the floor of [change] and frames the route on it inside [insets], the map area under

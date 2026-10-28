@@ -1032,6 +1032,15 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   2026-10-26).
 - **Visible:** the stop card keeps its instruction line while the route is routed again, so the card
   and the buttons above it do not move (RPR, Monday "Accessible routing", 2026-10-28).
+- **Visible:** a floor without positioning shows no route, with the destination highlighted. "Resume
+  your Journey" there starts the way back: the map stays on that floor, the lift or stairs to the next
+  stop's floor nearest the destination is highlighted, and the card reads "NEXT STOP IS LEVEL n" /
+  "Head to Level n by lift or stairs". The first new fix ends it (PM, Monday "POIs on floors with no
+  positioning", 2026-10-26).
+- **Visible:** gallery first (personalised journeys): the artworks' numbers are hidden while the leg
+  ends at a gallery, and while the visitor is outside every gallery and the active artwork is in one;
+  a detour keeps its marker. The POI of the gallery the visitor is in is not drawn (PM, Monday
+  "Navigation to a gallery", 2026-10-26 and 2026-10-27).
 
 #### Changed (SDK 6.0.0-beta.34, Map 6.0.0-beta.30; iOS 1.15.0, 1.16.0)
 

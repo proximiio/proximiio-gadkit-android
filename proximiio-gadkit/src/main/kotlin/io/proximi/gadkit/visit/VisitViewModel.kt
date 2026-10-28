@@ -76,6 +76,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import io.proximi.gadkit.map.LevelChangerPlace
 import io.proximi.map.kit.MapCameraFollow
 import kotlinx.coroutines.flow.collectLatest
 import io.proximi.gadkit.GadSettings
@@ -246,6 +247,21 @@ internal class VisitViewModel(
     /** The artworks and level changers, which the map draws itself. The gallery a leg leads to first is hidden too. */
     private var hiddenFeatureIds = emptySet<String>()
 
+    /** The galleries of gallery first (`Gallery.destinations`). */
+    private var galleryDestinations: List<GalleryDestination> = emptyList()
+
+    /** The lifts and stairs, for the way back from a floor without positioning. */
+    private var levelChangerPlaces: List<LevelChangerPlace> = emptyList()
+
+    /** The destination on the floor without positioning, where the way back starts. */
+    private var returnOrigin: Coordinate? = null
+
+    /**
+     * The POI of the gallery the visitor is in, which the map does not draw (PM, Monday "Navigation
+     * to a gallery", 2026-10-26).
+     */
+    private var visitorGalleryPlaceId: String? = null
+
     /** Galleries the visitor has been in during this visit. */
     private var visitedGalleries = emptySet<String>()
 
@@ -326,7 +342,7 @@ internal class VisitViewModel(
     init {
         // Before `controller.start` below: the host app's collectors get the journey's first events.
         onNavigator?.invoke(controller.navigator)
-        session.journeyStopMarkerStyle = MapStyle.journeyStops
+        applyStopMarkers()
         controller.onArtworkDone = { stop, isActiveStop ->
             onEvent(if (isActiveStop) VisitEvent.ArtworkReached(stop.toCore()) else VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))
         }
@@ -361,6 +377,7 @@ internal class VisitViewModel(
         scope.launch { monitor.health.drop(1).collect { onEvent(VisitEvent.TrackingChanged(it)) } }
         // No dot while a privacy zone holds it (`MapStyle.hidingPosition`).
         scope.launch { monitor.health.collect(::applyPositionStyle) }
+        scope.launch { floorGuide.phase.drop(1).collect(::floorGuidePhaseChanged) }
         scope.launch { snapshotFlow { visitorGallery?.id }.distinctUntilChanged().collect { applyFollowZoom() } }
         scope.launch {
             // "Rerouting you…" after 0.5 s of routing; hidden when the routing ends (PM, Monday
@@ -413,6 +430,7 @@ internal class VisitViewModel(
                 if (progress.isFinished && !wasFinished && ProximiMapView.Option.JOURNEY_COMPLETE in options) isShowingWrapUp = true
                 controller.save()
                 refreshMapLayers()
+                applyStopMarkers()
                 refreshConnector()
                 refreshLevelChanger()
                 updateNotification()
@@ -430,6 +448,8 @@ internal class VisitViewModel(
                 visitorGallery = Gallery.containing(Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level, galleries)
                 // The map publishes guidance only on a leg with a route, so the arrival is checked on
                 // the position (field test 2026-10-19).
+                updateVisitorGallery(position)
+                floorGuide.positionReceived(position.timestampMillis)
                 checkArrival()
                 controller.checkCloserArtwork()
                 controller.checkWrongFloor(floorGuide.isActive)
@@ -576,9 +596,11 @@ internal class VisitViewModel(
         // every floor they serve.
         val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers)
+        levelChangerPlaces = levelChangers
         hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
-        session.hiddenFeatureIds = hiddenFeatureIds + listOfNotNull(galleryAheadDestination?.placeId)
         val destinations = Gallery.destinations(venue.venueGeofences(), places)
+        galleryDestinations = destinations.values.toList()
+        applyHiddenFeatures()
         controller.setGalleryFirst(kind.guidesToGalleryFirst, places, destinations)
         galleries = venue.galleries(language)
         galleryNames = Gallery.names(places)
@@ -661,8 +683,8 @@ internal class VisitViewModel(
     /** The leg now ends at [gallery], or at the artwork for `null` (gallery first). */
     private fun galleryAheadChanged(gallery: GalleryDestination?) {
         refreshMapLayers()
-        // The red gallery marker takes the place of the gallery's own POI.
-        session.hiddenFeatureIds = hiddenFeatureIds + listOfNotNull(gallery?.placeId)
+        applyHiddenFeatures()
+        applyStopMarkers()
         FieldLog.log("gallery first: ${gallery?.let { "route ends at ${it.gallery.name}" } ?: "route ends at the artwork"}")
     }
 
@@ -703,9 +725,110 @@ internal class VisitViewModel(
         )
     }
 
+    /**
+     * The features the map does not draw: the artworks and level changers ([hiddenFeatureIds]), the
+     * POI of the gallery the leg ends at (the red gallery marker takes its place) and the POI of the
+     * gallery the visitor is in.
+     */
+    private fun applyHiddenFeatures() {
+        val hidden = hiddenFeatureIds + listOfNotNull(galleryAheadDestination?.placeId, visitorGalleryPlaceId)
+        if (session.hiddenFeatureIds != hidden) session.hiddenFeatureIds = hidden
+    }
+
+    /**
+     * The numbered stop markers. With gallery first they are hidden while the leg ends at a gallery,
+     * and while the visitor is outside every gallery and the active artwork is in one (PM, Monday
+     * "Navigation to a gallery", 2026-10-26 and 2026-10-27). The detour keeps its marker.
+     */
+    private fun applyStopMarkers() {
+        val shows = showsArtworkMarkers(
+            guidesToGalleryFirst = kind.guidesToGalleryFirst && galleryDestinations.isNotEmpty(),
+            hasGalleryAhead = galleryAheadDestination != null,
+            isInGallery = visitorGalleryPlaceId != null,
+            isActiveStopInGallery = controller.navigator.activeStop?.group != null,
+        )
+        val style = if (shows) MapStyle.journeyStops else MapStyle.journeyStopsHidden
+        if (session.journeyStopMarkerStyle != style) session.journeyStopMarkerStyle = style
+    }
+
+    /** Finds the gallery the visitor is in, on every fix. */
+    private fun updateVisitorGallery(position: VenuePosition?) {
+        val placeId = position?.let { fix ->
+            galleryDestinations.firstOrNull { it.gallery.contains(Coordinate(fix.coordinate.latitude, fix.coordinate.longitude), fix.floor?.level) }?.placeId
+        }
+        if (placeId == visitorGalleryPlaceId) return
+        visitorGalleryPlaceId = placeId
+        applyHiddenFeatures()
+        refreshMapLayers()
+        applyStopMarkers()
+    }
+
+    // Floor without positioning
+
+    /** The leg's destination: the detour's place, else the active stop's. */
+    private val floorDestination: VenuePlace?
+        get() {
+            val navigator = controller.navigator
+            val stop = navigator.detourStop ?: navigator.activeStop ?: return null
+            return places.firstOrNull { it.id == (stop.poiId ?: stop.id) }
+        }
+
+    /** The next stop's floor on the way back from a floor without positioning. */
+    val returningToLevel: Int?
+        get() {
+            if (floorGuide.phase.value !is FloorWithoutPositioningGuide.Phase.Returning) return null
+            return controller.navigator.activeStop?.floor?.level?.roundToInt()
+        }
+
+    /** The lift or stairs to the next stop's floor, nearest the destination the visitor went to. */
+    private fun exitChanger(change: FloorWithoutPositioningGuide.Change): LevelChangerPlace? {
+        val origin = returnOrigin ?: return null
+        val target = returningToLevel ?: return null
+        return FloorWithoutPositioningGuide.exitChanger(origin, change.level, target, levelChangerPlaces)
+    }
+
+    /**
+     * On a floor without positioning the route is not drawn (PM, Monday "POIs on floors with no
+     * positioning", 2026-10-26). On the way there the destination is highlighted; on the way back the
+     * lift or stairs to take.
+     */
+    private fun floorGuidePhaseChanged(phase: FloorWithoutPositioningGuide.Phase) {
+        val hidesRoute = when (phase) {
+            is FloorWithoutPositioningGuide.Phase.OnFloor -> {
+                layers.updateHighlight(JourneyMapLayers.highlight(floorDestination))
+                true
+            }
+            is FloorWithoutPositioningGuide.Phase.Returning -> {
+                layers.updateHighlight(null)
+                true
+            }
+            else -> {
+                layers.updateHighlight(JourneyMapLayers.highlight(selectedAmenity ?: routedAmenity))
+                false
+            }
+        }
+        val style = if (hidesRoute) MapStyle.hiddenRoute else MapStyle.route
+        if (session.options.routeLineStyle != style) session.options = session.options.copy(routeLineStyle = style)
+        refreshLevelChanger()
+    }
+
+    /** "Resume your Journey" on the stop card: on the floor without positioning the way back starts first. */
+    fun resumeFromCard() {
+        if (floorGuide.phase.value is FloorWithoutPositioningGuide.Phase.OnFloor) {
+            returnOrigin = floorDestination?.coordinate
+            floorGuide.returnFromFloor()
+        }
+        resumeJourney()
+    }
+
     /** Marks the lift or stairs of the route's next level change on the shown floor in red. */
     private fun refreshLevelChanger() {
         if (isClosed) return
+        (floorGuide.phase.value as? FloorWithoutPositioningGuide.Phase.Returning)?.let { returning ->
+            val change = returning.change
+            layers.updateLevelChanger(exitChanger(change)?.let { JourneyMapLayers.LevelChanger(it.coordinate, change.level.toDouble(), it.featureType) })
+            return
+        }
         val level = session.selectedFloor.value.level
         val next = session.routeRenderer?.geometry?.markers?.firstOrNull { !it.isCompleted && VenueLevel.same(it.from.level, level) }
         layers.updateLevelChanger(
@@ -946,7 +1069,8 @@ internal class VisitViewModel(
 
     /** The host app paused (`true`) or resumed (`false`) the journey. Reports no event. */
     fun pausedChanged(isPaused: Boolean) {
-        if (!hasStops || !isReady) return
+        // Before the start too: the controller starts paused, and a resume before it changes nothing.
+        if (!hasStops) return
         if (isPaused) controller.pause() else scope.launch { controller.resumeFromPause() }
     }
 
@@ -1047,6 +1171,12 @@ internal class VisitViewModel(
 
     companion object {
         private const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
+
+        /** Whether the artworks' markers show. Pure; covered by tests. */
+        internal fun showsArtworkMarkers(guidesToGalleryFirst: Boolean, hasGalleryAhead: Boolean, isInGallery: Boolean, isActiveStopInGallery: Boolean): Boolean {
+            if (!guidesToGalleryFirst) return true
+            return !hasGalleryAhead && (isInGallery || !isActiveStopInGallery)
+        }
 
         /** "Rerouting you…" shows after this much routing. */
         private const val REROUTING_DELAY_MILLIS = 500L

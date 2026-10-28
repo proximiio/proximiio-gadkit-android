@@ -99,4 +99,21 @@ class FloorWithoutPositioningTest {
         guide.update(north(2.0), 1.0, toCafe, destinationId = "prayer")
         assertTrue(guide.isActive)
     }
+
+    /**
+     * PM, Monday "POIs on floors with no positioning", 2026-10-26: on the way back the lift or stairs
+     * to the next stop's floor nearest the destination is highlighted.
+     */
+    @Test
+    fun theWayBackTakesTheNearestLiftOrStairsToTheNextFloor() {
+        val origin = Coordinate(24.5, 54.4)
+        val changers = listOf(
+            LevelChangerPlace("far-lift", "elevator", Coordinate(24.502, 54.4), listOf(0.0, 1.0, 2.0)),
+            LevelChangerPlace("near-stairs", "staircase", Coordinate(24.5001, 54.4), listOf(0.0, 1.0)),
+            LevelChangerPlace("nearest-other", "elevator", Coordinate(24.50001, 54.4), listOf(2.0, 3.0)),
+        )
+        assertEquals("near-stairs", FloorWithoutPositioningGuide.exitChanger(origin, 0, 1, changers)?.id)
+        assertEquals("far-lift", FloorWithoutPositioningGuide.exitChanger(origin, 0, 2, changers)?.id)
+        assertNull(FloorWithoutPositioningGuide.exitChanger(origin, 0, 4, changers))
+    }
 }

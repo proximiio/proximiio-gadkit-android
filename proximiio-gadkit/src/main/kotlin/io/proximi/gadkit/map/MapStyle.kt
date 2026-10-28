@@ -211,4 +211,19 @@ internal object MapStyle {
 
     /** Route line without the traveled part, for a map that draws the walked trail. */
     val routeAhead: RouteLineStyle = route.copy(completedOpacity = 0.0)
+
+    /** No route line: the map of a floor without positioning (`FloorWithoutPositioningGuide`). */
+    val hiddenRoute: RouteLineStyle = route.copy(remainingOpacity = 0.0, completedOpacity = 0.0)
+
+    /**
+     * [journeyStops] with the artworks' markers invisible; the detour keeps its marker. A stop marker
+     * style of `null` would take the detour's marker off too.
+     */
+    val journeyStopsHidden: JourneyStopMarkerStyle = journeyStops.copy(
+        done = journeyStops.done.copy(opacity = 0.0),
+        active = journeyStops.active.copy(opacity = 0.0),
+        pending = journeyStops.pending.copy(opacity = 0.0),
+        passed = journeyStops.passed.copy(opacity = 0.0),
+        skipped = journeyStops.skipped.copy(opacity = 0.0),
+    )
 }

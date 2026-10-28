@@ -1,6 +1,7 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.GadSettings
+import io.proximi.gadkit.map.MapStyle
 import io.proximi.map.core.FloorKey
 import io.proximi.map.core.JourneyEvent
 import io.proximi.map.core.MapCoordinate
@@ -70,5 +71,30 @@ class OffRouteTest {
         assertTrue(VisitViewModel.isRouteDeviation(JourneyEvent.OffRouteTooLong(60.0)))
         assertTrue(VisitViewModel.isRouteDeviation(JourneyEvent.ReturnedToRoute))
         assertFalse(VisitViewModel.isRouteDeviation(JourneyEvent.JourneyFinished))
+    }
+
+    /** Monday "Navigation to a gallery", 2026-10-27: outside every gallery the numbers of the artworks in galleries are hidden. A curated tour shows them. */
+    @Test
+    fun artworkMarkersShowInAGalleryWithGalleryFirst() {
+        fun shows(galleryFirst: Boolean, ahead: Boolean = false, inGallery: Boolean, activeInGallery: Boolean = true) =
+            VisitViewModel.showsArtworkMarkers(galleryFirst, ahead, inGallery, activeInGallery)
+        assertTrue(shows(true, inGallery = true))
+        assertFalse(shows(true, inGallery = false))
+        assertFalse(shows(true, ahead = true, inGallery = true))
+        // The active artwork is outside every gallery: its number shows.
+        assertTrue(shows(true, inGallery = false, activeInGallery = false))
+        assertTrue(shows(false, ahead = true, inGallery = false))
+    }
+
+    /** The markers are hidden with an invisible style, never `null`: the detour keeps its marker. */
+    @Test
+    fun theHiddenStyleKeepsTheDetour() {
+        val hidden = MapStyle.journeyStopsHidden
+        assertEquals(0.0, hidden.pending.opacity)
+        assertEquals(0.0, hidden.active.opacity)
+        assertEquals(0.0, hidden.done.opacity)
+        assertEquals(0.0, hidden.passed.opacity)
+        assertEquals(1.0, hidden.detour.opacity)
+        assertTrue(hidden != MapStyle.journeyStops)
     }
 }

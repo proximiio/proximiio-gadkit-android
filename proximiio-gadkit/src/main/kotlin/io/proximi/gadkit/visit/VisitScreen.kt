@@ -465,7 +465,7 @@ private fun VisitCard(model: VisitViewModel) {
             subtitle = place?.let { placeSubtitle(it, resources) }
                 ?: detour.floor?.let { resources.getString(R.string.level_n, it.level.roundToInt()) }.orEmpty(),
             primary = stringResource(R.string.resume_your_journey),
-            onPrimary = model::resumeJourney,
+            onPrimary = model::resumeFromCard,
             onClose = null,
         )
         return
@@ -486,7 +486,11 @@ private fun VisitCard(model: VisitViewModel) {
         GuidanceText.levelChangeTitle(markers, model.session.position.value?.floor?.level, it.level)
     }
     val title = VisitCardText.title(state, galleryAhead, levelChangeTitle)
-    val instruction = if (isOnFloorWithoutPositioning) {
+    // The way back from a floor without positioning: "NEXT STOP IS LEVEL 1", "Head to Level 1 by lift or stairs".
+    val returningToLevel = model.returningToLevel
+    val instruction = if (returningToLevel != null) {
+        stringResource(R.string.head_to_level_n_by_lift_or, returningToLevel)
+    } else if (isOnFloorWithoutPositioning) {
         stringResource(R.string.your_position_is_not_shown_on_this)
     } else if (model.hasNoAccessibleRoute) {
         // The navigator keeps a stop that no route with the visitor's accessibility needs
@@ -500,12 +504,14 @@ private fun VisitCard(model: VisitViewModel) {
         ?.let { remainingText(it.remainingMeters, resources) }
     val number = model.activeStopNumber
     StopInfoCard(
-        caption = if (isOnFloorWithoutPositioning) {
+        caption = if (returningToLevel != null) {
+            stringResource(R.string.next_stop_is_level_n, returningToLevel)
+        } else if (isOnFloorWithoutPositioning) {
             stringResource(R.string.next_stop)
         } else {
             VisitCardText.caption(state, isLast, model.cardVisitorGallery?.name, galleryAhead).mapText()
         },
-        title = progress.activeStop?.takeIf { isOnFloorWithoutPositioning }?.title ?: title.mapText(),
+        title = progress.activeStop?.takeIf { isOnFloorWithoutPositioning }?.let { galleryAhead ?: it.title } ?: title.mapText(),
         instruction = instruction,
         remaining = remaining,
         icon = {
