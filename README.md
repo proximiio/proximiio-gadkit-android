@@ -909,6 +909,7 @@ adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> -
 | `gad.mapGalleryFills true` | The museum map of Journey Complete fills every gallery. |
 | `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
 | `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. With `gad.openMap`: the museum map in `ProximiExploreView`, with "Close map". The debug host also has "Host pause" / "Host resume" (`isPaused`), "Go to café" (`destination` by `properties.id`) and a line of the view's events (test tag `hostedMapEvents`). |
+| `gad.hostedDestination <title>` | With `gad.hostedMap`: the debug host routes to the first place whose title matches (`destination`). |
 
 `gad.hubPage` is read by the Proximi GAD app; the library does not act on it.
 

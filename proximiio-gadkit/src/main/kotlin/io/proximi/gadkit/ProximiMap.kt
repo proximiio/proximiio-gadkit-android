@@ -196,6 +196,10 @@ public class ProximiMap(
     /** `gad.hostedMap`: the journey of the [ProximiMapView] the debug launch opens. */
     internal val hostedJourney = MutableStateFlow(ProximiJourney(stops = emptyList()))
 
+    /** `gad.hostedDestination`: the title of the place the debug host routes to. */
+    internal var hostedDestinationTitle: String? = null
+        private set
+
     init {
         arrival.onArrival = {
             FieldLog.log("map: at the museum")
@@ -605,6 +609,7 @@ public class ProximiMap(
         if (options.hostedMap) {
             // Without `gad.visit` the view shows the map alone.
             DebugLaunch.log("hosted map: ${ids.size} stops")
+            hostedDestinationTitle = options.hostedDestination
             hostedJourney.value = ProximiJourney.ofArtworks(ids, options.visitKind)
             presenter.replace { presenter.show(Presentation.HostedMap) }
             return

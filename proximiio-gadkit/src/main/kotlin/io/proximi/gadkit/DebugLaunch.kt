@@ -34,6 +34,8 @@ import kotlinx.coroutines.CancellationException
  * - `gad.hostedMap`: opens the `gad.visit` journey in [io.proximi.gadkit.ProximiMapView] on the
  *   app's SDK with the default options (iOS `-hostedMap`). Without `gad.visit` the view shows the map
  *   alone. With `gad.openMap`: the museum map in [io.proximi.gadkit.ProximiExploreView].
+ * - `gad.hostedDestination <title>`: with `gad.hostedMap`, the debug host routes to the first place
+ *   whose title matches (`destination`; iOS `-hostedDestination`).
  * - `gad.visitAutoAdvance`: a reached detour ends 5 m after the visitor leaves it, without
  *   "Resume your Journey" (iOS `-visitAutoAdvance`). It applies to every visit of the process.
  * - `gad.routeAvoid`: `stairs,escalators,revolvingDoors,inaccessiblePaths` sets
@@ -73,6 +75,11 @@ public object DebugLaunch {
         public val pairWristband: String? = null,
         /** `gad.hostedMap`: `ProximiMap` opens the visit in `ProximiMapView` instead of its journey screen. */
         public val hostedMap: Boolean = false,
+        /**
+         * `gad.hostedDestination`: with `gad.hostedMap`, the debug host sets `destination` to the first
+         * place whose title matches, once the venue is loaded (iOS `-hostedDestination`).
+         */
+        public val hostedDestination: String? = null,
     )
 
     /** Playback starts once per process; the map screen can open many times. */
@@ -101,6 +108,7 @@ public object DebugLaunch {
             openMap = value("gad.openMap").toBoolean(),
             pairWristband = value("gad.pairWristband")?.trim()?.takeIf { it.isNotEmpty() },
             hostedMap = value("gad.hostedMap").toBoolean(),
+            hostedDestination = value("gad.hostedDestination")?.trim()?.takeIf { it.isNotEmpty() },
         )
     }
 

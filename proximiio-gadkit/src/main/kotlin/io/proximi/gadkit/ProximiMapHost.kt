@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.explore.MuseumMapScreen
 import io.proximi.gadkit.map.LocalRouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
@@ -218,6 +219,12 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     /** The names of the view's events, oldest first. */
     var mapEvents by remember { mutableStateOf(emptyList<String>()) }
     val places by map.places.collectAsState()
+    // `gad.hostedDestination`: the place, once the venue is loaded.
+    LaunchedEffect(places) {
+        val title = map.hostedDestinationTitle ?: return@LaunchedEffect
+        if (destination != null) return@LaunchedEffect
+        VenuePlace.matching(title, places).firstOrNull()?.let { destination = ProximiDestination(it.id.substringAfter(':')) }
+    }
     fun set(id: String, state: ProximiJourney.State) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
     }
