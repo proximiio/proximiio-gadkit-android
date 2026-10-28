@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.sdk.core.model.ProximiioAmenity
 import io.proximi.gadkit.Coordinate
 import java.net.URI
 import java.text.Collator
@@ -55,6 +56,12 @@ internal data class VenuePlace(
      * amenity ([HIGHLIGHT_AMENITY_ID]).
      */
     internal val includedAmenityIds: List<String> = emptyList(),
+    /**
+     * The kind of the POI's amenity, from the amenity's title, not from the POI's title (PM, Monday
+     * "Amenity search & Map legend views", 2026-10-28: the prayer room shortcut led to the artwork
+     * "Endless Prayers XIII"). Set by [withAmenityKinds].
+     */
+    internal val amenityKind: AmenityKind? = null,
 ) {
     /** True for a highlight artwork of the Explore Museum map. */
     internal val isHighlight: Boolean get() = HIGHLIGHT_AMENITY_ID in includedAmenityIds
@@ -117,6 +124,12 @@ internal data class VenuePlace(
          * The place under a map tap. [identifiers] are the tapped feature ids, topmost first.
          * The first matching id is used.
          */
+        /** [places] with [amenityKind] set from [amenities]. Pure; covered by tests. */
+        internal fun withAmenityKinds(places: List<VenuePlace>, amenities: List<ProximiioAmenity>): List<VenuePlace> {
+            val kinds = AmenityKind.kinds(amenities)
+            return places.map { place -> place.copy(amenityKind = place.amenityId?.let { kinds[it] }) }
+        }
+
         internal fun placeUnder(identifiers: List<String>, places: List<VenuePlace>): VenuePlace? {
             for (identifier in identifiers) {
                 places.firstOrNull { it.id == identifier }?.let { return it }

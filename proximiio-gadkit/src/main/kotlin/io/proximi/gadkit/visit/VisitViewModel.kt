@@ -76,6 +76,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import io.proximi.gadkit.map.catalogue
+import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.LevelChangerPlace
 import io.proximi.map.kit.MapCameraFollow
 import kotlinx.coroutines.flow.collectLatest
@@ -231,6 +233,10 @@ internal class VisitViewModel(
 
     /** The gallery the visitor is in, from the gallery polygons. */
     var visitorGallery by mutableStateOf<Gallery?>(null)
+        private set
+
+    /** The search shortcuts, from the amenities' `in_search` and `search_order` ([AmenityListing]). */
+    var searchShortcuts by mutableStateOf(emptyList<AmenityKind>())
         private set
 
     /** "Rerouting you…": the journey has been routed again for longer than 0.5 s. */
@@ -589,6 +595,7 @@ internal class VisitViewModel(
 
     private suspend fun loadVenue() {
         places = venue.places(language)
+        searchShortcuts = AmenityListing.search(venue.catalogue()).shortcuts(places)
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }
         controller.artworkAreas = venue.artworkAreas()
         // The journey map shows artworks only as the numbered stop markers. Amenities, galleries

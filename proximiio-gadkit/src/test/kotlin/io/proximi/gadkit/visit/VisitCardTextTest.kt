@@ -62,7 +62,7 @@ class VisitCardTextTest {
 
     @Test
     fun beforeYouGoSuggestsCafeShopAndKiosk() {
-        val cafe = VenuePlace(id = "c", title = "Café", coordinate = Coordinate(0.0, 0.0), level = 0.0, amenityId = "food:cafe")
+        val cafe = VenuePlace(id = "c", title = "Café", coordinate = Coordinate(0.0, 0.0), level = 0.0, amenityId = "food:cafe", amenityKind = AmenityKind.CAFE)
         val kiosk = VenuePlace(id = "k", title = "Ticket Kiosk", coordinate = Coordinate(0.0, 0.0), level = 0.0)
         val suggestions = BeforeYouGo.suggestions(places + kiosk + cafe)
         assertTrue(AmenityKind.CAFE.matches(cafe))

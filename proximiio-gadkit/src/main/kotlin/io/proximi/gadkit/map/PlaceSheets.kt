@@ -75,6 +75,8 @@ import kotlin.math.roundToInt
 @Composable
 internal fun PlaceSearchSheet(
     places: List<VenuePlace>,
+    /** The amenity shortcuts ([AmenityListing.shortcuts]). */
+    shortcuts: List<AmenityKind>,
     onPick: (VenuePlace) -> Unit,
     onPickAmenity: (AmenityKind) -> Unit,
     onDismiss: () -> Unit,
@@ -95,7 +97,7 @@ internal fun PlaceSearchSheet(
                 style = SystemTitle,
             )
             SystemSearchField(query, { query = it }, stringResource(R.string.search_the_museum), Modifier.padding(horizontal = 16.dp))
-            val amenities = AmenityKind.SHORTCUTS.filter { kind -> places.any(kind::matches) }
+            val amenities = shortcuts
             val matches = VenuePlace.matching(query, places)
             val showsAmenities = query.isEmpty() && amenities.isNotEmpty()
             LazyColumn(

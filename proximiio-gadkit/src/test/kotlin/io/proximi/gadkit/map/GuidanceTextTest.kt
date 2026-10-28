@@ -1,5 +1,7 @@
 package io.proximi.gadkit.map
 
+import kotlin.test.assertNull
+import io.proximi.sdk.core.model.ProximiioAmenity
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.UiText
 import kotlin.test.Test
@@ -47,24 +49,39 @@ class AmenityKindTest {
     private fun place(title: String, amenity: String? = null, level: Double = 1.0, lat: Double = 0.0, placeId: String? = null) =
         VenuePlace(id = title, title = title, coordinate = Coordinate(lat, 0.0), level = level, amenityId = amenity, placeId = placeId)
 
-    @Test
-    fun restroomsAreNotConfused() {
-        assertTrue(AmenityKind.WOMENS_RESTROOM.matches(place("Women's Restroom")))
-        assertFalse(AmenityKind.MENS_RESTROOM.matches(place("Women's Restroom")))
-        assertTrue(AmenityKind.MENS_RESTROOM.matches(place("Men's Restroom")))
-        assertFalse(AmenityKind.WOMENS_RESTROOM.matches(place("Men's Restroom")))
-    }
+    private fun cafe(title: String, level: Double, lat: Double, placeId: String? = null) =
+        place(title, amenity = "a-cafe", level = level, lat = lat, placeId = placeId).copy(amenityKind = AmenityKind.CAFE)
 
     @Test
-    fun matchesByAmenityID() {
-        assertTrue(AmenityKind.CAFE.matches(place("The Terrace", amenity = "food:cafe")))
-        assertTrue(AmenityKind.PRAYER_ROOM.matches(place("Room 4", amenity = "services:prayer_room")))
-        assertFalse(AmenityKind.CAFE.matches(place("Gallery 101")))
+    fun restroomsAreNotConfused() {
+        assertEquals(AmenityKind.WOMENS_RESTROOM, AmenityKind.kind("a1", "Women's Restroom"))
+        assertEquals(AmenityKind.MENS_RESTROOM, AmenityKind.kind("a2", "Men's Restroom"))
+        assertNull(AmenityKind.kind("a3", "Womens restroom visited"))
+    }
+
+    /**
+     * A place matches by its amenity, never by its title (PM, Monday "Amenity search & Map legend
+     * views", 2026-10-28: the prayer room shortcut led to the artwork "Endless Prayers XIII").
+     */
+    @Test
+    fun aPlaceMatchesByItsAmenityNotItsTitle() {
+        val amenities = listOf(
+            ProximiioAmenity(id = "a-prayer", title = "Prayer Room"),
+            ProximiioAmenity(id = "a-art", title = "Artwork"),
+            ProximiioAmenity(id = "a-cafe", title = "Cafe"),
+        )
+        val places = VenuePlace.withAmenityKinds(
+            listOf(place("Endless Prayers XIII", "a-art"), place("Room 4", "a-prayer"), place("The Terrace", "a-cafe"), place("Prayer room", null)),
+            amenities,
+        )
+        assertEquals(listOf("Room 4"), places.filter(AmenityKind.PRAYER_ROOM::matches).map { it.title })
+        assertEquals(listOf("The Terrace"), places.filter(AmenityKind.CAFE::matches).map { it.title })
+        assertEquals(mapOf("a-prayer" to AmenityKind.PRAYER_ROOM, "a-cafe" to AmenityKind.CAFE), AmenityKind.kinds(amenities))
     }
 
     @Test
     fun nearestPrefersTheVisitorsLevel() {
-        val places = listOf(place("Café A", level = 3.0, lat = 0.0001), place("Café B", level = 1.0, lat = 0.01))
+        val places = listOf(cafe("Café A", level = 3.0, lat = 0.0001), cafe("Café B", level = 1.0, lat = 0.01))
         assertEquals("Café B", AmenityKind.CAFE.nearest(places, Coordinate(0.0, 0.0), 1.0)?.title)
         assertEquals("Café A", AmenityKind.CAFE.nearest(places, Coordinate(0.0, 0.0), 2.0)?.title)
     }
@@ -75,8 +92,8 @@ class AmenityKindTest {
      */
     @Test
     fun nearestStaysInTheVenueOfTheNearestPlace() {
-        val guggenheim = place("Café", level = 0.0, lat = 0.0001, placeId = "guggenheim")
-        val dct = place("DCT Cafe", level = 1.0, lat = 0.1, placeId = "dct")
+        val guggenheim = cafe("Café", level = 0.0, lat = 0.0001, placeId = "guggenheim")
+        val dct = cafe("DCT Cafe", level = 1.0, lat = 0.1, placeId = "dct")
         assertEquals("Café", AmenityKind.CAFE.nearest(listOf(dct, guggenheim), Coordinate(0.0, 0.0), 1.0)?.title)
         assertEquals("DCT Cafe", AmenityKind.CAFE.nearest(listOf(dct, guggenheim), Coordinate(0.1, 0.0), 0.0)?.title)
     }

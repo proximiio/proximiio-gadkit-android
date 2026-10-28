@@ -369,7 +369,7 @@ private fun CardOverlay(model: VisitViewModel) {
                     ) { MapIcon(R.drawable.icon_search) }
                     AnimatedVisibility(model.isShowingAmenities, enter = fadeIn(), exit = fadeOut()) {
                         AmenityChipList(
-                            kinds = AmenityKind.SHORTCUTS.filter { kind -> model.places.any(kind::matches) },
+                            kinds = model.searchShortcuts,
                             selected = null,
                             onPick = model::detour,
                         )

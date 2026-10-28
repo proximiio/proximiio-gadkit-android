@@ -37,9 +37,9 @@ class ExploreCatalogTest {
                 place("p303", "G303 Language", level = 3.0, amenity = THEMATIC, details = "Words and signs"),
                 place("p202", "G202 Yayoi Kusama", level = 2.0, amenity = SINGLE),
                 highlight, artwork,
-                place("cafe", "Café", level = 0.0, amenity = "org:cafe"),
-                place("lift", "Elevator 1", level = 1.0, amenity = "org:elevator"),
-                place("dctPrayer", "DCT prayer room", level = 1.0, amenity = "org:prayer", placeId = OFFICE),
+                place("cafe", "Café", level = 0.0, amenity = "org:cafe").copy(amenityKind = AmenityKind.CAFE),
+                place("lift", "Elevator 1", level = 1.0, amenity = "org:elevator").copy(amenityKind = AmenityKind.ELEVATOR),
+                place("dctPrayer", "DCT prayer room", level = 1.0, amenity = "org:prayer", placeId = OFFICE).copy(amenityKind = AmenityKind.PRAYER_ROOM),
             )
             val destinations = mapOf(
                 "g303" to destination("g303", "G303 Language", 3.0, "p303"),
@@ -53,7 +53,8 @@ class ExploreCatalogTest {
     fun spacesAreTheGalleriesWithCategoryAndDescription() {
         val spaces = catalog.spaces
         assertEquals(listOf("G202 Yayoi Kusama", "G303 Language"), spaces.map { it.title })
-        assertEquals(listOf(listOf("Single Artist Gallery"), listOf("Thematic Gallery. Words and signs")), spaces.map { it.lines })
+        // The POI's description, else its category (PM, Monday "Explore Museum view: gallery POI view", 2026-10-26).
+        assertEquals(listOf(listOf("Single Artist Gallery"), listOf("Words and signs")), spaces.map { it.lines })
         assertEquals("p202", spaces.first().id)
         assertEquals("g202", spaces.first().gallery?.id)
     }

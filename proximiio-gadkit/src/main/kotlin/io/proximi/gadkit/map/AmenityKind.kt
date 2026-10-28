@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.sdk.core.model.ProximiioAmenity
 import io.proximi.gadkit.Coordinate
 
 /**
@@ -7,8 +8,10 @@ import io.proximi.gadkit.Coordinate
  * node 10889:116263): Women's restroom, Men's restroom, Café, Help Desk, Prayer Room,
  * Stairs, Elevator, Museum Shop.
  *
- * A place matches a kind by its amenity id or its title. The venue data is still being
- * built, so both are checked.
+ * An amenity has a kind when its title names it ("Prayer Room", "Women's Restroom"). A place matches
+ * a kind by its amenity ([VenuePlace.amenityKind]), not by its own title: the prayer room shortcut
+ * led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend views",
+ * 2026-10-28).
  *
  * [titleKey] is the string resource of the title; [icon] names the design's icon (`icons-svg`,
  * iOS `GADIcon`).
@@ -44,7 +47,8 @@ internal enum class AmenityKind(
     MUSEUM_SHOP("amenity_museum_shop", "shop", listOf("shop", "store")),
     ;
 
-    internal fun matches(place: VenuePlace): Boolean = matches("${place.amenityId ?: ""} ${place.title}".lowercase())
+    /** Whether the place's amenity is of this kind. */
+    internal fun matches(place: VenuePlace): Boolean = place.amenityKind == this
 
     /** [text] is the lower-case amenity id and title. */
     private fun matches(text: String): Boolean {
@@ -69,6 +73,11 @@ internal enum class AmenityKind(
     }
 
     internal companion object {
+        /** The kind of each amenity that has one, by amenity id. Pure; covered by tests. */
+        fun kinds(amenities: List<ProximiioAmenity>): Map<String, AmenityKind> = buildMap {
+            for (amenity in amenities) kind(amenity.id, amenity.title)?.let { putIfAbsent(amenity.id, it) }
+        }
+
         /**
          * The kind an amenity's id and title name, or `null`. The data's variants for a visited stop
          * or a destination ("Womens restroom visited") are left out. Pure; covered by tests.

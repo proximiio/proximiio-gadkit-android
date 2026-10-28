@@ -669,7 +669,8 @@ not follow.
     Gallery") and the description.
   - Highlights: the artworks that list the "Highlight" amenity in `included_amenities`, with
     `metadata.artist_name` and the gallery.
-  - Amenities: restrooms, café, help desk, prayer room and shop. Stairs and lifts are not listed.
+  - Amenities: restrooms, café, help desk, prayer room and shop, by level, then by the amenity's
+    `metadata.facilities_order`. Stairs and lifts are not listed. See "Amenity lists".
   - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
     holds the DCT office.
 - The map legend has two columns. Facilities: the amenities the museum's POIs use, other than
@@ -686,6 +687,24 @@ not follow.
 
 The map of Journey Complete (the map button of its bottom bar) is the museum map with the visitor's
 position, search and routes.
+
+### Amenity lists
+
+A place is of an amenity kind (restroom, café, help desk, prayer room, shop, stairs, lift) by its
+amenity: the amenity's title names the kind. The POI's own title is never matched, so the artwork
+"Endless Prayers XIII" is no prayer room. The amenity's optional `metadata` chooses and orders the
+lists:
+
+| Keys | List |
+|---|---|
+| `in_search`, `search_order` | The amenity shortcuts of the journey map's and the museum map's search. |
+| `in_facilities`, `facilities_order` | The Explore Museum Amenities list (within a level) and the legend's facilities. A lift or stairs entry ranks as the amenity titled "elevator" or "staircase". |
+
+- When an amenity has the flag `true` (or "true"), the list shows only the amenities with the flag
+  true. Without one, the list shows its own choice (for the search: women's and men's restroom, café,
+  help desk, prayer room, museum shop) without the amenities whose flag is `false`.
+- The order is a number or a numeric string, lowest first. An amenity without an order comes after
+  the ordered ones, in the list's own order. The legend's galleries keep the data's order.
 
 ## Events
 
@@ -1021,6 +1040,16 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   fixes (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-28).
 - **BREAKING:** `GadSettings.followZoom` is 18.8 (was 21; RPR, Monday "Need to determine correct zoom
   levels on-site", 2026-10-28).
+- **Visible:** a place matches an amenity kind by its amenity, not by its title: the prayer room
+  shortcut led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend views",
+  2026-10-28). The search shortcuts, the Explore Museum amenities, the legend, the detour icon and the
+  card subtitle use it.
+- **Visible:** the amenity's `metadata` chooses and orders the search shortcuts (`in_search`,
+  `search_order`) and the Explore Museum facilities (`in_facilities`, `facilities_order`). On the GAD
+  data of 2026-10-28 only Museum Shop has `in_search` true, so it is the only shortcut. See "Amenity
+  lists".
+- **Visible:** an Explore Museum space's text is the POI's description, else its category (PM, Monday
+  "Explore Museum view: gallery POI view", 2026-10-26).
 - **Visible:** an artwork visited out of order moves before the stops still to visit, so the numbers
   in the list and on the map follow the visit order. No `NextStop` is sent for that moment.
 - **Visible:** "Rerouting you…" in a white card in the middle of the faded map while the journey is

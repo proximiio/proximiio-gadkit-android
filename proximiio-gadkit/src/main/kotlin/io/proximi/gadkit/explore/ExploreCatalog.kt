@@ -2,6 +2,7 @@ package io.proximi.gadkit.explore
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.AmenityKind
+import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryDestination
 import io.proximi.gadkit.map.StandardTitleOrder
@@ -100,13 +101,15 @@ internal data class ExploreCatalog(
         /**
          * [categories] maps an amenity id to its title. [levelChangerTitles] names the venue's kinds
          * of lift and staircase by feature type (`elevator`, `staircase`), in the app's language.
-         * Pure; covered by tests.
+         * [facilities] chooses and orders the Amenities list and the legend's facilities
+         * (`in_facilities`, `facilities_order`). Pure; covered by tests.
          */
         fun of(
             places: List<VenuePlace>,
             destinations: Map<String, GalleryDestination>,
             categories: Map<String, String>,
             levelChangerTitles: Map<String, String> = emptyMap(),
+            facilities: AmenityListing = AmenityListing.ALL,
         ): ExploreCatalog {
             val byId = LinkedHashMap<String, VenuePlace>().apply { places.forEach { putIfAbsent(it.id, it) } }
             val museum = museumPlaceId(destinations, byId)
@@ -115,10 +118,12 @@ internal data class ExploreCatalog(
             val spaces = destinations.values.mapNotNull { destination ->
                 val poi = byId[destination.placeId]?.takeIf(inMuseum) ?: return@mapNotNull null
                 val category = poi.amenityId?.let { categories[it] }
-                val line = listOfNotNull(category, poi.details).joinToString(". ")
+                // The POI's description, else its category (PM, Monday "Explore Museum view: gallery
+                // POI view", 2026-10-26).
+                val line = poi.details ?: category
                 ExploreItem(
                     id = poi.id, kind = ExploreItem.Kind.Space, title = destination.gallery.name,
-                    lines = if (line.isEmpty()) emptyList() else listOf(line), level = poi.level,
+                    lines = listOfNotNull(line), level = poi.level,
                     coordinate = destination.entry, gallery = destination.gallery, category = category,
                     amenityId = poi.amenityId,
                 )
@@ -136,21 +141,28 @@ internal data class ExploreCatalog(
             val amenities = places.mapNotNull { place ->
                 if (place.isArtwork || !inMuseum(place)) return@mapNotNull null
                 val kind = AmenityKind.entries.firstOrNull { it.matches(place) } ?: return@mapNotNull null
-                if (kind == AmenityKind.STAIRS || kind == AmenityKind.ELEVATOR) return@mapNotNull null
-                ExploreItem(place.id, ExploreItem.Kind.Amenity(kind), place.title, emptyList(), place.level, place.coordinate, amenityId = place.amenityId)
-            }.sortedWith(ORDER)
+                if (kind == AmenityKind.STAIRS || kind == AmenityKind.ELEVATOR || facilities.rank(place.amenityId) == null) return@mapNotNull null
+                ExploreItem(place.id, ExploreItem.Kind.Amenity(kind), place.title, listOfNotNull(place.details), place.level, place.coordinate, amenityId = place.amenityId)
+            }
+                // Level, then the data's order, then title.
+                .sortedWith(compareBy<ExploreItem> { it.level }.thenBy { facilities.rank(it.amenityId) ?: 0.0 }.thenBy(StandardTitleOrder) { it.title })
 
             val galleryAmenities = spaces.mapNotNull { it.amenityId }.toSet()
             val used = places.filter { !it.isArtwork && inMuseum(it) }.mapNotNull { it.amenityId }.toSet()
             val entries = used.mapNotNull { id -> categories[id]?.let { ExploreLegendEntry(id, it) } }.sortedWith(LEGEND_ORDER)
             val isGallery = { entry: ExploreLegendEntry -> entry.amenityId in galleryAmenities || GALLERY_TITLE.containsMatchIn(entry.title) }
             val titles = entries.map { it.title.lowercase() }.toSet()
+            // A lift or staircase entry ranks as the amenity named after its feature type.
             val changers = listOf("elevator", "staircase").mapNotNull { type ->
-                levelChangerTitles[type]?.takeIf { it.lowercase() !in titles }?.let { ExploreLegendEntry("level-changer-$type", it) }
+                val title = levelChangerTitles[type]?.takeIf { it.lowercase() !in titles } ?: return@mapNotNull null
+                facilities.rankOfTitle(type)?.let { ExploreLegendEntry("level-changer-$type", title) to it }
             }
-            val facilities = (entries.filterNot(isGallery) + changers).sortedWith(LEGEND_ORDER)
+            val ranked = entries.filterNot(isGallery).mapNotNull { entry -> facilities.rank(entry.amenityId)?.let { entry to it } }
+            val legendFacilities = (ranked + changers)
+                .sortedWith(compareBy<Pair<ExploreLegendEntry, Double>> { it.second }.thenBy(StandardTitleOrder) { it.first.title })
+                .map { it.first }
 
-            return ExploreCatalog(spaces, highlights, amenities, entries.filter(isGallery), facilities)
+            return ExploreCatalog(spaces, highlights, amenities, entries.filter(isGallery), legendFacilities)
         }
 
         /** [items] by level, lowest first. Pure; covered by tests. */

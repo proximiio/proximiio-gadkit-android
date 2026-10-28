@@ -1,5 +1,8 @@
 package io.proximi.gadkit.map
 
+import kotlinx.coroutines.CancellationException
+import io.proximi.sdk.amenities
+import io.proximi.sdk.core.model.ProximiioAmenity
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.Gallery
@@ -38,8 +41,20 @@ private fun JsonValue.decoded(): Any? = when (this) {
 }
 
 /** Every point POI of the cached venue data, for [language] (an app language tag such as `ar`). */
-internal suspend fun VenueService.places(language: String?): List<VenuePlace> = withContext(Dispatchers.Default) {
-    VenuePlace.all(sdk.features().map { it.toVenueFeature() }, language)
+internal suspend fun VenueService.places(language: String?): List<VenuePlace> {
+    val amenities = catalogue()
+    return withContext(Dispatchers.Default) {
+        VenuePlace.withAmenityKinds(VenuePlace.all(sdk.features().map { it.toVenueFeature() }, language), amenities)
+    }
+}
+
+/** The SDK's amenity catalogue, or none when it cannot be read. */
+internal suspend fun VenueService.catalogue(): List<ProximiioAmenity> = try {
+    sdk.amenities().distinctBy { it.id }
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    emptyList()
 }
 
 /**

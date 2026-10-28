@@ -104,6 +104,8 @@ internal fun MuseumMapView(
     val selectedFloor by session.selectedFloor.collectAsStateWithLifecycle()
 
     var places by remember { mutableStateOf(emptyList<VenuePlace>()) }
+    // The search shortcuts, from the amenities' `in_search` and `search_order`.
+    var shortcuts by remember { mutableStateOf(emptyList<AmenityKind>()) }
     var selectedPlace by remember { mutableStateOf<VenuePlace?>(null) }
     var destination by remember { mutableStateOf<VenuePlace?>(null) }
     var routeError by remember { mutableStateOf<Int?>(null) }
@@ -243,6 +245,7 @@ internal fun MuseumMapView(
 
     LaunchedEffect(language) {
         places = venue.places(language)
+        shortcuts = AmenityListing.search(venue.catalogue()).shortcuts(places)
         // The picked places take their titles in the new language.
         destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
         selectedPlace = selectedPlace?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
@@ -254,6 +257,7 @@ internal fun MuseumMapView(
     LaunchedEffect(language) {
         venue.data.version.drop(1).collect {
             places = venue.places(language)
+            shortcuts = AmenityListing.search(venue.catalogue()).shortcuts(places)
             destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
             selectedPlace = selectedPlace?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
         }
@@ -315,7 +319,7 @@ internal fun MuseumMapView(
                         AnimatedVisibility(isShowingAmenities, enter = fadeIn(), exit = fadeOut()) {
                             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 AmenityChipList(
-                                    kinds = AmenityKind.SHORTCUTS.filter { kind -> places.any(kind::matches) },
+                                    kinds = shortcuts,
                                     selected = selectedAmenity,
                                 ) { kind ->
                                     selectedAmenity = kind
@@ -409,6 +413,7 @@ internal fun MuseumMapView(
     if (isSearching) {
         PlaceSearchSheet(
             places = places,
+            shortcuts = shortcuts,
             onPick = { place ->
                 isSearching = false
                 selectedPlace = place
