@@ -1023,6 +1023,15 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   levels on-site", 2026-10-28).
 - **Visible:** an artwork visited out of order moves before the stops still to visit, so the numbers
   in the list and on the map follow the visit order. No `NextStop` is sent for that moment.
+- **Visible:** "Rerouting you…" in a white card in the middle of the faded map while the journey is
+  routed again for longer than 0.5 s (PM, Monday "Rerouting calculation view", 2026-10-26).
+- **Visible:** inside a gallery of a personalised journey the follow zooms to
+  `GadSettings.galleryFollowZoom` (20); a camera the visitor moved stays.
+- **Visible:** the position dot disappears when the position is lost, and in a privacy zone, instead of
+  turning grey (PM, Monday "Privacy zone to have the same position marker as position disappearing",
+  2026-10-26).
+- **Visible:** the stop card keeps its instruction line while the route is routed again, so the card
+  and the buttons above it do not move (RPR, Monday "Accessible routing", 2026-10-28).
 
 #### Changed (SDK 6.0.0-beta.34, Map 6.0.0-beta.30; iOS 1.15.0, 1.16.0)
 

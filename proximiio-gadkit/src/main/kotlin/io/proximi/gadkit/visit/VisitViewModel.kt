@@ -76,6 +76,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import io.proximi.map.kit.MapCameraFollow
+import kotlinx.coroutines.flow.collectLatest
+import io.proximi.gadkit.GadSettings
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
@@ -229,6 +232,10 @@ internal class VisitViewModel(
     var visitorGallery by mutableStateOf<Gallery?>(null)
         private set
 
+    /** "Rerouting you…": the journey has been routed again for longer than 0.5 s. */
+    var showsRerouting by mutableStateOf(false)
+        private set
+
     /**
      * The gallery the leg to the active artwork ends at ([VisitController.galleryAhead]), or `null`
      * when it ends at the artwork.
@@ -352,6 +359,21 @@ internal class VisitViewModel(
         monitor.start()
         // No tracking or wristband alerts: the host app handles the wristband states (PM 2026-10-15).
         scope.launch { monitor.health.drop(1).collect { onEvent(VisitEvent.TrackingChanged(it)) } }
+        // No dot while a privacy zone holds it (`MapStyle.hidingPosition`).
+        scope.launch { monitor.health.collect(::applyPositionStyle) }
+        scope.launch { snapshotFlow { visitorGallery?.id }.distinctUntilChanged().collect { applyFollowZoom() } }
+        scope.launch {
+            // "Rerouting you…" after 0.5 s of routing; hidden when the routing ends (PM, Monday
+            // "Rerouting calculation view", 2026-10-26).
+            controller.isRerouting.collectLatest { isRerouting ->
+                if (!isRerouting) {
+                    showsRerouting = false
+                    return@collectLatest
+                }
+                delay(REROUTING_DELAY_MILLIS)
+                showsRerouting = true
+            }
+        }
         scope.launch {
             loadVenue()
             refreshMapLayers()
@@ -511,6 +533,29 @@ internal class VisitViewModel(
     private var accessibility = accessibility
 
     /** The app language changed: map labels and place titles follow it. */
+    /** No dot while a privacy zone holds it (`MapStyle.hidingPosition`). */
+    private fun applyPositionStyle(health: TrackingHealth) {
+        val position = MapStyle.options(language, routeMarkers = false, settings = settings).position
+        val style = if (health == TrackingHealth.PRIVACY_ZONE) MapStyle.hidingPosition(position) else position
+        if (session.options.position != style) session.options = session.options.copy(position = style)
+    }
+
+    /**
+     * The zoom of "Centre on me" and of the follow: [GadSettings.galleryFollowZoom] inside a gallery
+     * in a personalised journey, else [GadSettings.followZoom] (PM, Monday "Navigation to a gallery"
+     * and "Curated tours: zoom level", 2026-10-27). A camera that follows the visitor zooms to it; one
+     * the visitor moved stays.
+     */
+    private fun applyFollowZoom() {
+        val zoom = followZoom(inGallery = visitorGallery != null, kind = kind, settings = settings)
+        if (session.options.recentreZoom == zoom) return
+        session.options = session.options.copy(recentreZoom = zoom)
+        if (session.cameraMode.value != MapCameraFollow.Mode.FREE && !floorGuide.isActive) {
+            FieldLog.log("follow zoom $zoom · in a gallery ${visitorGallery?.name ?: "-"}")
+            session.recentre(zoom = zoom)
+        }
+    }
+
     fun setLanguage(appLanguage: String?) {
         val language = MapLanguage.forAppLanguage(appLanguage)
         if (language == this.language) return
@@ -1002,6 +1047,15 @@ internal class VisitViewModel(
 
     companion object {
         private const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
+
+        /** "Rerouting you…" shows after this much routing. */
+        private const val REROUTING_DELAY_MILLIS = 500L
+
+        /** The follow zoom: [GadSettings.galleryFollowZoom] in a gallery of a personalised journey. Pure; covered by tests. */
+        internal fun followZoom(inGallery: Boolean, kind: JourneyKind, settings: GadSettings): Double {
+            val zoom = settings.galleryFollowZoom
+            return if (inGallery && kind.guidesToGalleryFirst && zoom != null) zoom else settings.followZoom
+        }
 
         /** The states of a stop still to visit: a destination at such a stop makes it the next stop. */
         private val OPEN_STATES = setOf(MapJourneyStop.State.PENDING, MapJourneyStop.State.ACTIVE, MapJourneyStop.State.REACHED)

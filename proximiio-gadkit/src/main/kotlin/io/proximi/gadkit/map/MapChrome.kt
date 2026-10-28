@@ -205,6 +205,12 @@ internal fun StopInfoCard(
      * Reality and Audio symbols").
      */
     badges: @Composable RowScope.() -> Unit = {},
+    /**
+     * The instruction line keeps its height without an instruction, for example while the route is
+     * routed again: the card and the buttons above it do not move (RPR, Monday "Accessible routing",
+     * 2026-10-28).
+     */
+    keepsInstructionLine: Boolean = false,
 ) {
     Row(
         modifier
@@ -233,18 +239,15 @@ internal fun StopInfoCard(
                 badges()
             }
             Text(title, style = GadTextStyle.LargeBodyBold.textStyle, color = Palette.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (instruction != null || remaining != null) {
+            if (instruction != null || remaining != null || keepsInstructionLine) {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (instruction != null) {
-                        Text(
-                            instruction,
-                            Modifier.weight(1f),
-                            style = GadTextStyle.BodyExtraSmall.textStyle.copy(fontWeight = FontWeight.Bold),
-                            color = Palette.ink,
-                        )
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                    }
+                    // An empty line still takes the height of one line of text.
+                    Text(
+                        instruction ?: "",
+                        Modifier.weight(1f),
+                        style = GadTextStyle.BodyExtraSmall.textStyle.copy(fontWeight = FontWeight.Bold),
+                        color = Palette.ink,
+                    )
                     if (remaining != null) Text(remaining, style = GadTextStyle.BodyExtraSmall.textStyle, color = Palette.ink)
                 }
             }

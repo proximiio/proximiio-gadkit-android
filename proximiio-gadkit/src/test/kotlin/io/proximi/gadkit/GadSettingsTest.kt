@@ -1,5 +1,7 @@
 package io.proximi.gadkit
 
+import io.proximi.gadkit.visit.JourneyKind
+import io.proximi.gadkit.visit.VisitViewModel
 import io.proximi.gadkit.map.MapLoading
 import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.visit.StopNearbyDetector
@@ -76,5 +78,16 @@ class GadSettingsTest {
         assertFalse(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0))
         assertTrue(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0, nearbyMeters = 10.0))
         assertTrue(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0, routeMeters = 9.0, nearbyMeters = 10.0))
+    }
+
+    /** RPR, Monday "Need to determine correct zoom levels on-site", 2026-10-28. */
+    @Test
+    fun theFollowZoomIs18Point8And20InAGalleryOfAPersonalisedJourney() {
+        val settings = GadSettings.STANDARD
+        assertEquals(18.8, VisitViewModel.followZoom(inGallery = false, kind = JourneyKind.PERSONALISED, settings = settings))
+        assertEquals(20.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = settings))
+        assertEquals(18.8, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = settings))
+        val withoutGalleryZoom = settings.copy(galleryFollowZoom = null)
+        assertEquals(18.8, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = withoutGalleryZoom))
     }
 }

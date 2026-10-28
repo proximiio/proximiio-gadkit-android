@@ -11,6 +11,7 @@ import android.content.Context
 import io.proximi.map.core.JourneyStopMarkerStyle
 import io.proximi.map.core.MapColor
 import io.proximi.map.core.PositionAccuracyStyle
+import io.proximi.map.core.PositionFreshnessRules
 import io.proximi.map.core.PositionHeadingStyle
 import io.proximi.gadkit.GadSettings
 import io.proximi.map.core.PositionPrivacyStyle
@@ -99,6 +100,20 @@ internal object MapStyle {
             } else {
                 PositionTrailStyle()
             },
+            // The dot disappears when the position does (PM, Monday "Privacy zone to have the same
+            // position marker as position disappearing", 2026-10-26). `hidingPosition` hides it in a
+            // privacy zone.
+            freshness = venue.freshness.let {
+                PositionFreshnessRules.of(
+                    staleAfter = it.staleAfter,
+                    driftMetersPerSecond = it.driftMetersPerSecond,
+                    maxAccuracyMeters = it.maxAccuracyMeters,
+                    greyingSeconds = it.greyingSeconds,
+                    lostAfter = it.lostAfter,
+                    staleOpacity = 0.0,
+                    lostOpacity = 0.0,
+                )
+            },
         )
         return MapOptions(
             camera = MapOptions.Camera.FOLLOW_WITH_HEADING,
@@ -123,6 +138,18 @@ internal object MapStyle {
             // The camera keeps to the range in every frame the map sets too (map 6.0.0-beta.28).
             minimumZoom = settings.minimumZoom,
             maximumZoom = settings.maximumZoom,
+        )
+    }
+
+    /**
+     * [position] with nothing drawn while a privacy zone holds the dot. The map library draws a held
+     * dot at full opacity; its stroke, shadow and ring are made clear.
+     */
+    fun hidingPosition(position: PositionStyle): PositionStyle {
+        val clear = MapColor.hex(0xFFFFFF, alpha = 0.0)
+        return position.copy(
+            dot = position.dot.copy(strokeColor = clear, shadowOpacity = 0.0),
+            privacy = PositionPrivacyStyle(color = clear, showsAccuracy = false),
         )
     }
 

@@ -1,5 +1,7 @@
 package io.proximi.gadkit.visit
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import android.Manifest
 import android.app.Application
 import androidx.activity.compose.LocalActivity
@@ -276,6 +278,11 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                     )
                     // The list covers the map with white: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
+                    // "Rerouting you…" fades the map (PM, Monday "Rerouting calculation view", 2026-10-26).
+                    // The scope-free overload: inside the frame's Box the Column scope of the screen is also in reach.
+                    androidx.compose.animation.AnimatedVisibility(model.showsRerouting, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+                        Box(Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) { ReroutingCard() }
+                    }
                     ProvideGlassBackdrop(if (!model.showsList) mapBackdrop else null) { CardOverlay(model) }
                 }
                 if (ProximiMapView.Option.BOTTOM_BAR in model.options) {
@@ -313,6 +320,22 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
         FollowsVisitorFloor(model.session, model.venue, isPaused = floorPhase != FloorWithoutPositioningGuide.Phase.Idle)
         FloorChangeOverlay(model.floorGuide)
         VisitSheets(model)
+    }
+}
+
+/** "Rerouting you…" in the middle of the map (PM, Monday "Rerouting calculation view", 2026-10-26). */
+@Composable
+private fun ReroutingCard() {
+    Column(
+        Modifier
+            .background(Palette.white, RoundedCornerShape(16.dp))
+            .padding(horizontal = 36.dp, vertical = 28.dp)
+            .semantics(mergeDescendants = true) {},
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        CircularProgressIndicator(color = Palette.ink)
+        Text(stringResource(R.string.rerouting_you), style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
     }
 }
 
@@ -501,6 +524,8 @@ private fun VisitCard(model: VisitViewModel) {
             }
         },
         badges = { model.namedArtwork?.let { ArtworkBadges(it) } },
+        // On the way to a stop the card keeps the instruction line, also while the route is routed again.
+        keepsInstructionLine = state is VisitCardState.Walking || state is VisitCardState.NextStopOnOtherLevel,
     )
 }
 
