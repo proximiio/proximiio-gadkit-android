@@ -197,9 +197,11 @@ private fun HostedExploreCheck(map: ProximiMap, venue: VenueService) {
 /**
  * `gad.hostedMap`: [ProximiMapView] on the app's SDK with the default options, as Nagarro's app uses
  * it. This view is the host app: it skips a stop the visitor swiped, "Visited" marks the first
- * pending stop visited, and "Remove" removes the last stop. The lines at the top count the stop
- * states of its journey and list the navigators it got from `onNavigator` and the events of the
- * last one, for UI tests.
+ * pending stop visited, and "Remove" removes the last stop. "Host pause" and "Host resume" set
+ * `isPaused`, as the audio guide's pause button (iOS "Host pause" / "Host resume"); "Go to café" sets
+ * `destination` to the café's `properties.id`, as proximiio-mcp returns it. The lines at the top count
+ * the stop states of its journey, list the navigators it got from `onNavigator` and the events of the
+ * last one, and the view's latest events (test tag `hostedMapEvents`), for UI tests.
  */
 @Composable
 private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
@@ -211,6 +213,11 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     var navigatorJob by remember { mutableStateOf<Job?>(null) }
     /** The navigators `onNavigator` got. The screen starts again with a new one. */
     var navigators by remember { mutableStateOf(0) }
+    var isPaused by remember { mutableStateOf(false) }
+    var destination by remember { mutableStateOf<ProximiDestination?>(null) }
+    /** The names of the view's events, oldest first. */
+    var mapEvents by remember { mutableStateOf(emptyList<String>()) }
+    val places by map.places.collectAsState()
     fun set(id: String, state: ProximiJourney.State) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
     }
@@ -222,8 +229,13 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
             routeAccessibility = accessibility,
             onEvent = { event ->
                 FieldLog.log("hosted map → host app: $event")
+                mapEvents = mapEvents + (event::class.simpleName ?: "?")
                 if (event is ProximiMapEvent.SkipRequested) set(event.stop.id, ProximiJourney.State.SKIPPED)
             },
+            destination = destination,
+            onDestinationChange = { destination = it },
+            isPaused = isPaused,
+            onPausedChange = { isPaused = it },
             onNavigator = { navigator ->
                 navigators += 1
                 navigatorJob?.cancel()
@@ -248,10 +260,25 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                 }
                 TextButton(onClick = map.presenter::hide) { Text("Close map", style = MaterialTheme.typography.labelSmall) }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { isPaused = !isPaused }) {
+                    Text(if (isPaused) "Host resume" else "Host pause", style = MaterialTheme.typography.labelSmall)
+                }
+                places.firstOrNull { it.title.contains("café", ignoreCase = true) || it.title.contains("cafe", ignoreCase = true) }?.let { cafe ->
+                    TextButton(onClick = { destination = ProximiDestination(cafe.id.substringAfter(':')) }) {
+                        Text("Go to café", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
             Text(
                 "navigator $navigators: ${navigatorEvents.takeLast(6).joinToString(" ")}",
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.testTag("hostedNavigatorEvents"),
+            )
+            Text(
+                "events: ${mapEvents.takeLast(4).joinToString(" ")}",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.testTag("hostedMapEvents"),
             )
         }
     }

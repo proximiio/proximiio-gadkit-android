@@ -124,6 +124,14 @@ internal data class VenuePlace(
             return null
         }
 
+        /**
+         * The place with [id]: the feature id, or its `properties.id`. On GAD data the SDK's feature
+         * id is `<organisation id>:<properties.id>`; proximiio-mcp returns `properties.id` (GAD data,
+         * 2026-10-27). Pure; covered by tests.
+         */
+        internal fun place(id: String, places: List<VenuePlace>): VenuePlace? =
+            places.firstOrNull { it.id == id } ?: places.firstOrNull { it.id.endsWith(":$id") }
+
         /** Case- and diacritic-insensitive substring match on the title. An empty query matches all. */
         internal fun matching(query: String, places: List<VenuePlace>): List<VenuePlace> {
             val needle = query.trim()

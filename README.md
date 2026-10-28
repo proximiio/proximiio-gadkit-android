@@ -306,7 +306,11 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 |---|---|---|
 | `BOTTOM_BAR` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `BACKGROUND` | The library's background image around the map card. | Transparent. |
-| `PROMPTS` | "Skip this artwork?" ("Skip artwork" reports `StopSkipped`; the stop is skipped with `PROGRESS`, else the host app skips it), "You've left your route" (the route stays until "Show the route from here"), "Probably at …", "Change your route?" and "Leave the tour here" (with `onClose`). | No prompt. A swipe reports `SkipRequested`; the route follows a visitor who left it and `OffRoute` reports it; an uncertain position reports `PositionUncertain`; "Go here" on an amenity starts the detour; `JourneyFinished` reports the end. |
+| `PROMPTS` | All four prompts below (iOS `.prompts`). | Only the prompts named one by one. |
+| `SKIP_PROMPT` | "Skip this artwork?" after a swipe. "Skip artwork" reports `StopSkipped`; the stop is skipped with `PROGRESS`, else the host app skips it. | A swipe reports `SkipRequested` only. |
+| `OFF_ROUTE_PROMPT` | "Looks like you've left your route" with "Dismiss", in place of the stop card, `GadSettings.offRouteMeters` (12 m) off the route and before any routing. It stays `GadSettings.offRouteWarningDuration` (10 s). With `PROGRESS` a personalised journey keeps the leg until another open artwork is nearer, then the stops ahead are ordered again; other journeys are routed again from the visitor. A floor the route does not take counts as off the route after `GadSettings.wrongFloorAfter` (10 s). See "Journeys". | The route follows a visitor who left it; `OffRoute` reports it. |
+| `UNCERTAIN_POSITION_PROMPT` | "Probably at …" when the position is uncertain near the active stop. | `PositionUncertain` reports it. |
+| `LEAVE_TOUR_PROMPT` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `onClose`). | Back calls `onClose` at once. |
 | `PROGRESS` | The view moves the journey on and reports it through `onJourneyChange`: an artwork is visited when the visitor enters its geofence (`ArtworkReached`) or, in a personalised journey, stays at it out of order (`ArtworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and reports no journey. |
 | `JOURNEY_NOTIFICATION` | The ongoing journey notification (iOS `.liveActivity`). It needs the notification permission; the view asks for it. | No journey notification. |
 | `JOURNEY_COMPLETE` | Journey Complete when the last stop is done. | No screen; `JourneyFinished` reports the end. |
@@ -356,10 +360,14 @@ With `PROGRESS` the view also reports through `onJourneyChange`:
 `onEvent` receives the journey screen's events of the [Events](#events) table: `TrackingChanged`,
 `NextStop`, `StopNearby`, `PositionUncertain`, `StopPlaceDeleted`, `SkipRequested`, the amenity and
 detour events, `JourneyResumed`, `OffRoute`, `BackOnRoute`, `JourneyFinished`, the floor without
-positioning events, `ModeChanged`, `Recentred` and `AccessibleRoutesChanged`; with `PROMPTS` also
-`StopSkipped` and `SkipCancelled`; with `PROGRESS`
-also `ArtworkReached` and `ArtworkVisitedOutOfOrder`; with `BOTTOM_BAR`, `PROMPTS` and `onClose` also
-the exit events. Screen, wristband, arrival, geofence and `JourneyChanged` events come only from
+positioning events, `ModeChanged`, `Recentred`, `AccessibleRoutesChanged`, `JourneyPaused` and
+`DestinationUnavailable`; with `SKIP_PROMPT` also `StopSkipped` and `SkipCancelled`; with `PROGRESS`
+also `ArtworkReached`, `ArtworkVisitedOutOfOrder` and `StopOrderChanged`; with `BOTTOM_BAR`,
+`LEAVE_TOUR_PROMPT` and `onClose` also the exit events.
+
+`StopOrderChanged(journey)` comes after `onJourneyChange` got a new order of the stops: from the
+visitor's first position, after `ArtworkVisitedOutOfOrder` and after a detour. A change of the states
+alone sends none. Without `PROGRESS` the view keeps the host app's order and never sends it. Screen, wristband, arrival, geofence and `JourneyChanged` events come only from
 `ProximiMap`; geofence enter and exit events are on the host app's SDK (`geofenceEvents()`).
 
 ### The navigator
@@ -408,10 +416,62 @@ The view's navigator differs from a navigator with the map library's default rul
 | | The view's navigator |
 |---|---|
 | `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies a change of `journey` (`update(to)`). |
-| `FarFromRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (30 m) and `GadSettings.offRouteAfter` (300 s). |
-| Off the route | Without `PROMPTS` the route follows the visitor (`JourneyDeviationPolicy.AUTOMATIC`); with `PROMPTS` the view asks (`ASK_APP`). |
+| `LeftRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (12 m, 3 fixes; `leftRouteMeters`) and `GadSettings.offRouteAfter` (300 s). |
+| Off the route | Without `OFF_ROUTE_PROMPT` the route follows the visitor (`JourneyDeviationPolicy.AUTOMATIC`); with it the navigator routes nothing by itself (`ASK_APP`) and the view shows its warning first. While the journey is paused the view passes on no `LeftRoute`, `FarFromRoute`, `OffRouteTooLong` or `ReturnedToRoute`. |
 | `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `APPROACHING_DESTINATION` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
+
+### Routing to a place
+
+`destination` routes the visitor to a POI at once, for example to the place of the audio guide's
+proximiio-mcp answer (`route_to_place`, `route_to_nearest_amenity`). The visitor agreed with the host
+app, so the view shows no card and no prompt.
+
+```kotlin
+var destination by remember { mutableStateOf<ProximiDestination?>(null) }
+
+ProximiMapView(
+    sdk = sdk, journey = journey, onJourneyChange = { journey = it },
+    destination = destination, onDestinationChange = { destination = it },
+    onEvent = { event ->
+        if (event is ProximiMapEvent.DestinationUnavailable) println("${event.poiId}: ${event.reason}")
+    },
+)
+// The audio guide's answer:
+destination = ProximiDestination(poiId = "c1f9…")   // feature id or properties.id
+```
+
+- During a journey the place is a detour: `DetourStarted`, then `DetourEnded` when the visitor
+  reached it or left it, and "Resume your Journey" on the stop card. A stop of the journey still to
+  visit becomes the next stop instead. A place that is already a stop gets the stop id
+  `detour:<poi id>`.
+- Without stops the map shows the route from the visitor, as "Go here".
+- The view sets the destination back to `null` through `onDestinationChange` when the route ends:
+  "Resume your Journey", "Close", another place picked on the map, or `DestinationUnavailable`.
+  `null` from the host app ends the route.
+- `DestinationUnavailable(poiId, reason)`: `UNKNOWN_PLACE` (no place of the venue has the id),
+  `NO_ROUTE` (no route from the visitor with the accessibility needs) or `NO_POSITION` (a map without
+  a journey has no position yet).
+- The id is the feature id (`<organisation id>:<properties.id>` on GAD data) or its `properties.id`,
+  which proximiio-mcp returns.
+
+### Pausing the journey
+
+`isPaused = true` pauses the journey, for example from the audio guide's pause button
+(`onPausedChange` hands back `false`):
+
+- The dot moves and the route stays. No artwork is visited, gallery first does not draw the leg
+  again, and no off-route warning, closer artwork or wrong floor shows. The navigator leaves the leg
+  where it is (`ASK_APP`).
+- The view reports no `OffRoute`, `BackOnRoute` or `PositionUncertain`.
+- The stop card shows "Journey paused", "Your next stop is …." and "Resume your Journey". A detour
+  keeps its leg and its arrival.
+- `isPaused = false`: the leg is drawn again from the visitor; with `PROGRESS` a personalised journey
+  is ordered again from the visitor first.
+- "Resume your Journey" on the card sets it back to `false` through `onPausedChange` and reports
+  `JourneyResumed`. A change of the host app reports no event.
+- "Add a stop" on an amenity reports `DetourStarted` and `JourneyPaused`; the journey waits for
+  "Resume your Journey" (`JourneyResumed`). `isPaused` does not change for it.
 
 ## Screens
 
@@ -827,7 +887,7 @@ adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> -
 | `gad.routeTo <title>` | The museum map of Journey Complete routes to the first place whose title matches, after the first position. |
 | `gad.mapGalleryFills true` | The museum map of Journey Complete fills every gallery. |
 | `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
-| `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. With `gad.openMap`: the museum map in `ProximiExploreView`, with "Close map". |
+| `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. With `gad.openMap`: the museum map in `ProximiExploreView`, with "Close map". The debug host also has "Host pause" / "Host resume" (`isPaused`), "Go to café" (`destination` by `properties.id`) and a line of the view's events (test tag `hostedMapEvents`). |
 
 `gad.hubPage` is read by the Proximi GAD app; the library does not act on it.
 
@@ -931,6 +991,38 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Added (iOS 1.15.0, 1.17.0; Nagarro, 2026-10-26 to 2026-10-28)
+
+- One option per prompt: `ProximiMapView.Option.SKIP_PROMPT`, `OFF_ROUTE_PROMPT`,
+  `UNCERTAIN_POSITION_PROMPT` and `LEAVE_TOUR_PROMPT`. `PROMPTS` still turns on all four. Without one,
+  the view behaves as without prompts for that prompt only. See "Options".
+- `ProximiMapView(destination, onDestinationChange)` and `ProximiDestination`: the host app routes
+  the visitor to a POI at once, for example from the audio guide. New event
+  `ProximiMapEvent.DestinationUnavailable(poiId, reason)`. See "Routing to a place".
+- `ProximiMapView(isPaused, onPausedChange)`: the host app pauses and resumes the journey. New event
+  `ProximiMapEvent.JourneyPaused` after "Add a stop". See "Pausing the journey".
+- `ProximiMapEvent.StopOrderChanged(journey)`: with `PROGRESS`, after a new order of the stops. See
+  "Events of ProximiMapView".
+- `GadSettings.offRouteWarningDuration` (10 s), `wrongFloorAfter` (10 s) and `galleryFollowZoom` (20).
+- A `when` over `ProximiMapEvent` without `else` adds the three new events.
+
+#### Changed (iOS 1.15.0 to 1.20.0)
+
+- **Visible:** during a journey the amenity card has "Add a stop" and "Close". "Add a stop" starts the
+  detour at once and takes the map back to the visitor. "Change your route?" is gone (PM, Monday "Add
+  stop confirmation", 2026-10-26).
+- **Visible:** off the route, "Looks like you've left your route" / "Your next stop is …." /
+  "Dismiss" takes the place of the stop card; the bottom sheet "You've left your route" and "Show the
+  route from here" are gone. The warning comes before any routing and stays 10 s. A personalised
+  journey keeps its leg until another open artwork is nearer; a curated tour is routed again from the
+  visitor. A floor the route does not take counts as off the route after 10 s.
+- **BREAKING:** `GadSettings.offRouteMeters` is 12 (was 30): the navigator's `leftRouteMeters`, 3
+  fixes (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-28).
+- **BREAKING:** `GadSettings.followZoom` is 18.8 (was 21; RPR, Monday "Need to determine correct zoom
+  levels on-site", 2026-10-28).
+- **Visible:** an artwork visited out of order moves before the stops still to visit, so the numbers
+  in the list and on the map follow the visit order. No `NextStop` is sent for that moment.
 
 #### Changed (SDK 6.0.0-beta.34, Map 6.0.0-beta.30; iOS 1.15.0, 1.16.0)
 

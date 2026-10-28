@@ -22,6 +22,7 @@ import io.proximi.map.core.JourneyRules
 import io.proximi.map.core.JourneyStop
 import io.proximi.map.core.RouteFollowRules
 import io.proximi.map.core.RouteSnapRules
+import io.proximi.map.core.RouteGeometry
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryDestination
 import io.proximi.map.core.MapCoordinate
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.roundToInt
 import io.proximi.gadkit.visit.Journey as CoreJourney
 
 /**
@@ -77,11 +79,28 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * order. After a detour the stops still ahead are ordered again from the visitor. A curated tour
  * keeps the curators' order ([keepsOrder]).
  *
- * With prompts ([io.proximi.gadkit.ProximiMapView.Option.PROMPTS]), leaving the route does not
- * re-route the leg (`JourneyDeviationPolicy.ASK_APP`): the visitor gets a warning ([isOffRoute])
- * after the navigator reports `FarFromRoute` or `OffRouteTooLong`, and "Show the route from here"
- * re-routes from the current position. Without prompts the navigator re-routes from the visitor
- * (`AUTOMATIC`).
+ * Off the route (PM, Monday "Personalized tour: off-route and re-route behaviour" and "Curated tour:
+ * off-route and recalculation", 2026-10-26 and 2026-10-28): the visitor gets a warning ([isOffRoute])
+ * once they are [GadSettings.offRouteMeters] (12 m) off the route to the current destination
+ * (`LeftRoute`), far from it, or off it for too long. The warning comes before any routing: with
+ * [io.proximi.gadkit.ProximiMapView.Option.OFF_ROUTE_PROMPT] the navigator routes nothing by itself
+ * (`JourneyDeviationPolicy.ASK_APP`). After the warning a personalised journey keeps the leg where the
+ * visitor left it; when another open artwork is now the nearest stop, the stops ahead are ordered
+ * again from the visitor and the leg leads to it ([checkCloserArtwork]). A curated tour is routed
+ * again from the visitor after the warning ([reroutesAfterWarning]). A journey without the prompt is
+ * routed again by the navigator (`AUTOMATIC`).
+ *
+ * The warning stays open for [GadSettings.offRouteWarningDuration], unless the visitor closes it; the
+ * routing after it does not close it (PM, 2026-10-27). A visitor on a floor the route does not take
+ * for [GadSettings.wrongFloorAfter] is off the route too ([checkWrongFloor]; PM, Monday "Wrong floor to
+ * trigger off-route and re-routing", 2026-10-27).
+ *
+ * An artwork visited out of order moves before the stops still to visit, so the numbers in the list
+ * and on the map follow the visit order (PM, Monday "Personalized tour: renumbering artworks",
+ * 2026-10-26).
+ *
+ * [pause] stops the guidance until [resumeFromPause]: no artwork is visited, no warning shows, and the
+ * navigator leaves the leg where it is (Nagarro, 2026-10-28).
  *
  * Without [managesProgress] ([io.proximi.gadkit.ProximiMapView.Option.PROGRESS]) the host app moves
  * the journey on: no arrival by geofence, no ordering, and [apply] takes the host app's changes.
@@ -128,8 +147,8 @@ internal class VisitController(
      */
     private val managesProgress: Boolean = true,
     /**
-     * [io.proximi.gadkit.ProximiMapView.Option.PROMPTS]: the leg stays where the visitor left it
-     * until "Show the route from here" (`ASK_APP`). Off, the navigator routes again from the visitor.
+     * [io.proximi.gadkit.ProximiMapView.Option.OFF_ROUTE_PROMPT]: the navigator routes nothing by
+     * itself; the warning comes first (`ASK_APP`). Off, the navigator routes again from the visitor.
      */
     private val deviationPolicy: JourneyDeviationPolicy = JourneyDeviationPolicy.ASK_APP,
     /** Times and distances: arrival, out-of-order dwell, off route, route snap, journey order. */
@@ -195,9 +214,9 @@ internal class VisitController(
         // The dot is drawn on the route within this distance. Display only: guidance and arrival
         // use the real position (PM review 2026-10-12).
         session.routeSnapping = RouteSnapRules(maximumOffsetMeters = settings.routeSnapMeters)
-        // "You've left your route": this far from the route, or off it this long.
+        // "Looks like you've left your route": this far from the route, or off it this long.
         navigator.deviationRules = navigator.deviationRules.copy(
-            farFromRouteMeters = settings.offRouteMeters,
+            leftRouteMeters = settings.offRouteMeters,
             offRouteTooLongSeconds = settings.offRouteAfter.inWholeMilliseconds / 1000.0,
         )
     }
@@ -232,10 +251,47 @@ internal class VisitController(
     private val mutableOffRoute = MutableStateFlow(false)
 
     /**
-     * `true` after `FarFromRoute` or `OffRouteTooLong`, until the visitor returns to the route or
-     * answers the warning.
+     * `true` for [GadSettings.offRouteWarningDuration] after `LeftRoute`, `FarFromRoute`,
+     * `OffRouteTooLong` or a wrong floor, until the visitor closes the warning, resumes the journey or
+     * adds a stop.
      */
     val isOffRoute: StateFlow<Boolean> = mutableOffRoute.asStateFlow()
+    private var offRouteWarning: Job? = null
+
+    /**
+     * From `LeftRoute`, `FarFromRoute` or `OffRouteTooLong` until the visitor is back on the route or
+     * a new leg starts. The warning can be closed meanwhile.
+     */
+    private var isOffRouteEpisode = false
+
+    /** Since when the fixes have been on a floor the route does not take (milliseconds). */
+    private var wrongFloorSince: Long? = null
+
+    /** The journey was routed again for the wrong floor the visitor is still on. */
+    private var isRoutedForWrongFloor = false
+    private var lastCloserArtworkCheck = 0L
+
+    private val mutablePaused = MutableStateFlow(false)
+
+    /** [pause] until [resumeFromPause]. */
+    val isPaused: StateFlow<Boolean> = mutablePaused.asStateFlow()
+
+    private val mutableRerouting = MutableStateFlow(false)
+    private var reroutes = 0
+
+    /**
+     * `true` while the controller routes the journey again: the order after an artwork visited out of
+     * order or a closer artwork, the leg from the visitor, the end of a detour ("Rerouting you…").
+     */
+    val isRerouting: StateFlow<Boolean> = mutableRerouting.asStateFlow()
+
+    private val mutablePassingStopId = MutableStateFlow<String?>(null)
+
+    /**
+     * The stop the navigator walks to for a moment while an artwork visited out of order moves ahead.
+     * The screen reports no `NextStop` for it.
+     */
+    val passingStopId: StateFlow<String?> = mutablePassingStopId.asStateFlow()
 
     /** `true` after [end]: the visit is over and nothing is saved any more. */
     private var hasEnded = false
@@ -261,7 +317,7 @@ internal class VisitController(
     suspend fun start() {
         if (isStarted) return
         isStarted = true
-        navigator.deviationPolicy = deviationPolicy
+        navigator.deviationPolicy = if (mutablePaused.value) JourneyDeviationPolicy.ASK_APP else deviationPolicy
         navigator.setRouteOptions(routeOptions)
         var isOrderedWithoutFix = false
         if (!keepsOrder && navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING }) {
@@ -311,10 +367,137 @@ internal class VisitController(
         refreshGalleryAhead()
         when (event) {
             is JourneyEvent.StopReached -> if (event.stop.kind != JourneyStop.Kind.DETOUR) scheduleDone(event.stop.id)
-            is JourneyEvent.DetourEnded -> if (event.completed) doneJobs += scope.launch { serially { orderRemaining() } }
-            is JourneyEvent.FarFromRoute, is JourneyEvent.OffRouteTooLong -> mutableOffRoute.value = true
-            JourneyEvent.ReturnedToRoute -> mutableOffRoute.value = false
+            is JourneyEvent.DetourEnded -> if (event.completed) doneJobs += scope.launch { serially { rerouting { orderRemaining() } } }
+            is JourneyEvent.LeftRoute, is JourneyEvent.FarFromRoute, is JourneyEvent.OffRouteTooLong -> offRouteEpisode()
+            JourneyEvent.ReturnedToRoute, is JourneyEvent.LegChanged, is JourneyEvent.Rerouted -> isOffRouteEpisode = false
             else -> Unit
+        }
+    }
+
+    /** The navigator reported the visitor off the route: the warning, and for a curated tour the leg from the visitor. */
+    private fun offRouteEpisode() {
+        if (mutablePaused.value) return
+        val startsEpisode = !isOffRouteEpisode
+        isOffRouteEpisode = true
+        showOffRouteWarning()
+        if (startsEpisode && reroutesAfterWarning) rerouteFromVisitor()
+    }
+
+    /**
+     * Called on every fix. Personalised journeys off the route: when the nearest open artwork is no
+     * longer the active stop, the stops ahead are ordered again from the visitor and the leg leads to
+     * that artwork. At most every 5 s.
+     */
+    fun checkCloserArtwork() {
+        if (!managesProgress || keepsOrder || !isNavigating || mutablePaused.value || !isOffRouteEpisode || navigator.detourStop != null) return
+        val active = navigator.activeStop ?: return
+        val now = System.currentTimeMillis()
+        if (now - lastCloserArtworkCheck < CLOSER_ARTWORK_INTERVAL_MILLIS) return
+        lastCloserArtworkCheck = now
+        doneJobs += scope.launch {
+            serially {
+                if (!isOffRouteEpisode || navigator.activeStop?.id != active.id) return@serially
+                val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY) ?: return@serially
+                val first = proposal.order.firstOrNull()
+                if (!proposal.isImprovement || first == null || first == active.id) return@serially
+                FieldLog.log("off route: $first is nearer than ${active.title} · journey ordered again")
+                isOffRouteEpisode = false
+                rerouting { apply(proposal) }
+            }
+        }
+    }
+
+    /**
+     * Called on every fix. A visitor on a floor the route ahead does not take for
+     * [GadSettings.wrongFloorAfter] is off the route: the warning shows, and the leg is drawn again
+     * from the visitor. A personalised journey is ordered again first, so the leg leads to the nearest
+     * open artwork; a curated tour keeps its next stop. Once per wrong floor: the next check starts
+     * when a fix is on a floor of the route again. Off on a floor without positioning
+     * ([isFloorGuideActive]).
+     */
+    fun checkWrongFloor(isFloorGuideActive: Boolean) {
+        val level = session.position.value?.floor?.level
+        val legs = session.routeRenderer?.geometry?.legs
+        if (!isNavigating || mutablePaused.value || isFloorGuideActive || navigator.activeStop == null || navigator.hasArrived ||
+            level == null || legs == null || isOnRouteFloor(level, legs)
+        ) {
+            wrongFloorSince = null
+            isRoutedForWrongFloor = false
+            return
+        }
+        if (isRoutedForWrongFloor) return
+        val now = System.currentTimeMillis()
+        val since = wrongFloorSince ?: now
+        wrongFloorSince = since
+        if (now - since < settings.wrongFloorAfter.inWholeMilliseconds) return
+        isRoutedForWrongFloor = true
+        wrongFloorSince = null
+        FieldLog.log("wrong floor: L${level.roundToInt()} is not on the route · journey routed again from the visitor")
+        isOffRouteEpisode = true
+        showOffRouteWarning()
+        val reorders = managesProgress && !keepsOrder
+        doneJobs += scope.launch {
+            serially {
+                rerouting {
+                    if (reorders) {
+                        navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY)
+                            ?.takeIf { it.isImprovement }
+                            ?.let { apply(it) }
+                    }
+                    navigator.resumeJourney()
+                }
+                save()
+            }
+        }
+    }
+
+    /**
+     * A journey that keeps its order and shows the warning (`ASK_APP`, a curated tour) is routed
+     * again from the visitor after the warning. A personalised journey keeps its leg.
+     */
+    private val reroutesAfterWarning: Boolean
+        get() = deviationPolicy == JourneyDeviationPolicy.ASK_APP && keepsOrder
+
+    /** Draws the leg again from the visitor, after the warning. */
+    private fun rerouteFromVisitor() {
+        FieldLog.log("off route: warning shown · leg drawn again from the visitor")
+        doneJobs += scope.launch {
+            serially {
+                if (!isOffRouteEpisode) return@serially
+                rerouting { navigator.resumeJourney() }
+                save()
+            }
+        }
+    }
+
+    /**
+     * Opens the off-route warning for [GadSettings.offRouteWarningDuration]. A new episode while it
+     * is open starts the time again.
+     */
+    private fun showOffRouteWarning() {
+        mutableOffRoute.value = true
+        offRouteWarning?.cancel()
+        offRouteWarning = scope.launch {
+            delay(settings.offRouteWarningDuration)
+            mutableOffRoute.value = false
+        }
+    }
+
+    private fun closeOffRouteWarning() {
+        offRouteWarning?.cancel()
+        offRouteWarning = null
+        mutableOffRoute.value = false
+    }
+
+    /** Runs [body] with [isRerouting] on. */
+    private suspend fun <T> rerouting(body: suspend () -> T): T {
+        reroutes += 1
+        mutableRerouting.value = true
+        try {
+            return body()
+        } finally {
+            reroutes -= 1
+            mutableRerouting.value = reroutes > 0
         }
     }
 
@@ -324,7 +507,7 @@ internal class VisitController(
      * detour.
      */
     fun artworkGeofenceEntered(remoteId: String?) {
-        if (!managesProgress || navigator.detourStop != null) return
+        if (!managesProgress || mutablePaused.value || navigator.detourStop != null) return
         val id = ArtworkArrival.activeStopId(remoteId, journey, artworkRemoteIds) ?: return
         FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"}")
         scheduleDone(id)
@@ -341,7 +524,7 @@ internal class VisitController(
     fun checkArtworkGeofences() {
         // Before the start the journey is still being ordered.
         if (!managesProgress || !isNavigating) return
-        if (navigator.detourStop != null) {
+        if (navigator.detourStop != null || mutablePaused.value) {
             outOfOrderDwell.update(emptySet(), System.currentTimeMillis(), outOfOrderDwellMillis)
             return
         }
@@ -393,7 +576,7 @@ internal class VisitController(
      */
     fun checkGalleryFirst() {
         try {
-            if (!isNavigating || navigator.detourStop != null || navigator.hasArrived) return
+            if (!isNavigating || mutablePaused.value || navigator.detourStop != null || navigator.hasArrived) return
             val stop = navigator.activeStop ?: return
             val gallery = galleryRouting.gallery(stop.coordinate) ?: return
             val position = session.position.value ?: return
@@ -401,10 +584,7 @@ internal class VisitController(
             galleryRouting.markReached(stop.coordinate)
             FieldLog.log("gallery first: in ${gallery.gallery.name} · leg to ${stop.title}")
             doneJobs += scope.launch {
-                serially {
-                    mutableOffRoute.value = false
-                    navigator.resumeJourney()
-                }
+                serially { rerouting { navigator.resumeJourney() } }
             }
         } finally {
             refreshGalleryAhead()
@@ -433,15 +613,22 @@ internal class VisitController(
                     if (navigator.journey.value.stops.firstOrNull { it.id == stopId }?.state != JourneyStop.State.PENDING) return@serially
                     FieldLog.log("artwork visited out of order: $stopId")
                     val activeStopId = navigator.activeStop?.id
-                    if (navigator.markDone(stopId)) doneStop(stopId)?.let { onArtworkDone?.invoke(it, false) }
-                    orderRemaining()
-                    // The navigator draws a new leg only when the active stop changes. Without a change
-                    // the old leg, from where the visitor was, would stay (PM "Route drawing when going
-                    // through artworks in wrong order").
-                    if (activeStopId != null && navigator.activeStop?.id == activeStopId) {
-                        FieldLog.log("leg to $activeStopId drawn again from the visitor")
-                        mutableOffRoute.value = false
-                        navigator.resumeJourney()
+                    rerouting {
+                        // The artwork moves before the stops still to visit: the numbers follow the
+                        // visit order. The navigator walks to it for a moment.
+                        mutablePassingStopId.value = stopId
+                        navigator.move(stopId, toIndex = 0)
+                        val isDone = navigator.markDone(stopId)
+                        mutablePassingStopId.value = null
+                        if (isDone) doneStop(stopId)?.let { onArtworkDone?.invoke(it, false) }
+                        orderRemaining()
+                        // The navigator draws a new leg only when the active stop changes. Without a
+                        // change the old leg, from where the visitor was, would stay (PM "Route drawing
+                        // when going through artworks in wrong order").
+                        if (activeStopId != null && navigator.activeStop?.id == activeStopId) {
+                            FieldLog.log("leg to $activeStopId drawn again from the visitor")
+                            navigator.resumeJourney()
+                        }
                     }
                     save()
                 } finally {
@@ -564,30 +751,82 @@ internal class VisitController(
      * sprite is a filled circle and drew a white disk once tinted (PM review 2026-10-12). The navigator
      * applies guidance rules to each new leg: the detour leg is reached by distance, the legs after
      * it by the artwork geofence only.
+     *
+     * A place that is already a stop of the journey (a visited artwork) gets the stop id
+     * `detour:<poi id>`, so the journey has no two stops with one id. Returns the id of the detour stop.
      */
-    suspend fun detour(place: VenuePlace) {
+    suspend fun detour(place: VenuePlace): String {
+        var stop = VisitPlan.stop(place).toMap().copy(iconName = amenityIconName(place))
+        if (navigator.journey.value.stops.any { it.id == stop.id }) stop = stop.copy(id = "detour:${place.id}")
+        closeOffRouteWarning()
         navigator.guidanceRules = detourGuidanceRules
-        navigator.detour(VisitPlan.stop(place).toMap().copy(iconName = amenityIconName(place)))
+        navigator.detour(stop)
         navigator.guidanceRules = artworkGuidanceRules
+        return stop.id
     }
 
-    /**
-     * "Resume your Journey" after a detour and "Show the route from here" after leaving the route.
-     * A detour reached is recorded as visited; one not reached is dropped. The leg is drawn from here.
-     */
-    suspend fun resumeJourney() {
-        mutableOffRoute.value = false
+    /** Drops the detour without recording it, and the leg to the next stop follows. */
+    suspend fun cancelDetour() {
         serially {
-            val hadDetour = navigator.detourStop != null
-            navigator.resumeJourney()
-            if (hadDetour) orderRemaining()
+            navigator.cancelDetour()
             save()
         }
     }
 
-    /** Closes the off-route warning without re-routing. It opens again on the next episode. */
+    /**
+     * "Resume your Journey" after a detour. A detour reached is recorded as visited; one not reached
+     * is dropped. After a detour the stops still ahead are ordered again from the visitor. The leg is
+     * drawn from here.
+     */
+    suspend fun resumeJourney() {
+        closeOffRouteWarning()
+        serially {
+            val hadDetour = navigator.detourStop != null
+            rerouting {
+                navigator.resumeJourney()
+                if (hadDetour) orderRemaining()
+            }
+            save()
+        }
+    }
+
+    /**
+     * Pauses the guidance: no artwork is visited, no off-route warning or wrong floor shows, and the
+     * navigator leaves the leg where it is (`ASK_APP`). The dot moves and the route stays. A detour
+     * keeps its leg.
+     */
+    fun pause() {
+        if (mutablePaused.value) return
+        mutablePaused.value = true
+        FieldLog.log("journey paused")
+        closeOffRouteWarning()
+        isOffRouteEpisode = false
+        wrongFloorSince = null
+        navigator.deviationPolicy = JourneyDeviationPolicy.ASK_APP
+    }
+
+    /**
+     * Ends [pause]. The leg is drawn again from the visitor; a personalised journey is ordered again
+     * from the visitor first. A detour keeps its leg.
+     */
+    suspend fun resumeFromPause() {
+        if (!mutablePaused.value) return
+        mutablePaused.value = false
+        FieldLog.log("journey resumed after a pause")
+        navigator.deviationPolicy = deviationPolicy
+        if (!isNavigating || navigator.detourStop != null) return
+        serially {
+            rerouting {
+                orderRemaining()
+                navigator.resumeJourney()
+            }
+            save()
+        }
+    }
+
+    /** "Dismiss" on the off-route warning. The leg is not drawn again. The warning opens again on the next episode. */
     fun dismissOffRoute() {
-        mutableOffRoute.value = false
+        closeOffRouteWarning()
     }
 
     /** Saves the journey, as iOS `VisitView` does on every change of `navigator.journey`. */
@@ -610,6 +849,7 @@ internal class VisitController(
     }
 
     private fun cancelJobs() {
+        closeOffRouteWarning()
         eventsJob?.cancel()
         doneJobs.forEach { it.cancel() }
         doneJobs.clear()
@@ -621,6 +861,18 @@ internal class VisitController(
          * off; the artwork geofence is the only arrival.
          */
         val artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds = Double.POSITIVE_INFINITY)
+
+        /** The closer-artwork check runs at most this often. */
+        private const val CLOSER_ARTWORK_INTERVAL_MILLIS = 5_000L
+
+        /**
+         * Whether a route still to walk takes the floor at [level]. No route still to walk counts as
+         * on the route. Pure; covered by tests.
+         */
+        internal fun isOnRouteFloor(level: Double, legs: List<RouteGeometry.Leg>): Boolean {
+            val ahead = legs.filter { !it.isCompleted }
+            return ahead.isEmpty() || ahead.any { VenueLevel.same(it.floor.level, level) }
+        }
 
         /**
          * The shapes of the artwork geofences, by `remote_id`. One artwork can have several

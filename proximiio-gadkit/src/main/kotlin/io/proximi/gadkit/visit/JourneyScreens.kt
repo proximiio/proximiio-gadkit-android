@@ -177,20 +177,6 @@ internal fun JourneyCompleteScreen(venue: VenueService, onClose: () -> Unit) {
     }
 }
 
-/**
- * "You've left your route" bottom sheet. The route is not redrawn while the visitor walks
- * elsewhere (PM review 2026-10-12); "Show the route from here" redraws it.
- */
-@Composable
-internal fun OffRouteWarning(onReroute: () -> Unit, onClose: () -> Unit) {
-    OverlaySheet(onDismiss = onClose) {
-        SheetTitle(stringResource(R.string.you_ve_left_your_route))
-        SheetBody(stringResource(R.string.the_route_stays_as_it_is_until), Modifier.padding(bottom = 20.dp))
-        PrimaryButton(stringResource(R.string.show_the_route_from_here), onReroute)
-        TextActionButton(stringResource(R.string.close), onClose)
-    }
-}
-
 /** "Skip this artwork?" bottom sheet. */
 @Composable
 internal fun SkipConfirmation(stop: String, onSkip: () -> Unit, onKeep: () -> Unit) {

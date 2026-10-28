@@ -37,6 +37,12 @@ internal sealed interface VisitEvent {
     /** The visitor tapped "Resume your Journey" or "Show the route from here". */
     data object JourneyResumed : VisitEvent
 
+    /** The host app's destination is not routed to; `ProximiMapView` sets it back to `null`. */
+    data class DestinationUnavailable(val poiId: String, val reason: io.proximi.gadkit.ProximiDestination.Failure) : VisitEvent
+
+    /** "Add a stop" on an amenity, after [DetourStarted]: the journey waits until "Resume your Journey". */
+    data object JourneyPaused : VisitEvent
+
     /** The visitor tapped "Centre on me". */
     data object Recentred : VisitEvent
 
@@ -70,7 +76,7 @@ internal sealed interface VisitEvent {
 
     /**
      * The position is uncertain near the active stop ("Probably at …"). Without
-     * [io.proximi.gadkit.ProximiMapView.Option.PROMPTS] the screen reports it instead of asking. At
+     * [io.proximi.gadkit.ProximiMapView.Option.UNCERTAIN_POSITION_PROMPT] the screen reports it instead of asking. At
      * most once per [io.proximi.gadkit.GadSettings.locationQuestionQuietPeriod].
      */
     data class PositionUncertain(val stop: JourneyStop) : VisitEvent

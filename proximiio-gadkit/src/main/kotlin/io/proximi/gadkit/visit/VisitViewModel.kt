@@ -48,7 +48,9 @@ import io.proximi.gadkit.map.isGallery
 import io.proximi.gadkit.map.places
 import io.proximi.gadkit.wristband.TrackingMonitor
 import io.proximi.gadkit.IncomingJourney
+import io.proximi.gadkit.ProximiDestination
 import io.proximi.gadkit.ProximiMapView
+import io.proximi.gadkit.hasPrompt
 import io.proximi.map.core.JourneyDeviationPolicy
 import io.proximi.sdk.computeRoute
 import io.proximi.sdk.wayfinding.WayfindingRoutingError
@@ -60,6 +62,7 @@ import kotlinx.coroutines.withContext
 import io.proximi.map.core.RouteGuidance
 import io.proximi.sdk.wayfinding.NoRouteReason
 import io.proximi.map.core.VenuePosition
+import io.proximi.map.core.JourneyEvent
 import io.proximi.map.core.JourneyStop as MapJourneyStop
 import io.proximi.map.live.JourneyNavigator
 import io.proximi.map.live.ProximiioMapSession
@@ -118,6 +121,14 @@ internal class VisitViewModel(
     private val onEvent: (VisitEvent) -> Unit = {},
     /** Gets the navigator before the journey starts (`ProximiMapView`'s `onNavigator`). */
     private val onNavigator: ((JourneyNavigator) -> Unit)? = null,
+    /** The host app's destination when the screen opens (`ProximiMapView`'s `destination`). */
+    destination: ProximiDestination? = null,
+    /** Sets the host app's destination back to `null` when the route to it ends. */
+    private val onDestinationChange: (ProximiDestination?) -> Unit = {},
+    /** The host app's pause when the screen opens (`ProximiMapView`'s `isPaused`). */
+    private val isPausedAtStart: Boolean = false,
+    /** Sets the host app's pause back to `false` after "Resume your Journey" on the paused card. */
+    private val onPausedChange: (Boolean) -> Unit = {},
 ) {
     /** What the navigator reports, read on each change of its journey. */
     data class Progress(
@@ -149,7 +160,7 @@ internal class VisitViewModel(
         keepsOrder = kind.keepsOrder,
         countsOutOfOrder = kind.countsOutOfOrder,
         managesProgress = ProximiMapView.Option.PROGRESS in options,
-        deviationPolicy = if (ProximiMapView.Option.PROMPTS in options) JourneyDeviationPolicy.ASK_APP else JourneyDeviationPolicy.AUTOMATIC,
+        deviationPolicy = if (options.hasPrompt(ProximiMapView.Option.OFF_ROUTE_PROMPT)) JourneyDeviationPolicy.ASK_APP else JourneyDeviationPolicy.AUTOMATIC,
         settings = settings,
     )
     val monitor = TrackingMonitor(venue.sdk, scope, settings)
@@ -243,8 +254,17 @@ internal class VisitViewModel(
     /** The amenity picked from search, shown on a card before it becomes a detour. */
     var selectedAmenity by mutableStateOf<VenuePlace?>(null)
 
-    /** The amenity whose detour waits for "Change your route?". */
-    var amenityToConfirm by mutableStateOf<VenuePlace?>(null)
+    /** The host app's latest destination. */
+    private var requestedDestination: ProximiDestination? = destination
+
+    /** A destination the screen routes to: the id the host app gave and the place's feature id. */
+    private data class RoutedDestination(val requested: String, val placeId: String)
+
+    /** The destination the screen routes to. */
+    private var routedDestination: RoutedDestination? = null
+
+    /** The places are loaded and the journey started: a destination can be routed to. */
+    private var isReady = false
 
     /** The amenity routed to from search on a map without a journey (no navigator). */
     var routedAmenity by mutableStateOf<VenuePlace?>(null)
@@ -314,7 +334,15 @@ internal class VisitViewModel(
             recentre(withHeading = true, reason = "floor without positioning left")
             onEvent(VisitEvent.FloorWithoutPositioningLeft(change.level))
         }
-        scope.launch { controller.navigator.events.collect { onEvent(VisitEvent.Journey(it)) } }
+        scope.launch {
+            controller.navigator.events.collect { event ->
+                // The navigator walks to an artwork visited out of order for a moment.
+                if (event is JourneyEvent.LegChanged && event.to.id == controller.passingStopId.value) return@collect
+                if (controller.isPaused.value && isRouteDeviation(event)) return@collect
+                onEvent(VisitEvent.Journey(event))
+                if (event is JourneyEvent.DetourEnded && routedDestination?.placeId == (event.stop.poiId ?: event.stop.id)) clearDestination()
+            }
+        }
         scope.launch {
             controller.navigator.noRouteReasons.collect {
                 noRouteReasons = it
@@ -328,10 +356,15 @@ internal class VisitViewModel(
             loadVenue()
             refreshMapLayers()
             // A journey without stops shows the map alone; the navigator would report it finished.
+            if (hasStops) {
+                if (isPausedAtStart) controller.pause()
+                controller.start()
+                // A visitor who opens the journey inside the first artwork's geofence.
+                checkArrival()
+            }
+            isReady = true
+            destinationChanged(requestedDestination)
             if (!hasStops) return@launch
-            controller.start()
-            // A visitor who opens the journey inside the first artwork's geofence.
-            checkArrival()
             // Starts the heading-up follow at `MapOptions.recentreZoom` once the journey is drawn,
             // the visitor has a position and the camera takes commands (PM review 2026-10-12: the
             // map did not turn until "Centre on me"; PM item 13273799998: the map stayed at world
@@ -376,6 +409,8 @@ internal class VisitViewModel(
                 // The map publishes guidance only on a leg with a route, so the arrival is checked on
                 // the position (field test 2026-10-19).
                 checkArrival()
+                controller.checkCloserArtwork()
+                controller.checkWrongFloor(floorGuide.isActive)
             }
         }
         scope.launch {
@@ -386,7 +421,7 @@ internal class VisitViewModel(
         }
         scope.launch {
             // The amenity picked in the menu while its card or route is on screen.
-            snapshotFlow { selectedAmenity ?: amenityToConfirm ?: routedAmenity }.distinctUntilChanged().drop(1).collect(::showAmenity)
+            snapshotFlow { selectedAmenity ?: routedAmenity }.distinctUntilChanged().drop(1).collect(::showAmenity)
         }
         scope.launch {
             // The venue data changed on the backend: places, galleries and level changers again; the
@@ -675,10 +710,10 @@ internal class VisitViewModel(
 
     /**
      * A swipe on [stop] in the list, or its "Skip" accessibility action: "Skip artwork?" with
-     * [ProximiMapView.Option.PROMPTS], else only the event.
+     * [ProximiMapView.Option.SKIP_PROMPT], else only the event.
      */
     fun requestSkip(stop: JourneyStop) {
-        if (ProximiMapView.Option.PROMPTS in options) stopToSkip = stop
+        if (options.hasPrompt(ProximiMapView.Option.SKIP_PROMPT)) stopToSkip = stop
         onEvent(VisitEvent.SkipRequested(stop))
     }
 
@@ -698,8 +733,8 @@ internal class VisitViewModel(
     }
 
     /**
-     * Shows the nearest place of [kind] on a card. "Go here" and "Change your route?" add it as a
-     * journey detour (PM review 2026-10-12).
+     * Shows the nearest place of [kind] on a card. "Add a stop" adds it as a journey detour (PM review
+     * 2026-10-12).
      */
     fun detour(kind: AmenityKind) {
         isShowingAmenities = false
@@ -710,21 +745,23 @@ internal class VisitViewModel(
     }
 
     /**
-     * "Go here" on the amenity card: asks "Change your route?" first with
-     * [ProximiMapView.Option.PROMPTS], else starts the detour. On a map without a journey it draws
-     * the route to the amenity.
+     * "Add a stop" on the amenity card during a journey: the detour starts at once (PM, Monday "Add
+     * stop confirmation", 2026-10-26: no second confirmation), and the map goes back to the visitor
+     * (Monday "Adding amenity -> focus back on my location", 2026-10-27). "Go here" on a map without a
+     * journey draws the route to the amenity.
      */
     fun confirmAmenity() {
         val place = selectedAmenity ?: return
         selectedAmenity = null
-        when {
-            !hasStops -> scope.launch { route(place) }
-            ProximiMapView.Option.PROMPTS in options -> amenityToConfirm = place
-            else -> {
-                onEvent(VisitEvent.DetourStarted(place))
-                scope.launch { controller.detour(place) }
-            }
+        if (!hasStops) {
+            scope.launch { route(place) }
+            return
         }
+        scope.launch { controller.detour(place) }
+        onEvent(VisitEvent.DetourStarted(place))
+        onEvent(VisitEvent.JourneyPaused)
+        session.followMyFloor()
+        recentre(reason = "stop added")
     }
 
     /**
@@ -732,6 +769,7 @@ internal class VisitViewModel(
      * map. There is no navigator to add a detour to.
      */
     private suspend fun route(place: VenuePlace) {
+        routedDestination?.let { if (it.placeId != place.id) clearDestination() }
         routedAmenity = place
         val here = session.position.value
         if (here == null) {
@@ -770,35 +808,115 @@ internal class VisitViewModel(
         routedAmenity = null
         amenityRouteError = null
         session.clearRoute()
+        if (routedDestination != null) clearDestination()
     }
 
-    /** "Close" on the "Change your route?" card. */
-    fun cancelAmenity() {
-        amenityToConfirm = null
-    }
-
-    /** "Go here" on the "Change your route?" card: the amenity becomes a detour. */
-    fun goToAmenity() {
-        val place = amenityToConfirm ?: return
-        amenityToConfirm = null
-        onEvent(VisitEvent.DetourStarted(place))
-        scope.launch { controller.detour(place) }
-    }
-
-    /** The gallery of the next artwork, or the artwork, for "Change your route?". */
+    /** "Your next stop is Gallery 103.": the gallery the leg ends at, else the next stop. */
     val nextStopName: String?
-        get() {
-            val stop = progress.journey.stops.firstOrNull {
-                it.kind != StopKind.DETOUR && (it.state == StopState.ACTIVE || it.state == StopState.PENDING)
-            } ?: return null
-            return Gallery.containing(stop.coordinate, stop.level, galleries)?.name ?: stop.title
+        get() = galleryAheadDestination?.gallery?.name ?: controller.navigator.activeStop?.title
+
+    // Destination
+
+    /**
+     * The host app set `destination`, or set it back to `null`. A new destination replaces the route
+     * of the previous one; `null` ends it.
+     */
+    fun destinationChanged(destination: ProximiDestination?) {
+        requestedDestination = destination
+        if (!isReady || destination?.poiId == routedDestination?.requested) return
+        if (routedDestination != null && destination == null) {
+            routedDestination = null
+            scope.launch { endDestinationRoute() }
+            return
         }
+        destination ?: return
+        scope.launch { route(destination) }
+    }
+
+    /**
+     * Routes to the host app's destination at once, as "Add a stop" does: the visitor agreed with the
+     * host app (the audio guide). A stop of the journey still to visit becomes the next stop instead.
+     */
+    private suspend fun route(destination: ProximiDestination) {
+        val place = VenuePlace.place(destination.poiId, places) ?: return destinationFailed(destination.poiId, ProximiDestination.Failure.UNKNOWN_PLACE)
+        // The feature id; the host app can give `properties.id`.
+        val id = place.id
+        val routed = RoutedDestination(destination.poiId, id)
+        FieldLog.log("destination: ${place.title}")
+        selectedAmenity = null
+        isShowingAmenities = false
+        routedDestination = routed
+        if (!hasStops) {
+            route(place)
+            if (routedDestination != routed || routedAmenity?.id != id) return
+            if (session.position.value == null) {
+                endAmenityRoute()
+                destinationFailed(routed.requested, ProximiDestination.Failure.NO_POSITION)
+            } else if (amenityRouteError != null) {
+                endAmenityRoute()
+                destinationFailed(routed.requested, ProximiDestination.Failure.NO_ROUTE)
+            }
+            return
+        }
+        val stop = controller.navigator.journey.value.stops.firstOrNull { (it.poiId ?: it.id) == id && it.kind != MapJourneyStop.Kind.DETOUR }
+        if (stop != null && stop.state in OPEN_STATES) {
+            if (stop.state == MapJourneyStop.State.PENDING) controller.activate(stop.id)
+            clearDestination()
+            return
+        }
+        val stopId = controller.detour(place)
+        onEvent(VisitEvent.DetourStarted(place))
+        if (routedDestination != routed) return
+        if (controller.navigator.noRouteReasons.value[stopId] != null) {
+            controller.cancelDetour()
+            destinationFailed(routed.requested, ProximiDestination.Failure.NO_ROUTE)
+        }
+    }
+
+    /** Ends the route the destination started, after the host app set it to `null`. */
+    private suspend fun endDestinationRoute() {
+        if (hasStops) {
+            if (controller.navigator.detourStop != null) controller.cancelDetour()
+        } else {
+            endAmenityRoute()
+        }
+    }
+
+    private fun destinationFailed(id: String, reason: ProximiDestination.Failure) {
+        FieldLog.log("destination $id unavailable: $reason")
+        clearDestination()
+        onEvent(VisitEvent.DestinationUnavailable(id, reason))
+    }
+
+    /** The route to the destination ended: the host app's destination goes back to `null`. */
+    private fun clearDestination() {
+        routedDestination = null
+        if (requestedDestination != null) {
+            requestedDestination = null
+            onDestinationChange(null)
+        }
+    }
+
+    // Pause
+
+    /** The host app paused (`true`) or resumed (`false`) the journey. Reports no event. */
+    fun pausedChanged(isPaused: Boolean) {
+        if (!hasStops || !isReady) return
+        if (isPaused) controller.pause() else scope.launch { controller.resumeFromPause() }
+    }
+
+    /** "Resume your Journey" on the card of a paused journey. */
+    fun resumeFromPause() {
+        onPausedChange(false)
+        scope.launch { controller.resumeFromPause() }
+        onEvent(VisitEvent.JourneyResumed)
+    }
 
     // Leaving
 
-    /** Back: a visit in progress asks first (03.10) with [ProximiMapView.Option.PROMPTS]; otherwise Back closes. */
+    /** Back: a visit in progress asks first (03.10) with [ProximiMapView.Option.LEAVE_TOUR_PROMPT]; otherwise Back closes. */
     fun requestClose() {
-        if (ProximiMapView.Option.PROMPTS in options && VisitPlan.asksBeforeLeaving(progress.journey, progress.isFinished)) {
+        if (options.hasPrompt(ProximiMapView.Option.LEAVE_TOUR_PROMPT) && VisitPlan.asksBeforeLeaving(progress.journey, progress.isFinished)) {
             isConfirmingExit = true
             onEvent(VisitEvent.ExitRequested)
         } else {
@@ -831,8 +949,8 @@ internal class VisitViewModel(
     private val isPresentingSomething: Boolean
         // Without prompts the off-route state shows nothing and does not hold the report back.
         get() = lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
-            (ProximiMapView.Option.PROMPTS in options && controller.isOffRoute.value) ||
-            amenityToConfirm != null || isShowingWrapUp || floorGuide.isActive
+            (options.hasPrompt(ProximiMapView.Option.OFF_ROUTE_PROMPT) && controller.isOffRoute.value) ||
+            isShowingWrapUp || floorGuide.isActive || controller.isPaused.value
 
     private fun evaluateAmbiguity() {
         if (isPresentingSomething || monitor.health.value != TrackingHealth.TRACKING) return
@@ -848,7 +966,7 @@ internal class VisitViewModel(
         if (LocationAmbiguity.isQuiet(ambiguity.kind, answeredAmbiguity, Instant.now(), settings.locationQuestionQuietPeriod.toJavaDuration())) return
         FieldLog.log("ambiguous location: ${ambiguity.kind}")
         when (ambiguity) {
-            is LocationAmbiguity.LowConfidence -> if (ProximiMapView.Option.PROMPTS in options) {
+            is LocationAmbiguity.LowConfidence -> if (options.hasPrompt(ProximiMapView.Option.UNCERTAIN_POSITION_PROMPT)) {
                 lowConfidenceStop = ambiguity.stop
             } else {
                 // Reported once per quiet period, as an answered prompt.
@@ -882,16 +1000,24 @@ internal class VisitViewModel(
         scope.cancel()
     }
 
-    private companion object {
-        const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
+    companion object {
+        private const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
+
+        /** The states of a stop still to visit: a destination at such a stop makes it the next stop. */
+        private val OPEN_STATES = setOf(MapJourneyStop.State.PENDING, MapJourneyStop.State.ACTIVE, MapJourneyStop.State.REACHED)
+
+        /** The navigator's off-route events, not reported while the journey is paused. Pure; covered by tests. */
+        internal fun isRouteDeviation(event: JourneyEvent): Boolean =
+            event is JourneyEvent.LeftRoute || event is JourneyEvent.FarFromRoute ||
+                event is JourneyEvent.OffRouteTooLong || event == JourneyEvent.ReturnedToRoute
 
         /** No connector this close to the route's end (metres). */
-        const val CONNECTOR_END_METERS = 2.0
+        private const val CONNECTOR_END_METERS = 2.0
 
         /**
          * False: no connector. Its bend moved with every fix, so the route appeared to be redrawn on
          * every fix (PM review 2026-10-12, screen recording 21-26-05), as iOS `showsConnector`.
          */
-        const val SHOWS_CONNECTOR = false
+        private const val SHOWS_CONNECTOR = false
     }
 }

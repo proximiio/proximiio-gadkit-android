@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.proximi.gadkit.DebugLaunch
+import io.proximi.gadkit.ProximiDestination
+import io.proximi.gadkit.hasPrompt
 import io.proximi.gadkit.map.AccessibleRoutes
 import io.proximi.gadkit.map.AccessibleRoutesButton
 import io.proximi.gadkit.map.LocalRouteAccessibility
@@ -139,6 +141,10 @@ internal fun VisitScreen(
     persist: (Journey?) -> Unit,
     onVisitEvent: (VisitEvent) -> Unit = {},
     onNavigator: ((JourneyNavigator) -> Unit)? = null,
+    destination: ProximiDestination? = null,
+    onDestinationChange: (ProximiDestination?) -> Unit = {},
+    isPaused: Boolean = false,
+    onPausedChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -149,6 +155,8 @@ internal fun VisitScreen(
         holder.onClose = onClose
         holder.onVisitEvent = onVisitEvent
         holder.persist = persist
+        holder.onDestinationChange = onDestinationChange
+        holder.onPausedChange = onPausedChange
     }
     val model = holder.visit(journey) { scope ->
         VisitViewModel(
@@ -165,6 +173,10 @@ internal fun VisitScreen(
             onClose = onClose?.let { { holder.onClose?.invoke() } },
             onEvent = { holder.onVisitEvent(it) },
             onNavigator = onNavigator,
+            destination = destination,
+            onDestinationChange = { holder.onDestinationChange(it) },
+            isPausedAtStart = isPaused,
+            onPausedChange = { holder.onPausedChange(it) },
         )
     }
     DisposableEffect(model) {
@@ -173,6 +185,8 @@ internal fun VisitScreen(
     }
     LaunchedEffect(model, accessibility) { model.setAccessibility(accessibility) }
     LaunchedEffect(model, incoming) { incoming?.let(model::apply) }
+    LaunchedEffect(model, destination) { model.destinationChanged(destination) }
+    LaunchedEffect(model, isPaused) { model.pausedChanged(isPaused) }
     VisitContent(model, hasBack = onClose != null)
 }
 
@@ -192,6 +206,12 @@ internal class VisitHolder : ViewModel() {
 
     /** The host app's latest `onVisitEvent`. */
     var onVisitEvent: (VisitEvent) -> Unit = {}
+
+    /** The host app's latest `onDestinationChange` (`ProximiMapView`). */
+    var onDestinationChange: (ProximiDestination?) -> Unit = {}
+
+    /** The host app's latest `onPausedChange` (`ProximiMapView`). */
+    var onPausedChange: (Boolean) -> Unit = {}
 
     /** The visit of [journey]; a different journey ends the visit before it. */
     fun visit(journey: Journey, create: (CoroutineScope) -> VisitViewModel): VisitViewModel {
@@ -256,11 +276,6 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                     )
                     // The list covers the map with white: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
-                    // Behind the "Change your route?" card the map is dimmed.
-                    // The scope-free overload: inside the frame's Box the Column scope of the screen is also in reach.
-                    androidx.compose.animation.AnimatedVisibility(model.amenityToConfirm != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
-                        Box(Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.5f)))
-                    }
                     ProvideGlassBackdrop(if (!model.showsList) mapBackdrop else null) { CardOverlay(model) }
                 }
                 if (ProximiMapView.Option.BOTTOM_BAR in model.options) {
@@ -358,27 +373,18 @@ private fun CardOverlay(model: VisitViewModel) {
                 }
             }
             val amenity = model.selectedAmenity
-            val detour = model.amenityToConfirm
-            if (detour != null) {
-                // "Change your route?" is a card on the map; the map behind it is dimmed.
-                val nextStop = model.nextStopName
-                PlaceInfoCard(
-                    title = stringResource(R.string.change_your_route),
-                    subtitle = if (nextStop != null) {
-                        stringResource(R.string.navigating_to_x_adds_a_stop_to, detour.title, nextStop)
-                    } else {
-                        stringResource(R.string.navigating_to_x_adds_a_stop_to_2, detour.title)
-                    },
-                    primary = stringResource(R.string.go_here),
-                    onPrimary = model::goToAmenity,
-                    onClose = model::cancelAmenity,
-                )
-            } else if (amenity != null) {
+            val isOffRoute by model.controller.isOffRoute.collectAsStateWithLifecycle()
+            val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
+            // "Looks like you've left your route" on the stop card's place, unless another card is up
+            // (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-26).
+            val showsOffRouteCard = model.options.hasPrompt(ProximiMapView.Option.OFF_ROUTE_PROMPT) && isOffRoute && model.hasStops &&
+                floorPhase == FloorWithoutPositioningGuide.Phase.Idle
+            if (amenity != null) {
                 val resources = LocalResources.current
                 PlaceInfoCard(
                     title = amenity.title,
                     subtitle = placeSubtitle(amenity, resources),
-                    primary = stringResource(R.string.go_here),
+                    primary = stringResource(if (model.hasStops) R.string.add_a_stop else R.string.go_here),
                     onPrimary = model::confirmAmenity,
                     onClose = { model.selectedAmenity = null },
                 )
@@ -391,6 +397,15 @@ private fun CardOverlay(model: VisitViewModel) {
                     subtitle = model.amenityRouteError?.let { stringResource(it) } ?: placeSubtitle(place, resources),
                     primary = stringResource(R.string.close),
                     onPrimary = model::endAmenityRoute,
+                    onClose = null,
+                )
+            } else if (showsOffRouteCard) {
+                PlaceInfoCard(
+                    title = stringResource(R.string.looks_like_you_ve_left_your_route),
+                    subtitle = model.nextStopName?.let { stringResource(R.string.your_next_stop_is_x, it) }
+                        ?: stringResource(R.string.head_back_to_your_route),
+                    primary = stringResource(R.string.dismiss),
+                    onPrimary = model::dismissOffRoute,
                     onClose = null,
                 )
             } else if (model.hasStops) {
@@ -407,6 +422,18 @@ private fun CardOverlay(model: VisitViewModel) {
 @Composable
 private fun VisitCard(model: VisitViewModel) {
     val resources = LocalResources.current
+    val isPaused by model.controller.isPaused.collectAsStateWithLifecycle()
+    if (isPaused) {
+        // The host app paused the journey (Nagarro, 2026-10-28).
+        PlaceInfoCard(
+            title = stringResource(R.string.journey_paused),
+            subtitle = model.nextStopName?.let { stringResource(R.string.your_next_stop_is_x, it) }.orEmpty(),
+            primary = stringResource(R.string.resume_your_journey),
+            onPrimary = model::resumeFromPause,
+            onClose = null,
+        )
+        return
+    }
     val detour = model.controller.navigator.detourStop
     if (model.progress.isDetour && detour != null) {
         val place = model.places.firstOrNull { it.id == detour.id }
@@ -495,15 +522,8 @@ private fun VisitSheets(model: VisitViewModel) {
     model.stopToSkip?.let { stop ->
         SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = model::keepStop)
     }
-    // The off-route warning, unless another prompt is up or the map shows a floor without
-    // positioning. No tracking or wristband alerts: the host app handles the wristband states
-    // (PM 2026-10-15).
-    val isOffRoute by model.controller.isOffRoute.collectAsStateWithLifecycle()
-    val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
-    val isOnFloorWithoutPositioning = floorPhase != FloorWithoutPositioningGuide.Phase.Idle
-    if (ProximiMapView.Option.PROMPTS in model.options && isOffRoute && !isOnFloorWithoutPositioning && model.stopToSkip == null && model.amenityToConfirm == null) {
-        OffRouteWarning(onReroute = model::resumeJourney, onClose = model::dismissOffRoute)
-    }
+    // The off-route warning is a card on the map (CardOverlay). No tracking or wristband alerts: the
+    // host app handles the wristband states (PM 2026-10-15).
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)
 }
 

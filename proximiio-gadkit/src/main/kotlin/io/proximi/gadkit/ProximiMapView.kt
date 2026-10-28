@@ -73,7 +73,7 @@ public object ProximiMapView {
     public enum class Option {
         /**
          * The bar at the bottom with Back and the Map / List button. Back shows with `onClose` and
-         * calls it, after "Leave the tour here" with [PROMPTS].
+         * calls it, after "Leave the tour here" with [LEAVE_TOUR_PROMPT].
          */
         BOTTOM_BAR,
 
@@ -81,14 +81,28 @@ public object ProximiMapView {
         BACKGROUND,
 
         /**
-         * The view's own prompts: "Skip this artwork?", "You've left your route", "Probably at …",
-         * "Change your route?" and "Leave the tour here". Without them the view
-         * reports [ProximiMapEvent.SkipRequested], [ProximiMapEvent.OffRoute],
-         * [ProximiMapEvent.PositionUncertain] and [ProximiMapEvent.JourneyFinished] and shows
-         * nothing, the route follows the visitor who left it, and "Go here" on an amenity starts the
-         * detour at once.
+         * All four prompts: [SKIP_PROMPT], [OFF_ROUTE_PROMPT], [UNCERTAIN_POSITION_PROMPT] and
+         * [LEAVE_TOUR_PROMPT]. iOS `.prompts`.
          */
         PROMPTS,
+
+        /** "Skip this artwork?" after a swipe in the list. Without it the view reports [ProximiMapEvent.SkipRequested] only. */
+        SKIP_PROMPT,
+
+        /**
+         * "Looks like you've left your route" with "Dismiss", [GadSettings.offRouteMeters] off the
+         * route and before any routing. After it, with [PROGRESS], a personalised journey keeps the leg
+         * where the visitor left it until another artwork is nearer; other journeys are routed again
+         * from the visitor. Without it the view reports [ProximiMapEvent.OffRoute] only, and the route
+         * follows the visitor who left it.
+         */
+        OFF_ROUTE_PROMPT,
+
+        /** "Probably at …" when the position is uncertain near the active stop. Without it the view reports [ProximiMapEvent.PositionUncertain]. */
+        UNCERTAIN_POSITION_PROMPT,
+
+        /** "Leave the tour here" after Back on the bottom bar during a journey in progress. Without it Back calls `onClose` at once. */
+        LEAVE_TOUR_PROMPT,
 
         /**
          * The view moves the journey on and reports it through `onJourneyChange`: an artwork is
@@ -116,6 +130,10 @@ public object ProximiMapView {
     }
 }
 
+/** Whether [prompt] is on: its own option or [ProximiMapView.Option.PROMPTS]. */
+internal fun Set<ProximiMapView.Option>.hasPrompt(prompt: ProximiMapView.Option): Boolean =
+    prompt in this || ProximiMapView.Option.PROMPTS in this
+
 /**
  * The journey screen of [ProximiMapView] on the host app's SDK.
  *
@@ -136,6 +154,22 @@ public object ProximiMapView {
  * @param onClose Back on the bottom bar, "Leave the tour" and the close button of Journey Complete.
  *   `null` (default): the bottom bar has no Back, so "Leave the tour here" never shows, the close
  *   button of Journey Complete returns to the map, and the system Back stays with the host app.
+ * @param destination a place to route the visitor to at once, for example from the audio guide. With
+ *   a journey it is a detour, as after "Add a stop" on an amenity, with no card and no prompt; a stop
+ *   of the journey still to visit becomes the next stop instead. Without a journey the map shows the
+ *   route from the visitor. The view sets it back to `null` through [onDestinationChange] when the
+ *   route ends: "Resume your Journey", "Close", another place picked on the map, or
+ *   [ProximiMapEvent.DestinationUnavailable]. `null` from the host app ends the route.
+ * @param onDestinationChange the destination after the view ended its route (`null`). Pass it back as
+ *   [destination].
+ * @param isPaused `true` pauses the journey, for example from the audio guide's pause button. The dot
+ *   moves and the route stays, but no artwork is visited, no off-route warning shows and the leg is
+ *   not routed again. The stop card shows "Journey paused" with "Resume your Journey". `false`
+ *   resumes it: the leg is drawn again from the visitor, and a personalised journey with
+ *   [ProximiMapView.Option.PROGRESS] is ordered again from the visitor first. A change of the host app
+ *   reports no event.
+ * @param onPausedChange `false` after "Resume your Journey" on the card of a paused journey, which
+ *   also reports [ProximiMapEvent.JourneyResumed]. Pass it back as [isPaused].
  * @param onNavigator called on the main thread with the `JourneyNavigator` that draws the journey,
  *   before the journey starts, and again with a new navigator each time the screen starts again (a
  *   new journey kind, a journey without a stop on the map, the first journey on an empty map). Start
@@ -157,6 +191,10 @@ public fun ProximiMapView(
     mode: VisitMode = VisitMode.MAP,
     onEvent: (ProximiMapEvent) -> Unit = {},
     onClose: (() -> Unit)? = null,
+    destination: ProximiDestination? = null,
+    onDestinationChange: (ProximiDestination?) -> Unit = {},
+    isPaused: Boolean = false,
+    onPausedChange: (Boolean) -> Unit = {},
     onNavigator: (JourneyNavigator) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -190,6 +228,10 @@ public fun ProximiMapView(
                     persist = { model.write(it, loaded.generation) },
                     onVisitEvent = model::handle,
                     onNavigator = { model.onNavigator(it) },
+                    destination = destination,
+                    onDestinationChange = onDestinationChange,
+                    isPaused = isPaused,
+                    onPausedChange = onPausedChange,
                 )
             }
         } else {
@@ -327,7 +369,8 @@ internal class HostedMapModel : ViewModel() {
      * Reports the order and states of the navigator's journey as the host app's journey, with
      * [ProximiMapView.Option.PROGRESS] only, and only from the screen of the current [generation]: a
      * screen that started again leaves the controller of the old one running until its work ends.
-     * `null` (after Journey Complete) changes nothing: the journey already holds the last states.
+     * `null` (after Journey Complete) changes nothing: the journey already holds the last states. A
+     * new order of the stops sends [ProximiMapEvent.StopOrderChanged] after the write.
      */
     fun write(journey: Journey?, generation: Int) {
         if (ProximiMapView.Option.PROGRESS !in options || generation != this.generation || journey == null) return
@@ -338,6 +381,7 @@ internal class HostedMapModel : ViewModel() {
         current = updated
         latest = updated
         onJourneyChange(updated)
+        if (isReordered(shown, updated)) onEvent(ProximiMapEvent.StopOrderChanged(updated))
     }
 
     fun handle(event: VisitEvent) {
@@ -357,6 +401,13 @@ internal class HostedMapModel : ViewModel() {
 
     companion object {
         const val KEY = "io.proximi.gadkit.hostedMap"
+
+        /**
+         * `true` when the stop ids of [updated] are in another order than those of [previous]. A
+         * change of the states alone is no new order. Pure; covered by tests.
+         */
+        fun isReordered(previous: ProximiJourney, updated: ProximiJourney): Boolean =
+            previous.stops.map { it.id } != updated.stops.map { it.id }
     }
 }
 

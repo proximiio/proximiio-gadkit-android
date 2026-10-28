@@ -83,6 +83,29 @@ public data class ProximiGeofence(
 )
 
 /**
+ * A place the host app routes the visitor to on [ProximiMapView], for example the place of the audio
+ * guide's proximiio-mcp answer (`route_to_place`, `route_to_nearest_amenity`). iOS
+ * `ProximiDestination`.
+ *
+ * @property poiId the Proximi.io POI id: the feature id, as in [ProximiStop.id], or its
+ *   `properties.id`, which proximiio-mcp returns. On GAD data the feature id is
+ *   `<organisation id>:<properties.id>`.
+ */
+public data class ProximiDestination(public val poiId: String) {
+    /** Why [ProximiMapView] does not route to a destination ([ProximiMapEvent.DestinationUnavailable]). */
+    public enum class Failure {
+        /** The id is not a place of the venue. */
+        UNKNOWN_PLACE,
+
+        /** No route from the visitor to the place with the route accessibility needs. */
+        NO_ROUTE,
+
+        /** A map without a journey has no position of the visitor yet. */
+        NO_POSITION,
+    }
+}
+
+/**
  * What [ProximiMap] reports to the host app, from [ProximiMap.events]. `ProximiMap` performs every
  * action itself; the events only report it. New cases can come in minor versions: a `when` with
  * `else` keeps compiling.
@@ -147,7 +170,8 @@ public sealed interface ProximiMapEvent {
     /**
      * The position is uncertain near the active stop: the accuracy is worse than
      * [GadSettings.uncertainAccuracyMeters] and the stop is within it. Sent by [ProximiMapView]
-     * without [ProximiMapView.Option.PROMPTS], which otherwise asks "Probably at …". At most once per
+     * without [ProximiMapView.Option.UNCERTAIN_POSITION_PROMPT], which otherwise asks "Probably at …".
+     * At most once per
      * [GadSettings.locationQuestionQuietPeriod].
      */
     public data class PositionUncertain(public val stop: ProximiStop) : ProximiMapEvent
@@ -173,8 +197,15 @@ public sealed interface ProximiMapEvent {
     public data class ArtworkVisitedOutOfOrder(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
-     * The visitor swiped a stop in the list. With [ProximiMapView.Option.PROMPTS] a dialog asks "Skip
-     * artwork?"; without them the host app decides.
+     * [ProximiMapView] with [ProximiMapView.Option.PROGRESS]: the view ordered the stops again, from
+     * the visitor's first position, after [ArtworkVisitedOutOfOrder] or after a detour. The journey in
+     * the host app's ids and its new order; `onJourneyChange` got it just before.
+     */
+    public data class StopOrderChanged(public val journey: ProximiJourney) : ProximiMapEvent
+
+    /**
+     * The visitor swiped a stop in the list. With [ProximiMapView.Option.SKIP_PROMPT] a dialog asks
+     * "Skip artwork?"; without it the host app decides.
      */
     public data class SkipRequested(public val stop: ProximiStop) : ProximiMapEvent
 
@@ -186,7 +217,7 @@ public sealed interface ProximiMapEvent {
     @Deprecated("Not sent since 1.14.0: the list has no Undo skip.")
     public data class SkipUndone(public val stop: ProximiStop) : ProximiMapEvent
 
-    /** The visitor picked an amenity on the map. A card shows it with "Go here". */
+    /** The visitor picked an amenity on the map. A card shows it with "Add a stop" (during a journey) or "Go here". */
     public data class AmenitySelected(public val stop: ProximiStop) : ProximiMapEvent
 
     /** The amenity is now a detour of the journey. */
@@ -195,7 +226,24 @@ public sealed interface ProximiMapEvent {
     /** The detour ended: reached ([completed]) or left. */
     public data class DetourEnded(public val stop: ProximiStop, public val completed: Boolean) : ProximiMapEvent
 
-    /** "Resume your Journey" or "Show the route from here". */
+    /**
+     * [ProximiMapView] does not route to the `destination` the host app set, and sets it back to
+     * `null` through `onDestinationChange`.
+     */
+    public data class DestinationUnavailable(public val poiId: String, public val reason: ProximiDestination.Failure) : ProximiMapEvent
+
+    /**
+     * "Add a stop" on an amenity: the journey waits while the visitor goes there, until "Resume your
+     * Journey" ([JourneyResumed]). Sent after [DetourStarted]. A detour to the host app's
+     * `destination` sends none.
+     */
+    public data object JourneyPaused : ProximiMapEvent
+
+    /**
+     * "Resume your Journey": after a detour, or on the card of a journey the host app paused
+     * ([ProximiMapView]'s `isPaused`, which the view then sets back to `false` through
+     * `onPausedChange`).
+     */
     public data object JourneyResumed : ProximiMapEvent
 
     /** The visitor has been off the route for [GadSettings.offRouteAfter]. */

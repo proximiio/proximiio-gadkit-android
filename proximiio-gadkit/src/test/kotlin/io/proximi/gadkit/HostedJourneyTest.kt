@@ -113,4 +113,14 @@ class HostedJourneyTest {
         val journey = ProximiJourney(stops = listOf(stop("a"), stop("b", ProximiJourney.State.SKIPPED), stop("c")))
         assertEquals("pending 2 · visited 0 · skipped 1", hostedStates(journey))
     }
+
+    /** Nagarro, 2026-10-26: `StopOrderChanged` only for a new order of the stops, not for new states. */
+    @Test
+    fun onlyANewOrderOfTheStopsIsAReorder() {
+        val shown = ProximiJourney(stops = listOf(stop("GAD.1"), stop("GAD.2"), stop("c")))
+        val visited = shown.copy(stops = listOf(stop("GAD.1", ProximiJourney.State.VISITED), stop("GAD.2"), stop("c")))
+        assertFalse(HostedMapModel.isReordered(shown, visited))
+        val reordered = shown.copy(stops = listOf(stop("GAD.1"), stop("c"), stop("GAD.2")))
+        assertTrue(HostedMapModel.isReordered(shown, reordered))
+    }
 }

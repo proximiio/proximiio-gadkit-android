@@ -727,6 +727,8 @@ public class ProximiMap(
                 is VisitEvent.AmenitySelected -> ProximiMapEvent.AmenitySelected(place(event.place))
                 is VisitEvent.DetourStarted -> ProximiMapEvent.DetourStarted(place(event.place))
                 VisitEvent.JourneyResumed -> ProximiMapEvent.JourneyResumed
+                is VisitEvent.DestinationUnavailable -> ProximiMapEvent.DestinationUnavailable(event.poiId, event.reason)
+                VisitEvent.JourneyPaused -> ProximiMapEvent.JourneyPaused
                 VisitEvent.Recentred -> ProximiMapEvent.Recentred
                 is VisitEvent.AccessibleRoutesChanged -> ProximiMapEvent.AccessibleRoutesChanged(event.isOn)
                 VisitEvent.ExitRequested -> ProximiMapEvent.ExitRequested

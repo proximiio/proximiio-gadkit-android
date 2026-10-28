@@ -174,4 +174,33 @@ class ProximiMapTest {
         assertEquals(20.0, MapStyle.exploreOptions("en", settings).maximumZoom)
         assertNull(MapStyle.options("en").minimumZoom)
     }
+
+    @Test
+    fun aDestinationMatchesTheFeatureIdOrItsPropertiesId() {
+        val places = listOf(
+            VenuePlace(id = "org-1:poi-wc", title = "Restrooms", coordinate = Coordinate(24.5, 54.4), level = 1.0),
+            VenuePlace(id = "org-1:poi-cafe", title = "Café", coordinate = Coordinate(24.5, 54.4), level = 0.0),
+        )
+        assertEquals("Café", VenuePlace.place("org-1:poi-cafe", places)?.title)
+        // proximiio-mcp returns `properties.id`, the part after the organisation id.
+        assertEquals("Restrooms", VenuePlace.place("poi-wc", places)?.title)
+        assertNull(VenuePlace.place("wc", places))
+        assertNull(VenuePlace.place("poi-shop", places))
+    }
+
+    @Test
+    fun promptsTurnsOnEachPromptAndEachPromptIsItsOwnOption() {
+        val prompts = listOf(
+            ProximiMapView.Option.SKIP_PROMPT,
+            ProximiMapView.Option.OFF_ROUTE_PROMPT,
+            ProximiMapView.Option.UNCERTAIN_POSITION_PROMPT,
+            ProximiMapView.Option.LEAVE_TOUR_PROMPT,
+        )
+        for (prompt in prompts) {
+            assertTrue(setOf(ProximiMapView.Option.PROMPTS).hasPrompt(prompt))
+            assertTrue(setOf(prompt).hasPrompt(prompt))
+            for (other in prompts - prompt) assertFalse(setOf(prompt).hasPrompt(other))
+        }
+        assertFalse(emptySet<ProximiMapView.Option>().hasPrompt(ProximiMapView.Option.SKIP_PROMPT))
+    }
 }

@@ -59,10 +59,23 @@ public data class GadSettings(
 
     // Route
 
-    /** Metres from the route before "You've left your route". */
-    val offRouteMeters: Double = 30.0,
-    /** Time off the route before "You've left your route", at any distance. iOS `offRouteSeconds`. */
+    /**
+     * Metres from the route to the current destination, for 3 fixes, before "Looks like you've left
+     * your route" (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-28).
+     */
+    val offRouteMeters: Double = 12.0,
+    /** Time off the route before "Looks like you've left your route", at any distance. iOS `offRouteSeconds`. */
     val offRouteAfter: Duration = 300.seconds,
+    /**
+     * How long "Looks like you've left your route" stays open, unless the visitor closes it. iOS
+     * `offRouteWarningSeconds`.
+     */
+    val offRouteWarningDuration: Duration = 10.seconds,
+    /**
+     * Time on a floor the route does not take before the visitor counts as off the route. iOS
+     * `wrongFloorSeconds`.
+     */
+    val wrongFloorAfter: Duration = 10.seconds,
     /**
      * The position dot is drawn on the route while it is within this many metres of it. Display
      * only; guidance and arrival use the real position.
@@ -71,8 +84,16 @@ public data class GadSettings(
 
     // Map
 
-    /** Zoom of "Centre on me" and of the first position. */
-    val followZoom: Double = 21.0,
+    /**
+     * Zoom of "Centre on me", of the first position and of the follow (PM, Monday "Curated tours:
+     * zoom level", 2026-10-27; RPR, "Need to determine correct zoom levels on-site", 2026-10-28).
+     */
+    val followZoom: Double = 18.8,
+    /**
+     * Zoom of the follow while the visitor is in a gallery during a personalised journey, or `null`
+     * for [followZoom] (PM, Monday "Navigation to a gallery", 2026-10-27).
+     */
+    val galleryFollowZoom: Double? = 20.0,
     /**
      * The farthest the visitor can zoom out, or `null` for the map library's limit. MapLibre zoom
      * levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
