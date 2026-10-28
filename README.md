@@ -52,7 +52,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.12.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.15.0")
 }
 ```
 
@@ -61,7 +61,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.12.0
+git -C gadkit checkout 1.15.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -929,6 +929,15 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+### [1.15.0] — 2026-10-28
+
+The behaviour of the iOS package 1.14.0, which includes 1.13.0 and 1.13.1, and `ProximiExploreView` of
+iOS 1.15.0, on SDK 6.0.0-beta.31 and Map 6.0.0-beta.27: the Explore Museum map legend and data icons,
+the Journey Complete option, zoom limits, the position dot drawn on each fix, the map spinner, no
+"Undo skip", the Android glass with the system's pressed state, and the Explore Museum map as a UI
+component on the host app's SDK. The other changes of iOS 1.15.0 (the prompt options, `destination`,
+SDK 6.0.0-beta.33 and Map 6.0.0-beta.30) come in a later release. There is no Android 1.13 or 1.14.
 
 #### Added (iOS 1.15.0)
 
