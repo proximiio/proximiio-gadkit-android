@@ -18,7 +18,7 @@ code to `connectWristband(code)`. The Proximi GAD Android app uses the library t
 
 | Artifact | Content |
 |---|---|
-| `io.proximi.gadkit:proximiio-gadkit` | `ProximiMap`, `ProximiMapHost` and their types, `GadConfiguration`, `GadSettings`, `FieldLog`. |
+| `io.proximi.gadkit:proximiio-gadkit` | `ProximiMap`, `ProximiMapHost`, `ProximiMapView`, `ProximiExploreView` and their types, `GadConfiguration`, `GadSettings`, `FieldLog`. |
 
 ## Requirements
 
@@ -580,7 +580,19 @@ binding.stateChanges().collect { state ->
 
 ## Explore Museum
 
-`open(Screen.MUSEUM_MAP)` shows the Explore Museum map (Figma "Explore Museum", node 12129:102006).
+`open(Screen.MUSEUM_MAP)` shows the Explore Museum map (Figma "Explore Museum", node 12129:102006)
+with the library's title "Explore Museum" and Back. `ProximiExploreView` is the same map as a UI
+component on the host app's started SDK, without title, Back and background: the host app draws
+them. A host app that uses it needs no `ProximiMap`.
+
+```kotlin
+ProximiExploreView(sdk, Modifier.fillMaxSize())       // settings: GadSettings, default STANDARD
+```
+
+`ProximiExploreView` reads the venue data the SDK holds and follows its `venueDataChanges()`. It does
+not start, stop or configure the SDK and reports no event. It reads `settings` (the zoom range and
+the map's loading timeout) when it opens.
+
 The visitor is not at the museum there: the map has no position dot, no route, and its camera does
 not follow.
 
@@ -814,7 +826,7 @@ adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> -
 | `gad.routeTo <title>` | The museum map of Journey Complete routes to the first place whose title matches, after the first position. |
 | `gad.mapGalleryFills true` | The museum map of Journey Complete fills every gallery. |
 | `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
-| `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. |
+| `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. With `gad.openMap`: the museum map in `ProximiExploreView`, with "Close map". |
 
 `gad.hubPage` is read by the Proximi GAD app; the library does not act on it.
 
@@ -885,6 +897,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `FieldLog.isEnabled = true` + `logLaunch()`, `FieldLogShareButton` | `FieldLog.start(context, secrets)`, `FieldLog.share(context)` | |
 | `ProximiMapView(sdk:journey:…)` with `Binding<ProximiJourney>` | `ProximiMapView(sdk, journey, onJourneyChange, …)` | Compose state hoisting: the host app passes the journey and takes the view's changes in `onJourneyChange`. |
 | `ProximiMapView.Options` (`OptionSet`, `.all`) | `Set<ProximiMapView.Option>` (`Option.ALL`) | `.liveActivity` is `JOURNEY_NOTIFICATION`. |
+| `ProximiExploreView(sdk:settings:)` | `ProximiExploreView(sdk, modifier, settings)` | |
 | `ProximiJourney(kind:artworks:)`, `Codable` | `ProximiJourney.ofArtworks(artworks, kind)`, `toJson()`, `fromJson(text)` | Same JSON. |
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
@@ -916,6 +929,12 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Added (iOS 1.15.0)
+
+- `ProximiExploreView(sdk, modifier, settings)`: the Explore Museum map as a UI component on the host
+  app's SDK, without title, Back and background (Nagarro, 2026-10-28: their app uses
+  `ProximiMapView`, not `ProximiMap`). See "Explore Museum". `open(Screen.MUSEUM_MAP)` is unchanged.
 
 #### Added (iOS 1.13.0, 1.13.1)
 

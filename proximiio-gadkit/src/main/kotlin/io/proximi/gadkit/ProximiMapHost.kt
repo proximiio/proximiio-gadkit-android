@@ -173,8 +173,23 @@ private fun Cover(map: ProximiMap, presentation: Presentation) {
                     VisitPlanPicker(places, onStart = map::planned, onCancel = map.presenter::hide)
                 }
                 Presentation.HostedMap -> HostedMapCheck(map, venue.sdk)
+                Presentation.HostedExplore -> HostedExploreCheck(map, venue)
                 is Presentation.ManageJourney -> Unit
             }
+        }
+    }
+}
+
+/**
+ * `gad.hostedMap` with `gad.openMap`: [ProximiExploreView] on the app's SDK, as Nagarro's app uses
+ * it. This view is the host app: a white background and "Close map".
+ */
+@Composable
+private fun HostedExploreCheck(map: ProximiMap, venue: VenueService) {
+    Box(Modifier.fillMaxSize().background(Color.White)) {
+        ProximiExploreView(venue.sdk, Modifier.fillMaxSize().statusBarsPadding(), settings = venue.settings)
+        TextButton(onClick = map.presenter::hide, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()) {
+            Text("Close map", style = MaterialTheme.typography.labelSmall)
         }
     }
 }

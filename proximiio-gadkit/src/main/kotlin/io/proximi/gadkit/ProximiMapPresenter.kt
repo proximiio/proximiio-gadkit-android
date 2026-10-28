@@ -56,6 +56,15 @@ internal sealed interface Presentation {
         override val key = "hostedMap"
     }
 
+    /**
+     * `gad.hostedMap` with `gad.openMap`, debuggable builds: [ProximiExploreView] on the app's SDK, as
+     * Nagarro's app uses it.
+     */
+    data object HostedExplore : Presentation {
+        override val screen = ProximiMap.Screen.MUSEUM_MAP
+        override val key = "hostedExplore"
+    }
+
     data class ManageJourney(val meta: VisitMeta) : Presentation {
         override val screen = ProximiMap.Screen.MANAGE_JOURNEY
         override val key = "manageJourney"

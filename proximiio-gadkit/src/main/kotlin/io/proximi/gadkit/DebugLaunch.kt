@@ -33,7 +33,7 @@ import kotlinx.coroutines.CancellationException
  * - `gad.visitList`: opens the journey screen in List mode (iOS `-visitList`).
  * - `gad.hostedMap`: opens the `gad.visit` journey in [io.proximi.gadkit.ProximiMapView] on the
  *   app's SDK with the default options (iOS `-hostedMap`). Without `gad.visit` the view shows the map
- *   alone.
+ *   alone. With `gad.openMap`: the museum map in [io.proximi.gadkit.ProximiExploreView].
  * - `gad.visitAutoAdvance`: a reached detour ends 5 m after the visitor leaves it, without
  *   "Resume your Journey" (iOS `-visitAutoAdvance`). It applies to every visit of the process.
  * - `gad.routeAvoid`: `stairs,escalators,revolvingDoors,inaccessiblePaths` sets
