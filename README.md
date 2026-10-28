@@ -1063,6 +1063,20 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   size on the phone and in MapTap: 120 px at 0.2 is 24 dp. Before, an icon was drawn at the screen's
   density, about a third of that. The design's amenity markers and the Explore Museum gallery
   circles take the data icon's pixel size (PM, 2026-10-27).
+- **Visible:** the journey map's Map / List control is two buttons on glass, 150 × 50 dp with 16 dp
+  corners; the selected part is white at 60 % with a 1.5 dp ink outline (PM, Monday "Native
+  elements", 2026-10-28). It replaces the Material segmented button of 1.15.0.
+- **Visible:** the glass buttons and the search shortcuts have a 1 dp ink outline while pressed, over
+  the ripple (PM, Monday "Buttons to have black border when pressed", 2026-10-28). The accessible
+  routes button, when on, has the ink outline and no blue fill (RPR, Monday "Accessible routing").
+- **Visible:** the search shortcuts have a white haze behind them (RPR, Monday "White blur behind
+  amenity list", 2026-10-28).
+- **Visible:** the journey map fades out under the controls at the top (110 dp) and over the card at
+  the bottom (170 dp; RPR, Monday "Map fade at top & bottom", 2026-10-28).
+- **Visible:** the floor on the journey map is a label, not a button (PM, Monday "Current level
+  button", 2026-10-28). "Centre on me" follows the visitor's floor.
+- **Visible:** "Skip this artwork?" has 12 dp under "Keep it" (was 40; PM, Monday "Skip artwork popup
+  too large", 2026-10-28).
 - **Visible:** the lift or stairs view plays RPR's animation of a lift or stairs, going up or down,
   looped, in place of the icon in a circle (PM, Monday "Elevator/Staircase animation", 2026-10-27).
   The library depends on `com.airbnb.android:lottie-compose` 6.7.1 (`implementation`); a host app

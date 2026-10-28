@@ -1,5 +1,10 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.designsystem.GlassStrength
+import io.proximi.gadkit.designsystem.glassSurface
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import io.proximi.gadkit.map.verticalFades
 import androidx.compose.runtime.remember
 import io.proximi.gadkit.map.FloorChangeView
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -273,7 +278,9 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                 MapGlassFrame(Modifier.weight(1f)) {
                     ProximiioMap(
                         session = model.session,
-                        modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp),
+                        // The map fades out under the controls at the top (110 dp) and over the card at the
+                        // bottom (170 dp; RPR, Monday "Map fade at top & bottom", 2026-10-28).
+                        modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp).verticalFades(top = 110.dp, bottom = 170.dp),
                         configure = { canvas ->
                             model.layers.attach(canvas)
                         },
@@ -404,8 +411,17 @@ private fun CardOverlay(model: VisitViewModel) {
                     ) { MapIcon(GadIcon.Compass.glyph) }
                     val isAccessibleRoutesOn by AccessibleRoutes.isOn(LocalContext.current).collectAsStateWithLifecycle()
                     AccessibleRoutesButton(isAccessibleRoutesOn, model::setAccessibleRoutes)
+                    // The shown floor, a label and no button (PM, Monday "Current level button", 2026-10-28).
                     val label = GuidanceText.floorLabel(selectedFloor.level)
-                    GlassSquareButton(onClick = model::followMyFloor, contentDescription = stringResource(R.string.floor_x, label)) {
+                    val floorDescription = stringResource(R.string.floor_x, label)
+                    Box(
+                        Modifier
+                            .size(50.dp)
+                            .glassSurface(RoundedCornerShape(12.dp), GlassStrength.Frosted)
+                            .clearAndSetSemantics { contentDescription = floorDescription }
+                            .testTag("visitFloor"),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Text(label, style = GadTextStyle.LargeBodyBold.textStyle, color = Palette.ink)
                     }
                 }

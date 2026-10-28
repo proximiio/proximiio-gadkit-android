@@ -1,5 +1,6 @@
 package io.proximi.gadkit.ui
 
+import androidx.compose.ui.unit.Dp
 import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -47,13 +48,20 @@ public fun BackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 @ProximiGadAppApi
 public fun OverlaySheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    OverlaySheet(onDismiss, rememberModalBottomSheetState(skipPartiallyExpanded = true), content)
+    OverlaySheet(onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), content = content)
+}
+
+/** [OverlaySheet] with [bottomPadding] under its content (40 dp by default). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun OverlaySheet(onDismiss: () -> Unit, bottomPadding: Dp, content: @Composable ColumnScope.() -> Unit) {
+    OverlaySheet(onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), bottomPadding = bottomPadding, content = content)
 }
 
 /** [OverlaySheet] with its [sheetState], so the caller can hide it before an action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun OverlaySheet(onDismiss: () -> Unit, sheetState: SheetState, content: @Composable ColumnScope.() -> Unit) {
+internal fun OverlaySheet(onDismiss: () -> Unit, sheetState: SheetState, bottomPadding: Dp = 40.dp, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -65,7 +73,7 @@ internal fun OverlaySheet(onDismiss: () -> Unit, sheetState: SheetState, content
         // The sheet is white and opaque: its glass has nothing to blur.
         ProvideGlassBackdrop(null) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 30.dp, vertical = 40.dp),
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 30.dp, end = 30.dp, top = 40.dp, bottom = bottomPadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 content = content,

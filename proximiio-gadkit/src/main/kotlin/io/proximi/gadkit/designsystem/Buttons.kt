@@ -37,14 +37,15 @@ import androidx.compose.ui.unit.dp
 // | `IconGlassButton` | Button_medium | glass, 40 × 40 dp |
 // | `TextActionButton` | "Skip for now", "Carry on" | Body Small, underlined |
 //
-// The glass is the frosted surface with a light shadow (`glassSurface`). The system ripple draws
-// the pressed state; selected is a 1 dp ink outline; disabled is 40 % opacity.
+// The glass is the frosted surface with a light shadow (`glassSurface`). Pressed and selected are a
+// 1 dp ink outline, over the system ripple; the button does not grow or shrink (PM, Monday "Buttons
+// to have black border when pressed", 2026-10-28). Disabled is 40 % opacity.
 
 private val ButtonShape = RoundedCornerShape(12.dp)
 
 /**
- * [content] on glass in [shape], as iOS `GlassButton`. The ripple draws the pressed state inside
- * the shape. [modifier] sizes the button; [content] lies inside the glass.
+ * [content] on glass in [shape], as iOS `GlassButton`. The ripple and a 1 dp ink outline draw the
+ * pressed state inside the shape. [modifier] sizes the button; [content] lies inside the glass.
  */
 @Composable
 internal fun GlassButtonBox(
@@ -56,12 +57,14 @@ internal fun GlassButtonBox(
     role: Role = Role.Button,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val isPressed by interaction.collectIsPressedAsState()
     Box(
         modifier
             .alpha(if (enabled) 1f else Palette.DISABLED_OPACITY)
             .glassSurface(shape)
-            .then(if (isSelected) Modifier.border(1.dp, Palette.ink, shape) else Modifier)
-            .clickable(remember { MutableInteractionSource() }, indication = ripple(), enabled = enabled, role = role, onClick = onClick),
+            .then(if (isSelected || isPressed) Modifier.border(1.dp, Palette.ink, shape) else Modifier)
+            .clickable(interaction, indication = ripple(), enabled = enabled, role = role, onClick = onClick),
         contentAlignment = Alignment.Center,
         content = content,
     )

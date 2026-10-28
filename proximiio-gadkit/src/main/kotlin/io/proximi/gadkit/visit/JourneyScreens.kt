@@ -180,7 +180,8 @@ internal fun JourneyCompleteScreen(venue: VenueService, onClose: () -> Unit) {
 /** "Skip this artwork?" bottom sheet. */
 @Composable
 internal fun SkipConfirmation(stop: String, onSkip: () -> Unit, onKeep: () -> Unit) {
-    OverlaySheet(onDismiss = onKeep) {
+    // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
+    OverlaySheet(onDismiss = onKeep, bottomPadding = 12.dp) {
         SheetTitle(stringResource(R.string.skip_this_artwork))
         Text(stop, style = GadTextStyle.LargeBodyRegular.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
         SheetBody(stringResource(R.string.it_will_be_removed_from_your_route), Modifier.padding(bottom = 20.dp))

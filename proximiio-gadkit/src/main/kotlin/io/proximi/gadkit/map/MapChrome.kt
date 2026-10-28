@@ -1,5 +1,14 @@
 package io.proximi.gadkit.map
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.background
@@ -63,12 +72,6 @@ import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.designsystem.glassSurface
 import io.proximi.gadkit.designsystem.GlassButtonBox
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
 import androidx.compose.material3.ripple
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -114,22 +117,23 @@ internal fun GlassSquareButton(
 }
 
 /**
- * The accessible routes button of the maps, as iOS `AccessibleRoutesButton`: a wheelchair on glass
- * while it is off; white on a filled [Palette.position] square while it is on (PM 2026-10-14: an
- * indicator for both states).
+ * The accessible routes button, 50 × 50 glass: the icon in ink, with a 1 dp ink outline while it is on
+ * or pressed (RPR, Monday "Accessible routing", 2026-10-28: no blue fill).
  */
 @Composable
 internal fun AccessibleRoutesButton(isOn: Boolean, onToggle: (Boolean) -> Unit) {
     val label = stringResource(R.string.accessible_routes)
     val state = stringResource(if (isOn) R.string.on else R.string.off)
+    val interaction = remember { MutableInteractionSource() }
+    val isPressed by interaction.collectIsPressedAsState()
     Box(
         Modifier
             .size(50.dp)
             .glassSurface(ControlShape, GlassStrength.Frosted)
-            .then(if (isOn) Modifier.background(Palette.position, ControlShape) else Modifier)
+            .then(if (isOn || isPressed) Modifier.border(1.dp, Palette.ink, ControlShape) else Modifier)
             .toggleable(
                 value = isOn,
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = ripple(),
                 role = Role.Switch,
                 onValueChange = onToggle,
@@ -140,7 +144,7 @@ internal fun AccessibleRoutesButton(isOn: Boolean, onToggle: (Boolean) -> Unit) 
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(R.drawable.ic_accessible), contentDescription = null, Modifier.size(22.dp), tint = if (isOn) Palette.white else Palette.ink)
+        Icon(painterResource(R.drawable.ic_accessible), contentDescription = null, Modifier.size(22.dp), tint = Palette.ink)
     }
 }
 
@@ -153,13 +157,30 @@ internal fun MapIcon(icon: Int, modifier: Modifier = Modifier, size: Int = 24) {
 /** Amenity shortcuts as a trailing-aligned stack of small chips (Figma search state). */
 @Composable
 internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, onPick: (AmenityKind) -> Unit) {
-    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        kinds.forEach { kind ->
-            // Frosted: on the clear glass the titles were hard to read over the map
-            // (PM 2026-10-15, "Search menu transparency").
-            AmenityChip(kind, selected = kind == selected, onClick = { onPick(kind) }, strength = GlassStrength.Frosted)
+    Box {
+        // A white haze behind the list, so the map behind it shows less (RPR, Monday "White blur
+        // behind amenity list", 2026-10-28).
+        Box(Modifier.matchParentSize().outset(12.dp).blur(18.dp, BlurredEdgeTreatment.Unbounded).background(Palette.white.copy(alpha = 0.8f)))
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            kinds.forEach { kind ->
+                // Frosted: on the clear glass the titles were hard to read over the map
+                // (PM 2026-10-15, "Search menu transparency").
+                AmenityChip(kind, selected = kind == selected, onClick = { onPick(kind) }, strength = GlassStrength.Frosted)
+            }
         }
     }
+}
+
+/** [this] grown by [amount] on every side, beyond its parent's bounds. */
+private fun Modifier.outset(amount: Dp): Modifier = layout { measurable, constraints ->
+    val extra = amount.roundToPx()
+    val placeable = measurable.measure(
+        Constraints.fixed(
+            (constraints.maxWidth + 2 * extra).coerceAtLeast(0),
+            (constraints.maxHeight + 2 * extra).coerceAtLeast(0),
+        ),
+    )
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-extra, -extra) }
 }
 
 /** "Button Small" with the amenity icon before the title. */
@@ -171,12 +192,14 @@ internal fun AmenityChip(
     modifier: Modifier = Modifier,
     strength: GlassStrength = GlassStrength.Light,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val isPressed by interaction.collectIsPressedAsState()
     Row(
         modifier
             .defaultMinSize(minHeight = 32.dp)
             .glassSurface(ControlShape, strength)
-            .then(if (selected) Modifier.border(1.dp, Palette.ink, ControlShape) else Modifier)
-            .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Button, onClick = onClick)
+            .then(if (selected || isPressed) Modifier.border(1.dp, Palette.ink, ControlShape) else Modifier)
+            .clickable(interaction, indication = ripple(), role = Role.Button, onClick = onClick)
             .semantics { this.selected = selected }
             .padding(horizontal = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -348,6 +371,24 @@ internal fun MapGlassFrame(modifier: Modifier = Modifier, content: @Composable B
  * rounded rectangle with [cornerRadius], inset by half of [width] and blurred by half of [width]. It
  * changes the look only: touches on the faded edge still reach the content.
  */
+/**
+ * Fades the content in over [top] from its top and out over [bottom] to its bottom: the journey map
+ * under the controls at the top and the card at the bottom (RPR, Monday "Map fade at top & bottom",
+ * 2026-10-28). It changes the look only.
+ */
+internal fun Modifier.verticalFades(top: Dp, bottom: Dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            if (size.height <= 0f) return@drawWithContent
+            val topEnd = (top.toPx() / size.height).coerceIn(0f, 1f)
+            val bottomStart = ((size.height - bottom.toPx()) / size.height).coerceIn(topEnd, 1f)
+            drawRect(
+                Brush.verticalGradient(0f to Color.Transparent, topEnd to Color.Black, bottomStart to Color.Black, 1f to Color.Transparent),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+
 internal fun Modifier.softEdges(cornerRadius: Dp, width: Dp = 28.dp): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithCache {
@@ -403,41 +444,37 @@ internal object MapLoading {
 }
 
 /**
- * "Map | List" toggle: the system's segmented button (Material 3 `SegmentedButton`) on glass,
- * 150 × 50, the selected half outlined in ink (Figma "Glass review", "System controls",
- * 2026-10-24).
+ * "Map | List" toggle: two buttons on glass, in place of the system's segmented button. 150 × 50 glass
+ * with 16 dp corners; the selected part is white at 60 % with a 1.5 dp ink outline (Figma frame of the
+ * PM, Monday "Native elements", 2026-10-28).
  */
 @Composable
 internal fun MapListToggle(showsList: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    SingleChoiceSegmentedButtonRow(
+    Row(
         modifier
             .size(width = 150.dp, height = 50.dp)
-            .glassSurface(ControlShape, GlassStrength.Frosted)
-            .padding(5.dp),
+            .glassSurface(RoundedCornerShape(16.dp), GlassStrength.Frosted)
+            .padding(4.dp)
+            .selectableGroup(),
     ) {
-        ToggleItem(stringResource(R.string.map), selected = !showsList) { onChange(false) }
-        ToggleItem(stringResource(R.string.list), selected = showsList) { onChange(true) }
+        ToggleSegment(stringResource(R.string.map), isSelected = !showsList) { onChange(false) }
+        ToggleSegment(stringResource(R.string.list), isSelected = showsList) { onChange(true) }
     }
 }
 
 @Composable
-private fun SingleChoiceSegmentedButtonRowScope.ToggleItem(title: String, selected: Boolean, onClick: () -> Unit) {
-    SegmentedButton(
-        selected = selected,
-        onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.weight(1f).fillMaxHeight(),
-        colors = SegmentedButtonDefaults.colors(
-            activeContainerColor = Palette.white.copy(alpha = 0.3f),
-            activeContentColor = Palette.ink,
-            inactiveContainerColor = Color.Transparent,
-            inactiveContentColor = Palette.ink,
-        ),
-        border = BorderStroke(1.dp, if (selected) Palette.ink else Color.Transparent),
-        contentPadding = PaddingValues(0.dp),
-        icon = {},
+private fun RowScope.ToggleSegment(title: String, isSelected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .then(if (isSelected) Modifier.background(Palette.white.copy(alpha = 0.6f), shape).border(1.5.dp, Palette.ink, shape) else Modifier)
+            .clip(shape)
+            .selectable(isSelected, remember { MutableInteractionSource() }, indication = ripple(), role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(title, style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+        Text(title, style = GadTextStyle.LargeBodyRegular.textStyle, color = Palette.ink)
     }
 }
 
