@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.15.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.20.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.15.0
+git -C gadkit checkout 1.20.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1019,6 +1019,15 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 
 ### [Unreleased]
 
+### [1.20.1] — 2026-10-29
+
+The behaviour of the iOS package 1.20.1, which includes 1.15.0 to 1.20.0, on SDK 6.0.0-beta.34 and Map
+6.0.0-beta.31: one option per prompt, `destination`, `isPaused`, `StopOrderChanged`, "Add a stop", the
+off-route card from 12 m, "Rerouting you…", the way back from a floor without positioning, the lift and
+stairs animations, galleries on their polygons, amenity kinds by the amenity, map icons at one dp per
+pixel, the Explore Museum card with a line to the place, the offline start and the refused token.
+There is no Android 1.16 to 1.20.0.
+
 #### Added (iOS 1.15.0, 1.17.0; Nagarro, 2026-10-26 to 2026-10-28)
 
 - One option per prompt: `ProximiMapView.Option.SKIP_PROMPT`, `OFF_ROUTE_PROMPT`,
@@ -1034,7 +1043,7 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
 - `GadSettings.offRouteWarningDuration` (10 s), `wrongFloorAfter` (10 s) and `galleryFollowZoom` (20).
 - A `when` over `ProximiMapEvent` without `else` adds the three new events.
 
-#### Changed (iOS 1.15.0 to 1.20.0)
+#### Changed (iOS 1.15.0 to 1.20.1)
 
 - **Visible:** during a journey the amenity card has "Add a stop" and "Close". "Add a stop" starts the
   detour at once and takes the map back to the visitor. "Change your route?" is gone (PM, Monday "Add
