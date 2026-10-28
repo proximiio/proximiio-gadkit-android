@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.15.0 uses SDK
-6.0.0-beta.31 and Map 6.0.0-beta.27.
+6.0.0-beta.31 and Map 6.0.0-beta.27; the next release uses SDK 6.0.0-beta.34 and Map 6.0.0-beta.30.
 
 Each change has a mark:
 
@@ -21,6 +21,8 @@ Each change has a mark:
 | SDK 6.0.0-beta.24 | `ProximiioConfiguration` has a new parameter `eventBatching` (default `false`) before `positioning`. | A call that passes `positioning` or a later argument by position, or destructures the configuration, passes it by name. Recompile in every case. | **Required** with positional arguments |
 | SDK 6.0.0-beta.25 | `BlueiotBindingError` has three new cases (relay-api 0.11): `SwapBandsApart(requestID)` (code 18), `SwapAtReception(requestID)` (code 19) and `SigningUnavailable(retryAfter, requestID)` (code 20). Before, the first two arrived as `Unexpected` and the third as `Server(503)`. | A `when` over `BlueiotBindingError` without `else` does not compile. Add the three cases. The SDK's texts: "Hold your current wristband next to the new one and scan again.", "Your wristband isn't reachable. Please swap it at the reception desk." and, for `SigningUnavailable`, a retry after `retryAfter` seconds. | **Required** with an exhaustive `when` |
 | SDK 6.0.0-beta.25 | `BlueiotBindingPolicy` has a new parameter `swapNearMeters` after `bindReceptionRequired`. | A positional `copy` or destructuring of the policy passes the arguments by name. Building one compiles. | **Check** |
+| SDK 6.0.0-beta.32 | `ProximiioAmenity::title` without an expected type is ambiguous: `title(language)` sits beside the `title` property. | `val f = ProximiioAmenity::title` does not compile; give the reference a type. `sortedBy(ProximiioAmenity::title)` compiles. | **Check** |
+| SDK 6.0.0-beta.33 | The constructors of `ProximiioDiagnostics.ConfigurationSummary` (`allowsOfflineStart`), `OfflinePackageFetchSummary` (`isDataOnly`, `carriesAcceptedToken`) and `OfflinePackageFetcher.fetch` (`acceptedTokenDigest`) gain trailing parameters. | Code that calls them is compiled again. | **Check** |
 | SDK 6.0.0-beta.31, Map 6.0.0-beta.27 | New cases `BlueiotBindingSignal.PrivacyZone(since)`, `ProximiioDiagnostics.NoPositionReason.PRIVACY_ZONE` and `PositionStage.PRIVACY_ZONE`. | A `when` over these types without `else` does not compile. Add the case. | **Required** with an exhaustive `when` |
 
 The SDK and Map versions have no other source break. `ProximiioConfiguration` gains the defaulted
@@ -58,6 +60,15 @@ built again: both have a new trailing parameter.
 | Map 6.0.0-beta.26 | Built against SDK 6.0.0-beta.30, which it requires. No map API change and nothing drawn changes. | Take SDK 6.0.0-beta.30 and Map 6.0.0-beta.26 together. | Info |
 | SDK 6.0.0-beta.31 | The binding reads relay-api's `private` (a band silent in a privacy zone) as `BlueiotBindingSignal.PrivacyZone(since)`; older SDKs read it as `Ok`. With `withholdsPositionsInPrivacyZones` on, `positions()` emits no fix while private and positioning stays available. | Turn the option on and pass the binding's signal with `setPositioningSourcePrivate(since)` (README "Privacy zones"). | **Required** for the privacy zones |
 | Map 6.0.0-beta.27 | While the SDK is private, the dot stays grey at the last fix before the zone, also with the SDK option off, and `JourneyNavigator` takes no fix: no off-route, re-route, deviation, passed stop or arrival. Built against SDK 6.0.0-beta.31, which it requires. | Take SDK 6.0.0-beta.31 and Map 6.0.0-beta.27 together. | Info |
+| SDK 6.0.0-beta.32 | A permission counts as asked only when its prompt was shown. Without a launcher, after a launcher that threw or a cancelled request, it reads `NOT_DETERMINED`, not `DENIED`, and the next request asks again. `requestMotionPermission()` no longer throws when the launcher throws. | | **Check** |
+| SDK 6.0.0-beta.32 | `refreshAmenities()` that changes only an amenity's metadata or title translations emits `VenueDataKind.amenities`. | | Info |
+| SDK 6.0.0-beta.33 | `authenticate()` no longer throws without a connection on a phone where the API accepted the token before (`allowsOfflineStart`, on by default). `tokenStatus()` is then `UNVERIFIED`: positioning runs on the stored venue, nothing is synced or uploaded. `loadRouteNetwork()` still needs the network. | Install the route network with `loadCachedRouteNetwork()` while `tokenStatus()` is not `VERIFIED`, and as the fallback of a failed download. `allowsOfflineStart = false` keeps the old behaviour. | **Required** |
+| SDK 6.0.0-beta.33 | Only a clear 401 counts as a refused token. After three refusals over at least two hours the SDK emits `SyncFailed("unauthorized")`, stops and deletes the venue data, the offline packages, the waiting uploads and the token; `tokenStatus()` is `REJECTED`. A token of another application deletes the stored data before the first sync. An unclear 401 is `ProximiioAPIError.Server(401)`. | Start the SDK again after a new `authenticate()`. | **Check** |
+| SDK 6.0.0-beta.33 | `authenticate()` gives up after 30 s on a connection that does not answer. Waiting uploads survive an app kill (with consent, at most 500 of each kind). | | Info |
+| SDK 6.0.0-beta.34 | Places, floors, departments, geofences, privacy zones and inputs deleted on the server leave the phone within about 15 minutes, as `SyncEvent.Deleted` and in `venueDataChanges()`. Map features the server deleted by their bare UUID leave the map. | | Info |
+| Map 6.0.0-beta.28 | A map opened after the last fix shows the dot at once, at the fix's real age, and that fix frames the place and arms the follow. With a zoom range, every zoom the camera writes keeps to it. | | Info |
+| Map 6.0.0-beta.29 | The style's raster tiles (`proximiio:raster:*` metadata) are drawn below the floor fills: the GAD illustrated map. A journey layer style set to `null` takes its layer off the map. A level two places share is named by the visitor's place. | `MapOptions(rasterTiles = false)` keeps the vector plan alone. | **Check** |
+| Map 6.0.0-beta.30 | Requires SDK 6.0.0-beta.33. After the SDK refused the token for good, the session deletes the stored style and tiles, takes the venue off the map, shows `fallbackStyleUrl` or an empty style and ends a running `JourneyNavigator`. | After a new successful `authenticate()`, call `session.start()` and `navigator.start()` again. | **Check** |
 
 ### Added
 
@@ -81,6 +92,12 @@ All Info.
   `Proximiio.setPositioningSourcePrivate(since)`, `privacyZoneStateChanges()`, `privacyZoneState()`
   and `PrivacyZoneState`.
 - Map 6.0.0-beta.27: `PositionStyle.privacy` and `PositionPrivacyStyle`.
+- SDK 6.0.0-beta.32: `ProximiioAmenity.metadata`, `title(language)`, `titleTranslations` and
+  `Proximiio.requestBluetoothPermission()`.
+- SDK 6.0.0-beta.33: `ProximiioConfiguration.allowsOfflineStart`, `Proximiio.tokenStatus()` with
+  `TokenStatus`.
+- Map 6.0.0-beta.28: `MapOptions.minimumZoom` and `maximumZoom`, `VenueDataSource.lastPosition()`.
+- Map 6.0.0-beta.29: `MapOptions.rasterTiles`, `ProximiioMapSession.unavailableFontStacks`.
 
 ### Fixed
 
@@ -111,8 +128,8 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.32 and later and Map 6.0.0-beta.28 and later are not used by ProximiioGADKit for
-Android 1.15.0. A host app that declares them gets them instead of the versions above.
+SDK 6.0.0-beta.35 and later and Map 6.0.0-beta.31 and later are not used by the next ProximiioGADKit
+for Android. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -134,7 +151,7 @@ Android 1.15.0. A host app that declares them gets them instead of the versions 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
   depend on `io.proximi.gadkit:proximiio-gadkit:1.15.0` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.31` and Map `6.0.0-beta.27` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.34` and Map `6.0.0-beta.30` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.

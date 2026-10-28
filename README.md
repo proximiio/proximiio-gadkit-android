@@ -4,6 +4,7 @@ ProximiioGADKit is an Android library with the Explore Museum map, the journey (
 picker and Manage journey of the Proximi GAD app (Guggenheim Abu Dhabi), and the wristband binding.
 It is built on the Proximi.io Android SDK and Map. It is the Android counterpart of
 `proximiio/proximiio-gadkit-ios`: an Android tag `X.Y.0` has the behaviour of the iOS tag `X.Y.0`.
+One exception: Android 1.15.0 has the behaviour of iOS 1.14.0 and `ProximiExploreView` of iOS 1.15.0.
 
 The host app uses one entry point, `ProximiMap`:
 
@@ -72,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.31` and Map `6.0.0-beta.27` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.34` and Map `6.0.0-beta.30` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - A host app that draws its journey with the map library's `ProximiioMap` and its own
@@ -902,7 +903,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.64 and Map 6.0.0-beta.51 | SDK 6.0.0-beta.31 and Map 6.0.0-beta.27 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 | SDK 6.0.0-beta.34 and Map 6.0.0-beta.30 | The same SDK changes. Map 6.0.0-beta.30 has the changes of the iOS map up to 6.0.0-beta.55; the stop markers over the dot and `venueDrawing` of iOS 6.0.0-beta.56 come with a later Android map. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -921,7 +922,8 @@ against the sandbox.
 The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/). Every change of
 the library adds an entry under `[Unreleased]` in the same commit. A release moves the entries
 under a heading with the version and the date. A tag `X.Y.0` has the behaviour of the iOS tag
-`X.Y.0`. Entries before 1.0.0 name the types of the API before `ProximiMap`.
+`X.Y.0`, except 1.15.0 (see its entry). Entries before 1.0.0 name the types of the API before
+`ProximiMap`.
 
 - **BREAKING:** the host app has to change its code: a public API is renamed or removed, a
   parameter is new and required, a type changes, or a default changes. The entry says what to change.
@@ -929,6 +931,24 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Changed (SDK 6.0.0-beta.34, Map 6.0.0-beta.30; iOS 1.15.0, 1.16.0)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.34` (was `6.0.0-beta.31`) and Map
+  `6.0.0-beta.30` (was `6.0.0-beta.27`). A host app that declares them itself moves to the same
+  versions. MIGRATION.md section 1 lists the SDK and Map changes; the host app of `ProximiMapView`
+  installs the cached route network when it starts offline (SDK 6.0.0-beta.33).
+- **Visible:** `ProximiMap.start()` works without a connection on a phone where the API accepted the
+  token before. The route network then comes from the stored features.
+- **Visible:** a token the API refused for at least two hours: the SDK deletes the venue data,
+  `ProximiMap` closes its screens and `status` is `Failed` with `StartFailed`. The stored journey is
+  kept. `start()` starts the same SDK again once the API accepts the token.
+- **Visible:** the maps draw the illustrated map of the GAD style (its raster tiles) under the floor
+  plan (Map 6.0.0-beta.29; PM, Monday "Illustrated map not visible").
+- **Visible:** places, floors and geofences deleted on the server leave the phone within about 15
+  minutes (SDK 6.0.0-beta.34).
+- `GadSettings.minimumZoom` and `maximumZoom` go to `MapOptions`: the camera keeps to the range in
+  every frame the map sets too, not only in the visitor's gestures.
 
 ### [1.15.0] — 2026-10-28
 

@@ -20,7 +20,6 @@ import io.proximi.map.core.PositionTrailStyle
 import io.proximi.map.core.RouteLineStyle
 import io.proximi.map.core.RouteMarkerStyle
 import io.proximi.map.kit.MapCanvasChrome
-import io.proximi.map.kit.ProximiioMapCanvas
 import io.proximi.map.live.MapOptions
 
 /**
@@ -121,20 +120,10 @@ internal object MapStyle {
             routeLineStyle = if (walkedTrail) routeAhead else route,
             language = language,
             recentreZoom = settings.followZoom,
+            // The camera keeps to the range in every frame the map sets too (map 6.0.0-beta.28).
+            minimumZoom = settings.minimumZoom,
+            maximumZoom = settings.maximumZoom,
         )
-    }
-
-    /**
-     * Applies `GadSettings.minimumZoom` and `maximumZoom` to the map of [canvas] once MapLibre hands
-     * it over. The map library has no zoom limit of its own; MapLibre keeps the camera inside these
-     * levels.
-     */
-    fun applyZoomLimits(settings: GadSettings, canvas: ProximiioMapCanvas) {
-        if (settings.minimumZoom == null && settings.maximumZoom == null) return
-        canvas.onStyleLoaded { map, _ ->
-            settings.minimumZoom?.let(map::setMinZoomPreference)
-            settings.maximumZoom?.let(map::setMaxZoomPreference)
-        }
     }
 
     /**

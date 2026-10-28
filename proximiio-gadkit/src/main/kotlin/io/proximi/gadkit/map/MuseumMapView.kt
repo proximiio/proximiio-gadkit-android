@@ -293,7 +293,6 @@ internal fun MuseumMapView(
             modifier = Modifier.fillMaxSize().glassBackdrop(backdrop),
             configure = { canvas ->
                 layers.attach(canvas)
-                MapStyle.applyZoomLimits(settings, canvas)
             },
         )
         ProvideGlassBackdrop(backdrop) {

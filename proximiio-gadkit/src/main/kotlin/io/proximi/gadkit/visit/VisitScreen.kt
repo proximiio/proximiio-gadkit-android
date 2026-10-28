@@ -252,7 +252,6 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                         modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp),
                         configure = { canvas ->
                             model.layers.attach(canvas)
-                            MapStyle.applyZoomLimits(model.settings, canvas)
                         },
                     )
                     // The list covers the map with white: its rows have nothing to blur.

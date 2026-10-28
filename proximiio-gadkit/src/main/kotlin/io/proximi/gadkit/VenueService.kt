@@ -95,6 +95,7 @@ internal class VenueService private constructor(
      * `server_time − ts` plus the time until the line is written. Network transit is not in it.
      */
     private fun logSamples(provider: CustomPositionProviding) {
+        sampleLog?.cancel()
         sampleLog = scope.launch {
             val levels = buildMap { sdk.floors().forEach { putIfAbsent(it.id, it.level.toInt()) } }
             provider.samples().collect { sample ->
@@ -162,6 +163,19 @@ internal class VenueService private constructor(
         data.stop()
     }
 
+    /**
+     * Starts the SDK again after it stopped on a refused token (`tokenStatus()` is `REJECTED`). It
+     * throws until the API accepts the token again. The binding's provider is attached again.
+     */
+    internal suspend fun restart(context: Context) {
+        authenticateAndStart(sdk)
+        attachBinding()
+        cacheMapStyle(context.applicationContext.cacheDir)
+        // The stop ended the stream of the venue data changes.
+        data.stop()
+        data.start()
+    }
+
     /** Field log: the visitor id and the SDK's sync events. */
     private suspend fun logReporting(configuration: GadConfiguration) {
         // The visitor id finds this phone's visitor, positions and events on the backend.
@@ -215,6 +229,29 @@ internal class VenueService private constructor(
             )
 
         /**
+         * Authenticates, starts positioning and installs the route network. Before the API has
+         * accepted the token in this run, the network comes from the stored features first;
+         * otherwise it is downloaded, and the stored features are the fallback.
+         */
+        private suspend fun authenticateAndStart(sdk: Proximiio) {
+            sdk.authenticate()
+            sdk.start()
+            val token = sdk.tokenStatus()
+            if (token != Proximiio.TokenStatus.VERIFIED && sdk.loadCachedRouteNetwork() > 0) {
+                FieldLog.log("venue: started on the stored data · token ${token.rawValue}")
+                return
+            }
+            try {
+                sdk.loadRouteNetwork()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (sdk.loadCachedRouteNetwork() == 0) throw error
+                FieldLog.log("venue: route network from the stored features: ${error.message}")
+            }
+        }
+
+        /**
          * A venue on the host app's started SDK. Installs the route network from the SDK's feature
          * cache, or downloads it when the cache has no path. Requests no permission and attaches no
          * position provider. Call [stop] when the screen closes.
@@ -240,13 +277,14 @@ internal class VenueService private constructor(
          * attaches the binding's position provider. The order matters; see
          * proximiio-blueiot-minimal-android `Venue.start`. Then fetches the map style in the
          * background, so call it at launch, before the first map screen.
+         *
+         * Without a connection the SDK starts on the data stored on the phone when the API accepted
+         * the token on this phone before (`tokenStatus()` is `UNVERIFIED`, SDK 6.0.0-beta.33).
          */
         internal suspend fun start(context: Context, configuration: GadConfiguration, binding: BlueiotWristbandBinding): VenueService {
             val sdk = Proximiio(context.applicationContext, configuration(context, configuration))
             sdk.refreshPermissions()
-            sdk.authenticate()
-            sdk.start()
-            sdk.loadRouteNetwork()
+            authenticateAndStart(sdk)
             val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
             val venue = VenueService(sdk, binding, isDebugBuild, configuration.settings)
             venue.attachBinding()

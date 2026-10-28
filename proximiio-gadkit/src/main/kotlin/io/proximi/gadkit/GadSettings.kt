@@ -75,7 +75,7 @@ public data class GadSettings(
     val followZoom: Double = 21.0,
     /**
      * The farthest the visitor can zoom out, or `null` for the map library's limit. MapLibre zoom
-     * levels; the maps apply it once their canvas exists.
+     * levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
      */
     val minimumZoom: Double? = null,
     /** The farthest the visitor can zoom in, or `null` for the map library's limit. */

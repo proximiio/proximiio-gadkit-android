@@ -1,5 +1,6 @@
 package io.proximi.gadkit
 
+import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyKind
@@ -17,6 +18,7 @@ import io.proximi.map.core.JourneyEvent
 import io.proximi.map.core.JourneyLegRequest
 import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioGeofence
+import io.proximi.sdk.core.sync.SyncEvent
 import io.proximi.sdk.geofencing.GeofenceEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -155,5 +157,21 @@ class ProximiMapTest {
             assertFalse(ProximiMap.canOpen(screen, ready, hasJourney = false))
             assertTrue(ProximiMap.canOpen(screen, ready, hasJourney = true))
         }
+    }
+
+    @Test
+    fun onlyAnUnauthorizedSyncFailureIsATokenRefusal() {
+        assertTrue(ProximiMap.isTokenRefusal(SyncEvent.SyncFailed(reason = "unauthorized")))
+        assertFalse(ProximiMap.isTokenRefusal(SyncEvent.SyncFailed(reason = "timeout")))
+        assertFalse(ProximiMap.isTokenRefusal(SyncEvent.SyncCompleted(applied = 3)))
+    }
+
+    @Test
+    fun mapOptionsKeepToTheZoomRangeOfTheSettings() {
+        val settings = GadSettings.STANDARD.copy(minimumZoom = 16.0, maximumZoom = 20.0)
+        assertEquals(16.0, MapStyle.options("en", settings = settings).minimumZoom)
+        assertEquals(20.0, MapStyle.options("en", settings = settings).maximumZoom)
+        assertEquals(20.0, MapStyle.exploreOptions("en", settings).maximumZoom)
+        assertNull(MapStyle.options("en").minimumZoom)
     }
 }

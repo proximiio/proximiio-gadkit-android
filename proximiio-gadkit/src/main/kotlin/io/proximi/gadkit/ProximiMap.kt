@@ -34,6 +34,8 @@ import io.proximi.sdk.geofenceEvents
 import io.proximi.sdk.geofencing.GeofenceEvent
 import io.proximi.sdk.positions
 import io.proximi.sdk.refreshPermissions
+import io.proximi.sdk.core.sync.SyncEvent
+import io.proximi.sdk.syncEvents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +50,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -177,6 +180,9 @@ public class ProximiMap(
     private var language: String? = context.resources.configuration.locales[0]?.toLanguageTag()
 
     private var startJob: Deferred<Unit>? = null
+
+    /** The work that follows the started SDK. A refused token ends it ([tokenRefused]). */
+    private val venueJobs = mutableListOf<Job>()
     private var isSessionRunning = false
     private var lastWristband: WristbandStatus? = null
 
@@ -226,27 +232,39 @@ public class ProximiMap(
         runSession()
         try {
             val store = storeLoad.await()
-            val venue = VenueService.start(context, configuration, session.binding)
-            this.venue = venue
-            session.forwardPrivacy(venue.sdk)
+            val stopped = this.venue
+            val venue = if (stopped != null) {
+                // The SDK stopped on a refused token (`tokenRefused`).
+                stopped.restart(context)
+                stopped
+            } else {
+                VenueService.start(context, configuration, session.binding).also { started ->
+                    this.venue = started
+                    session.forwardPrivacy(started.sdk)
+                }
+            }
             // A location answer that came during the start reaches the SDK here.
             venue.sdk.refreshPermissions()
             loadPlaces(venue)
             reconcileStoredJourney(store)
             arrival.check(places.value)
             venue.data.onChange = { mainScope.launch { venueDataChanged(venue) } }
-            mainScope.launch {
+            venueJobs += mainScope.launch {
                 // One position from the wristband or playback means the visitor is inside.
                 if (venue.sdk.positions().firstOrNull() != null) arrival.positionReceived()
             }
-            mainScope.launch { venue.sdk.geofenceEvents().collect { event -> event(event)?.let(::emit) } }
+            venueJobs += mainScope.launch { venue.sdk.geofenceEvents().collect { event -> event(event)?.let(::emit) } }
             if (configuration.settings.postsGeofenceNotifications && configuration.settings.notifiesGeofenceEvents) {
-                mainScope.launch { GeofenceNotifier(context).run(venue.sdk) }
+                venueJobs += mainScope.launch { GeofenceNotifier(context).run(venue.sdk) }
+            }
+            venueJobs += mainScope.launch {
+                venue.sdk.syncEvents().first(::isTokenRefusal)
+                tokenRefused(venue)
             }
             mutableJourney.value = summary(store.load(), store.loadMeta(), ::standardMeta)
             mutableStatus.value = Status.Ready
             FieldLog.log("map: ready · ${places.value.size} places")
-            if (venue.isDebugBuild) mainScope.launch { runDebugLaunch(venue, launchOptions.await()) }
+            if (stopped == null && venue.isDebugBuild) mainScope.launch { runDebugLaunch(venue, launchOptions.await()) }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -255,6 +273,27 @@ public class ProximiMap(
             mutableStatus.value = Status.Failed(failure)
             throw failure
         }
+    }
+
+    /**
+     * The API kept refusing the token for at least two hours. The SDK has stopped and deleted the
+     * venue data, and the maps have dropped the venue (SDK 6.0.0-beta.33, map 6.0.0-beta.30). Closes
+     * the screens and reports `StartFailed`. The stored journey is kept; [start] starts the same SDK
+     * again once the API accepts the token.
+     */
+    private fun tokenRefused(venue: VenueService) {
+        FieldLog.log("map: the API refused the token; the SDK stopped and deleted the venue data")
+        val jobs = venueJobs.toList()
+        venueJobs.clear()
+        venue.data.onChange = null
+        close()
+        mutablePlaces.value = emptyList()
+        galleries = emptyList()
+        startJob = null
+        val failure = ProximiMapException.StartFailed(text(R.string.i_couldn_t_get_things_started_check), "The API refused the application token.")
+        mutableStatus.value = Status.Failed(failure)
+        // Last: the caller is one of these jobs.
+        jobs.forEach { it.cancel() }
     }
 
     private suspend fun loadPlaces(venue: VenueService) {
@@ -591,6 +630,12 @@ public class ProximiMap(
 
         /** The notification id of [postNotification]; the tag tells the notices apart. */
         private const val APP_NOTIFICATION_ID = 2_003
+
+        /**
+         * `true` for the SDK's announcement of a refused token: `SyncFailed` with `"unauthorized"`.
+         * Pure; covered by tests.
+         */
+        fun isTokenRefusal(event: SyncEvent): Boolean = event is SyncEvent.SyncFailed && event.reason == "unauthorized"
 
         /** Whether [open] shows [screen]. Pure; covered by tests. */
         fun canOpen(screen: Screen, status: Status, hasJourney: Boolean): Boolean {

@@ -286,7 +286,6 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
             modifier = Modifier.fillMaxSize().glassBackdrop(backdrop).softEdges(cornerRadius = 40.dp),
             configure = { canvas ->
                 layers.attach(canvas)
-                MapStyle.applyZoomLimits(settings, canvas)
             },
         )
         ProvideGlassBackdrop(backdrop) {
