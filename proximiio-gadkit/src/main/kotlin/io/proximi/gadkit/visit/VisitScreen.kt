@@ -1,5 +1,7 @@
 package io.proximi.gadkit.visit
 
+import androidx.compose.runtime.remember
+import io.proximi.gadkit.map.FloorChangeView
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import android.Manifest
@@ -319,6 +321,7 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
         val floorPhase by model.floorGuide.phase.collectAsStateWithLifecycle()
         FollowsVisitorFloor(model.session, model.venue, isPaused = floorPhase != FloorWithoutPositioningGuide.Phase.Idle)
         FloorChangeOverlay(model.floorGuide)
+        RideOverlay(model)
         VisitSheets(model)
     }
 }
@@ -336,6 +339,18 @@ private fun ReroutingCard() {
     ) {
         CircularProgressIndicator(color = Palette.ink)
         Text(stringResource(R.string.rerouting_you), style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
+    }
+}
+
+/** The lift or stairs view at a ride to a floor with positioning, faded in and out (iOS 1.20.0). */
+@Composable
+private fun RideOverlay(model: VisitViewModel) {
+    val ride = model.ride
+    // The ride stays while the view fades out.
+    var shown by remember { mutableStateOf(ride) }
+    if (ride != null) shown = ride
+    androidx.compose.animation.AnimatedVisibility(ride != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+        shown?.let { FloorChangeView(it, onTap = model::dismissRide, showsNoPositionNote = false) }
     }
 }
 

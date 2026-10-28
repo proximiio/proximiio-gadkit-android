@@ -1,5 +1,10 @@
 package io.proximi.gadkit.map
 
+import kotlin.math.roundToInt
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieAnimation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -82,10 +87,12 @@ internal class FloorWithoutPositioningGuide(
     private val settings: GadSettings,
     private val scope: CoroutineScope,
 ) {
-    /** The lift or stairs ride to a floor without positioning. */
+    /** A lift or stairs ride: to a floor without positioning, or any ride of the route ([reachedRide]). */
     data class Change(
         /** The floor the ride ends on. */
         val level: Int,
+        /** The floor the ride starts on. */
+        val from: Int,
         /** `elevator`, `staircase` or `escalator`. */
         val featureType: String,
         /** The lift or stairs. */
@@ -205,14 +212,21 @@ internal class FloorWithoutPositioningGuide(
          * without positioning and the visitor is within [GadSettings.levelChangerReachedMeters] of
          * it. Pure; covered by tests.
          */
-        fun reachedChange(coordinate: Coordinate, level: Double?, markers: List<LevelChangeMarker>, settings: GadSettings): Change? {
+        fun reachedChange(coordinate: Coordinate, level: Double?, markers: List<LevelChangeMarker>, settings: GadSettings): Change? =
+            reachedRide(coordinate, level, markers, settings)?.takeIf { it.level in settings.levelsWithoutPositioning }
+
+        /**
+         * The route's next level change from the visitor's floor when the visitor is within
+         * [GadSettings.levelChangerReachedMeters] of its lift or stairs, to any floor. Pure; covered by
+         * tests.
+         */
+        fun reachedRide(coordinate: Coordinate, level: Double?, markers: List<LevelChangeMarker>, settings: GadSettings): Change? {
             val pending = markers.filter { !it.isCompleted }
             if (level == null) return null
             val marker = pending.firstOrNull { VenueLevel.same(it.fromLevel, level) } ?: return null
             val end = GuidanceText.rideEnd(marker.featureType, marker.coordinate, marker.fromLevel, marker.toLevel, pending)
-            if (end !in settings.levelsWithoutPositioning) return null
             if (coordinate.distanceTo(marker.coordinate) > settings.levelChangerReachedMeters) return null
-            return Change(end, marker.featureType, marker.coordinate)
+            return Change(end, level.roundToInt(), marker.featureType, marker.coordinate)
         }
 
         /**
@@ -262,12 +276,14 @@ internal fun FloorChangeOverlay(guide: FloorWithoutPositioningGuide) {
 }
 
 /**
- * The lift or stairs view on the way to a floor without positioning: the icon, "Take the lift to
- * level 0" and that the position is not shown there. A tap ends it.
+ * The lift or stairs view at a ride: RPR's animation, "Take the lift to level 0" and, on the way to a
+ * floor without positioning ([showsNoPositionNote]), that the position is not shown there. A tap ends
+ * it (PM, Monday "Elevator/Staircase animation", 2026-10-27 and 2026-10-28).
  */
 @Composable
-internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap: () -> Unit) {
+internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap: () -> Unit, showsNoPositionNote: Boolean = true) {
     val icon = if (change.featureType == "elevator") GadIcon.Elevator else GadIcon.Stairs
+    val animation by rememberLottieComposition(LottieCompositionSpec.RawRes(animationResource(change.featureType, change.from, change.level)))
     Box(
         Modifier
             .fillMaxSize()
@@ -294,11 +310,16 @@ internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap:
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Box(
-                Modifier.size(140.dp).background(Palette.white, CircleShape).border(1.5.dp, Palette.badgeStroke, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(painterResource(icon.glyph), contentDescription = null, modifier = Modifier.size(64.dp), tint = Palette.position)
+            val composition = animation
+            if (composition != null) {
+                LottieAnimation(composition, iterations = LottieConstants.IterateForever, modifier = Modifier.size(140.dp))
+            } else {
+                Box(
+                    Modifier.size(140.dp).background(Palette.white, CircleShape).border(1.5.dp, Palette.badgeStroke, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(icon.glyph), contentDescription = null, modifier = Modifier.size(64.dp), tint = Palette.position)
+                }
             }
             Text(
                 GuidanceText.rideText(change.featureType, change.level).mapText(),
@@ -306,14 +327,28 @@ internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap:
                 color = Palette.ink,
                 textAlign = TextAlign.Center,
             )
-            Text(
-                stringResource(R.string.your_position_is_not_shown_on_this),
-                style = GadTextStyle.BodySmallRegular.textStyle,
-                color = Palette.ink,
-                textAlign = TextAlign.Center,
-            )
+            if (showsNoPositionNote) {
+                Text(
+                    stringResource(R.string.your_position_is_not_shown_on_this),
+                    style = GadTextStyle.BodySmallRegular.textStyle,
+                    color = Palette.ink,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
 
 private const val FADE_MILLIS = 200
+
+/** RPR's animation name of a ride: a lift for a lift, stairs for stairs and escalators. Pure; covered by tests. */
+internal fun animationName(featureType: String, from: Int, to: Int): String =
+    "gad_${if (featureType == "elevator") "lift" else "stairs"}_going${if (to > from) "up" else "down"}"
+
+/** The raw resource of [animationName]. */
+private fun animationResource(featureType: String, from: Int, to: Int): Int = when (animationName(featureType, from, to)) {
+    "gad_lift_goingup" -> R.raw.gad_lift_goingup
+    "gad_lift_goingdown" -> R.raw.gad_lift_goingdown
+    "gad_stairs_goingup" -> R.raw.gad_stairs_goingup
+    else -> R.raw.gad_stairs_goingdown
+}

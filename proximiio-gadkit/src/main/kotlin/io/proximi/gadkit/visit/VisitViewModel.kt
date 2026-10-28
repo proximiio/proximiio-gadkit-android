@@ -244,6 +244,17 @@ internal class VisitViewModel(
     var searchShortcuts by mutableStateOf(emptyList<AmenityKind>())
         private set
 
+    /**
+     * The lift or stairs view at a ride to a floor with positioning, for
+     * [GadSettings.levelChangeViewDuration] (PM, Monday "Elevator/Staircase animation", 2026-10-28). A
+     * ride to a floor without positioning is the floor guide's.
+     */
+    var ride by mutableStateOf<FloorWithoutPositioningGuide.Change?>(null)
+        private set
+
+    /** The rides whose view showed, so each lift or stairs and floors shows it once. */
+    private val shownRides = mutableSetOf<String>()
+
     /** "Rerouting you…": the journey has been routed again for longer than 0.5 s. */
     var showsRerouting by mutableStateOf(false)
         private set
@@ -464,6 +475,7 @@ internal class VisitViewModel(
                 updateVisitorGallery(position)
                 floorGuide.positionReceived(position.timestampMillis)
                 checkArrival()
+                checkRide(position)
                 controller.checkCloserArtwork()
                 controller.checkWrongFloor(floorGuide.isActive)
             }
@@ -564,6 +576,31 @@ internal class VisitViewModel(
     private var accessibility = accessibility
 
     /** The app language changed: map labels and place titles follow it. */
+    /**
+     * Shows the lift or stairs view for [GadSettings.levelChangeViewDuration] when the visitor reaches
+     * the lift or stairs of the route's next level change, once per lift or stairs and floors. A ride
+     * to a floor without positioning is the floor guide's ([FloorWithoutPositioningGuide]).
+     */
+    private fun checkRide(position: VenuePosition) {
+        if (ride != null || floorGuide.isActive) return
+        val change = FloorWithoutPositioningGuide.reachedRide(
+            Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level, levelChangeMarkers, settings,
+        ) ?: return
+        if (change.level in settings.levelsWithoutPositioning) return
+        if (!shownRides.add("${change.coordinate.latitude},${change.coordinate.longitude},${change.from},${change.level}")) return
+        FieldLog.log("ride: at the ${change.featureType} to L${change.level}")
+        ride = change
+        scope.launch {
+            delay(settings.levelChangeViewDuration)
+            if (ride == change) ride = null
+        }
+    }
+
+    /** A tap on the lift or stairs view. */
+    fun dismissRide() {
+        ride = null
+    }
+
     /** No dot while a privacy zone holds it (`MapStyle.hidingPosition`). */
     private fun applyPositionStyle(health: TrackingHealth) {
         val position = MapStyle.options(language, routeMarkers = false, settings = settings).position

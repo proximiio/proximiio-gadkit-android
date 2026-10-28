@@ -76,6 +76,8 @@ Gradle resolves it to the included build.
 - The library depends on SDK `6.0.0-beta.34` and Map `6.0.0-beta.30` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
+- The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
+  (`implementation`). Gradle takes the highest Lottie version the host app and the library request.
 - A host app that draws its journey with the map library's `ProximiioMap` and its own
   `JourneyNavigator` moves to `ProximiMapView` with [MIGRATION.md](MIGRATION.md). It lists the SDK
   and Map changes since SDK 6.0.0-beta.23 and Map 6.0.0-beta.21.
@@ -1061,6 +1063,14 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   size on the phone and in MapTap: 120 px at 0.2 is 24 dp. Before, an icon was drawn at the screen's
   density, about a third of that. The design's amenity markers and the Explore Museum gallery
   circles take the data icon's pixel size (PM, 2026-10-27).
+- **Visible:** the lift or stairs view plays RPR's animation of a lift or stairs, going up or down,
+  looped, in place of the icon in a circle (PM, Monday "Elevator/Staircase animation", 2026-10-27).
+  The library depends on `com.airbnb.android:lottie-compose` 6.7.1 (`implementation`); a host app
+  that declares another Lottie version gets the higher one.
+- **Visible:** the lift or stairs view shows at every ride of the route, within
+  `GadSettings.levelChangerReachedMeters` of the lift or stairs, for `levelChangeViewDuration`, once
+  per lift or stairs and floors. "Your position is not shown on this level." only on the way to a
+  floor without positioning (PM, Monday "Elevator/Staircase animation", 2026-10-28).
 - **Visible:** Explore Museum: a picked place's card is over the map, with a line down to the place,
   drawn as a black dot in a ring with its title under it; the map frames the place at 31 % / 75 % of
   the map. A selected amenity is that dot too, not the red marker. The amenities' own icons are not

@@ -34,6 +34,26 @@ class FloorWithoutPositioningTest {
     @AfterTest
     fun cancelTimers() = scope.cancel()
 
+    /** RPR's Lottie animations, bundled with the library (PM, Monday "Elevator/Staircase animation"). */
+    @Test
+    fun theRidePlaysTheLiftOrStairsAnimationUpOrDown() {
+        assertEquals("gad_lift_goingdown", animationName("elevator", 1, 0))
+        assertEquals("gad_lift_goingup", animationName("elevator", 0, 2))
+        assertEquals("gad_stairs_goingdown", animationName("staircase", 1, 0))
+        assertEquals("gad_stairs_goingup", animationName("escalator", 0, 1))
+    }
+
+    /** Every ride gets the lift or stairs view, not only one to a floor without positioning (PM, Monday "Elevator/Staircase animation", 2026-10-28). */
+    @Test
+    fun everyRideIsReachedNearItsLiftOrStairs() {
+        val toLevel4 = listOf(marker("staircase", 1.0, 3.0), marker("staircase", 3.0, 4.0))
+        val ride = FloorWithoutPositioningGuide.reachedRide(north(1.0), 1.0, toLevel4, standard)
+        assertEquals(4, ride?.level)
+        assertEquals(1, ride?.from)
+        assertNull(FloorWithoutPositioningGuide.reachedRide(north(8.0), 1.0, toLevel4, standard))
+        assertNull(FloorWithoutPositioningGuide.reachedChange(north(1.0), 1.0, toLevel4, standard))
+    }
+
     @Test
     fun theRideToAFloorWithoutPositioningIsReachedNearTheStairs() {
         val change = FloorWithoutPositioningGuide.reachedChange(north(3.0), 1.0, toCafe, standard) ?: fail("no change")

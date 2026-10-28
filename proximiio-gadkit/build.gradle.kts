@@ -108,6 +108,7 @@ dependencies {
     implementation(libs.camera.view)
     implementation(libs.mlkit.barcode)
     implementation(libs.haze)
+    implementation(libs.lottie.compose)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
 
