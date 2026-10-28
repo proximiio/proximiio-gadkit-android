@@ -999,6 +999,11 @@ ride merge, the floor without positioning, galleries, level changers, artwork ge
 order and the settings. The UI tests run in the Proximi GAD Android app (`app/src/androidTest`),
 against the sandbox.
 
+On GitHub the workflow `Check` (`.github/workflows/check.yml`) runs `./gradlew check assembleDebug`
+(lint, the JVM tests and the debug build) for each push to `main` and each pull request, on the
+repository's own runner. It has no secrets. A pull request from a fork runs after a maintainer
+approves it.
+
 ## Changelog
 
 The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/). Every change of
@@ -1158,6 +1163,14 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   minutes (SDK 6.0.0-beta.34).
 - `GadSettings.minimumZoom` and `maximumZoom` go to `MapOptions`: the camera keeps to the range in
   every frame the map sets too, not only in the visitor's gestures.
+
+#### Fixed
+
+- **Visible:** in Arabic the counts of the Explore Museum lists ("5 spaces", "3 levels", the works
+  and the amenities) are in Arabic. Before, they were in English: the import of the iOS catalog wrote
+  them as plain strings beside the English plurals.
+- `./gradlew check` passes: lint found two `remember` calls that return `Unit` and two `StateFlow`
+  reads in composition. No change for the host app.
 
 ### [1.15.0] — 2026-10-28
 

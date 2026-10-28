@@ -93,8 +93,9 @@ internal fun MuseumMapView(
     val language = MapLanguage.forAppLanguage(LocalConfiguration.current.locales[0]?.language)
     // The host app's times and distances, read once when the screen opens.
     val settings = remember { venue.settings }
-    val session = rememberProximiioMapSession(venue.sdk, MapStyle.options(language, settings = settings))
-    remember(session) { MapStyle.useAmenityIcons(session, context) }
+    val created = rememberProximiioMapSession(venue.sdk, MapStyle.options(language, settings = settings))
+    // The amenity icons, once per session, before the map registers the venue's icons.
+    val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context) } }
     LaunchedEffect(session) { MapDiagnostics.follow(session, "museum", this) }
     // The labels and floor names follow a language change without a style reload.
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }

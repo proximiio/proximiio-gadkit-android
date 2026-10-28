@@ -518,7 +518,7 @@ private fun VisitCard(model: VisitViewModel) {
     // The route's next level change, from the drawn route (not a flow: read when the card recomposes).
     val markers = model.levelChangeMarkers
     val levelChangeTitle = (state as? VisitCardState.NextStopOnOtherLevel)?.let {
-        GuidanceText.levelChangeTitle(markers, model.session.position.value?.floor?.level, it.level)
+        GuidanceText.levelChangeTitle(markers, model.visitorLevel, it.level)
     }
     val title = VisitCardText.title(state, galleryAhead, levelChangeTitle)
     // The way back from a floor without positioning: "NEXT STOP IS LEVEL 1", "Head to Level 1 by lift or stairs".
@@ -553,7 +553,7 @@ private fun VisitCard(model: VisitViewModel) {
             // The lift or stairs of the next level change while the next stop is on another floor (PM,
             // Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27).
             val levelChange = (state as? VisitCardState.NextStopOnOtherLevel)?.let {
-                GuidanceText.levelChange(markers, model.session.position.value?.floor?.level)
+                GuidanceText.levelChange(markers, model.visitorLevel)
             }
             // While the leg ends at a gallery: the icon of the gallery POI's amenity (PM, Monday 2026-10-28).
             val galleryIcon = model.galleryAheadDestination

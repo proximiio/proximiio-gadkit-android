@@ -172,8 +172,9 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     val resources = LocalResources.current
     val language = MapLanguage.forAppLanguage(LocalConfiguration.current.locales[0]?.language)
     val settings = remember { venue.settings }
-    val session = rememberProximiioMapSession(venue.sdk, MapStyle.exploreOptions(language, settings))
-    remember(session) { MapStyle.useAmenityIcons(session, context, galleryIcons = true) }
+    val created = rememberProximiioMapSession(venue.sdk, MapStyle.exploreOptions(language, settings))
+    // The amenity icons, once per session, before the map registers the venue's icons.
+    val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context, galleryIcons = true) } }
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }
 
     val layers = remember { JourneyMapLayers() }

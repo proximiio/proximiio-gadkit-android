@@ -147,9 +147,23 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="museum_shop">متجر المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="n_amenities">%d مرافق</string>
+    <plurals name="n_amenities">
+        <item quantity="zero">%d مرافق</item>
+        <item quantity="one">%d مرافق</item>
+        <item quantity="two">%d مرافق</item>
+        <item quantity="few">%d مرافق</item>
+        <item quantity="many">%d مرافق</item>
+        <item quantity="other">%d مرافق</item>
+    </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="n_levels">%d طوابق</string>
+    <plurals name="n_levels">
+        <item quantity="zero">%d طوابق</item>
+        <item quantity="one">%d طوابق</item>
+        <item quantity="two">%d طوابق</item>
+        <item quantity="few">%d طوابق</item>
+        <item quantity="many">%d طوابق</item>
+        <item quantity="other">%d طوابق</item>
+    </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="n_m">%d م</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -162,7 +176,14 @@
         <item quantity="other">%d دقيقة</item>
     </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="n_spaces">%d مساحات</string>
+    <plurals name="n_spaces">
+        <item quantity="zero">%d مساحات</item>
+        <item quantity="one">%d مساحات</item>
+        <item quantity="two">%d مساحات</item>
+        <item quantity="few">%d مساحات</item>
+        <item quantity="many">%d مساحات</item>
+        <item quantity="other">%d مساحات</item>
+    </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <plurals name="n_stops">
         <item quantity="zero">لا محطات</item>
@@ -173,7 +194,14 @@
         <item quantity="other">%d محطة</item>
     </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="n_works">%d أعمال</string>
+    <plurals name="n_works">
+        <item quantity="zero">%d أعمال</item>
+        <item quantity="one">%d أعمال</item>
+        <item quantity="two">%d أعمال</item>
+        <item quantity="few">%d أعمال</item>
+        <item quantity="many">%d أعمال</item>
+        <item quantity="other">%d أعمال</item>
+    </plurals>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="new_route_from_here">مسار جديد من هنا</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

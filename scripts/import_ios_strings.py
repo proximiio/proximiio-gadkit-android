@@ -10,7 +10,8 @@ Reads `Sources/ProximiioGADKit/Resources/Localizable.xcstrings` of proximiio-gad
 - The resource name is a slug of the English key; `scripts/ios_strings_names.json` keeps the names
   stable once assigned, so code that uses them does not break when the catalog grows.
 - `%@` becomes `%s`, `%lld` / `%d` becomes `%d`; several placeholders become positional.
-- Plural variations become <plurals>.
+- Plural variations become <plurals>. An Arabic text without them, for a key with English plural
+  variations, becomes every item of a <plurals>, as iOS shows the one text for every count.
 - An Arabic string in state `needs_review` (translated by the developers) is marked with a comment.
 - A key with `shouldTranslate: false` (placeholders, debug copy) gets `translatable="false"`, so lint
   does not report it as missing in Arabic; iOS has no Arabic for it either.
@@ -84,6 +85,9 @@ def android_text(text: str) -> str:
     return text
 
 
+QUANTITIES = ("zero", "one", "two", "few", "many", "other")
+
+
 def unit(entry: dict, language: str):
     """Returns ("string", text, state) or ("plural", {quantity: text}, state) or None."""
     loc = entry.get("localizations", {}).get(language)
@@ -131,6 +135,9 @@ def main() -> None:
             if found is None:
                 continue
             kind, value, state = found
+            english = unit(entry, "en")
+            if kind == "string" and english is not None and english[0] == "plural":
+                kind, value = "plural", {quantity: value for quantity in QUANTITIES}
             name = names[key]
             if language == "ar" and state == "needs_review":
                 lines.append("    <!-- needs_review: developer translation, the client reviews it before release -->")
@@ -144,7 +151,7 @@ def main() -> None:
                 lines.append(f'    <string name="{name}"{fixed}>{android_text(value)}</string>')
             else:
                 lines.append(f'    <plurals name="{name}"{fixed}>')
-                for quantity in ("zero", "one", "two", "few", "many", "other"):
+                for quantity in QUANTITIES:
                     if quantity in value:
                         lines.append(f'        <item quantity="{quantity}">{android_text(value[quantity])}</item>')
                 lines.append("    </plurals>")

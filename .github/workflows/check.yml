@@ -1,0 +1,27 @@
+# The JVM checks of the library: lint, the unit tests and the debug build. They run on the
+# repository's own runner on pallas (infra, 2026-10-28), in a VM that reaches only the internet.
+# No secrets: the repository is public. A pull request from a fork runs after a maintainer
+# approves it. The UI tests run on a phone, in the Proximi GAD Android app.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: [self-hosted, pallas, android]
+    container: pallas/android-ci:jdk17
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./gradlew --console=plain --no-daemon check assembleDebug
