@@ -109,6 +109,14 @@ class AmenityKindTest {
     private fun take(changer: String, level: Int) =
         UiText.Resource("guidance_take_level_changer", listOf(UiText.Resource("guidance_level_changer_$changer"), level))
 
+    /** Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27: the card shows the icon of the next level change from the visitor's floor. */
+    @Test
+    fun theNextLevelChangeStartsOnTheVisitorsFloor() {
+        assertEquals("elevator", GuidanceText.levelChange(stairsThenLift, visitorLevel = 3.0)?.featureType)
+        assertEquals("staircase", GuidanceText.levelChange(stairsThenLift, visitorLevel = 2.0)?.featureType)
+        assertNull(GuidanceText.levelChange(listOf(marker("staircase", 1.0, 3.0, completed = true)), visitorLevel = 1.0))
+    }
+
     @Test
     fun levelChangeTitleNamesTheRoutesFirstChangeFromTheVisitorsFloor() {
         assertEquals(take("stairs", 3), GuidanceText.levelChangeTitle(stairsThenLift, visitorLevel = 1.0, stopLevel = 4))

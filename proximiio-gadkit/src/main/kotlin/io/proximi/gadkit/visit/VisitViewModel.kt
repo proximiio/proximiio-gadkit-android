@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.galleryDestinations
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.map.VenueLevel
 import android.app.Application
@@ -76,6 +77,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import io.proximi.map.live.AmenityIcon
+import io.proximi.gadkit.map.GalleryFill
 import io.proximi.gadkit.map.catalogue
 import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.LevelChangerPlace
@@ -269,7 +274,9 @@ internal class VisitViewModel(
     private var visitorGalleryPlaceId: String? = null
 
     /** Galleries the visitor has been in during this visit. */
-    private var visitedGalleries = emptySet<String>()
+    /** The amenity icons of the venue data, by amenity id: the gallery icon of the stop card. */
+    var amenityIcons by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
+        private set
 
     /** The stop of "Skip artwork?". */
     var stopToSkip by mutableStateOf<JourneyStop?>(null)
@@ -505,8 +512,6 @@ internal class VisitViewModel(
                     event is GeofenceEvent.Entered && event.geofence.isGallery -> {
                         val geofence = event.geofence
                         currentGallery = geofence.name
-                        visitedGalleries = visitedGalleries + (galleries.firstOrNull { it.name == geofence.name }?.id ?: geofence.id)
-                        refreshMapLayers()
                     }
                     event is GeofenceEvent.Exited && event.geofence.isGallery ->
                         if (currentGallery == event.geofence.name) currentGallery = null
@@ -595,7 +600,13 @@ internal class VisitViewModel(
 
     private suspend fun loadVenue() {
         places = venue.places(language)
-        searchShortcuts = AmenityListing.search(venue.catalogue()).shortcuts(places)
+        val amenities = venue.catalogue()
+        searchShortcuts = AmenityListing.search(amenities).shortcuts(places)
+        val icons = withContext(Dispatchers.Default) {
+            amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
+        }
+        layers.updateGalleryIcons(icons)
+        amenityIcons = icons.mapValues { it.value.asImageBitmap() }
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }
         controller.artworkAreas = venue.artworkAreas()
         // The journey map shows artworks only as the numbered stop markers. Amenities, galleries
@@ -605,7 +616,7 @@ internal class VisitViewModel(
         layers.updateLevelChangers(levelChangers)
         levelChangerPlaces = levelChangers
         hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
-        val destinations = Gallery.destinations(venue.venueGeofences(), places)
+        val destinations = venue.galleryDestinations(places)
         galleryDestinations = destinations.values.toList()
         applyHiddenFeatures()
         controller.setGalleryFirst(kind.guidesToGalleryFirst, places, destinations)
@@ -698,15 +709,54 @@ internal class VisitViewModel(
     /** Gallery fills and the gallery marker for the current journey and floor. The map library draws the stop markers. */
     private fun refreshMapLayers() {
         if (isClosed) return
-        val journey = progress.journey
-        val active = progress.activeStop?.id
+        val active = controller.navigator.activeStop
+        val destination = active?.let { Gallery.containing(Coordinate(it.coordinate.latitude, it.coordinate.longitude), it.floor?.level, galleries) }
+        val visited = visitedGalleryIds
+        // Gallery first: the outline of the gallery the leg ends at, in place of the outline that
+        // holds the artwork.
         val galleryAhead = galleryAheadDestination
-        layers.update(
-            JourneyMapContent.fills(journey, active, galleries, visitedGalleries, galleryAhead?.gallery),
-            session.selectedFloor.value.level,
+        val fills = galleries.mapNotNull { gallery ->
+            when {
+                gallery.id == destination?.id && galleryAhead == null -> GalleryFill(gallery, isDestination = true)
+                gallery.id in visited -> GalleryFill(gallery, isDestination = false)
+                else -> null
+            }
+        } + listOfNotNull(galleryAhead?.let { GalleryFill(it.shown, isDestination = true) })
+        layers.update(fills, session.selectedFloor.value.level)
+        layers.updateGalleryMarkers(
+            visitedGalleryPois(visited).map { galleryMarker(it, isDestination = false) } +
+                listOfNotNull(galleryAhead?.let { galleryMarker(it, isDestination = true) }),
         )
-        layers.updateGalleryMarker(galleryAhead?.let { JourneyMapLayers.GalleryMarker(it.entry, it.gallery.level, it.label) })
+        applyHiddenFeatures()
     }
+
+    /**
+     * The galleries whose artworks of the journey are all visited or skipped, at least one visited
+     * (the customer, Monday "Visited gallery visualization", 2026-10-28).
+     */
+    private val visitedGalleryIds: Set<String>
+        get() {
+            val stops = controller.navigator.journey.value.stops.filter { it.kind != MapJourneyStop.Kind.DETOUR }.mapNotNull { stop ->
+                Gallery.containing(Coordinate(stop.coordinate.latitude, stop.coordinate.longitude), stop.floor?.level, galleries)?.id?.let { it to stop.state }
+            }
+            return visitedGalleries(stops)
+        }
+
+    /** The POIs of the [visited] galleries, other than the gallery the leg ends at and the gallery the visitor is in. */
+    private fun visitedGalleryPois(visited: Set<String>): List<GalleryDestination> {
+        val shown = galleries.filter { it.id in visited }
+        if (shown.isEmpty()) return emptyList()
+        return galleryDestinations.filter { destination ->
+            destination.placeId != galleryAheadDestination?.placeId && destination.placeId != visitorGalleryPlaceId &&
+                shown.any { it.id == destination.shown.id || it.contains(destination.entry, destination.gallery.level) }
+        }
+    }
+
+    /** The marker of a gallery at its POI, with the icon of the POI's amenity. */
+    private fun galleryMarker(destination: GalleryDestination, isDestination: Boolean) = JourneyMapLayers.GalleryMarker(
+        destination.entry, destination.gallery.level, destination.gallery.name,
+        places.firstOrNull { it.id == destination.placeId }?.amenityId, isDestination,
+    )
 
     /**
      * The line from the visitor to the start of the route ahead, on the visitor's floor only. The
@@ -738,7 +788,8 @@ internal class VisitViewModel(
      * gallery the visitor is in.
      */
     private fun applyHiddenFeatures() {
-        val hidden = hiddenFeatureIds + listOfNotNull(galleryAheadDestination?.placeId, visitorGalleryPlaceId)
+        val hidden = hiddenFeatureIds + listOfNotNull(galleryAheadDestination?.placeId, visitorGalleryPlaceId) +
+            visitedGalleryPois(visitedGalleryIds).map { it.placeId }
         if (session.hiddenFeatureIds != hidden) session.hiddenFeatureIds = hidden
     }
 
@@ -1178,6 +1229,12 @@ internal class VisitViewModel(
 
     companion object {
         private const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
+
+        /** The galleries of [stops] whose stops are all done or skipped, at least one done. Pure; covered by tests. */
+        internal fun visitedGalleries(stops: List<Pair<String, MapJourneyStop.State>>): Set<String> =
+            stops.groupBy({ it.first }, { it.second }).filterValues { states ->
+                states.all { it == MapJourneyStop.State.DONE || it == MapJourneyStop.State.SKIPPED } && MapJourneyStop.State.DONE in states
+            }.keys
 
         /** Whether the artworks' markers show. Pure; covered by tests. */
         internal fun showsArtworkMarkers(guidesToGalleryFirst: Boolean, hasGalleryAhead: Boolean, isInGallery: Boolean, isActiveStopInGallery: Boolean): Boolean {

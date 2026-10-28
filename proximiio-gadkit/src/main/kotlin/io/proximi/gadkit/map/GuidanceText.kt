@@ -150,6 +150,16 @@ internal object GuidanceText {
     internal fun floorLabel(level: Double): String = "L${level.roundedInt()}"
 
     /**
+     * The route's next level change from the visitor's floor, else its first one still to take.
+     * Pure; covered by tests.
+     */
+    internal fun levelChange(markers: List<LevelChangeMarker>, visitorLevel: Double?): LevelChangeMarker? {
+        val pending = markers.filter { !it.isCompleted }
+        val fromHere = visitorLevel?.let { level -> pending.firstOrNull { it.fromLevel.roundedInt() == level.roundedInt() } }
+        return fromHere ?: pending.firstOrNull()
+    }
+
+    /**
      * The card title while the next stop is on another floor: the route's first level change that
      * leaves the visitor's floor, e.g. "Take the stairs to level 3". A route from level 1 to level 4
      * can take the stairs to level 3 and then the lift. Without a level change on the route:

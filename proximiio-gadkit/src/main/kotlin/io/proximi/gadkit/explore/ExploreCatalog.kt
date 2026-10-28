@@ -124,7 +124,7 @@ internal data class ExploreCatalog(
                 ExploreItem(
                     id = poi.id, kind = ExploreItem.Kind.Space, title = destination.gallery.name,
                     lines = listOfNotNull(line), level = poi.level,
-                    coordinate = destination.entry, gallery = destination.gallery, category = category,
+                    coordinate = destination.entry, gallery = destination.shown, category = category,
                     amenityId = poi.amenityId,
                 )
             }.sortedWith(ORDER)

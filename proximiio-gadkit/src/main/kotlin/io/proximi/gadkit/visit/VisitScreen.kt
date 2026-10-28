@@ -515,10 +515,21 @@ private fun VisitCard(model: VisitViewModel) {
         instruction = instruction,
         remaining = remaining,
         icon = {
+            // The lift or stairs of the next level change while the next stop is on another floor (PM,
+            // Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27).
+            val levelChange = (state as? VisitCardState.NextStopOnOtherLevel)?.let {
+                GuidanceText.levelChange(markers, model.session.position.value?.floor?.level)
+            }
+            // While the leg ends at a gallery: the icon of the gallery POI's amenity (PM, Monday 2026-10-28).
+            val galleryIcon = model.galleryAheadDestination
+                ?.let { ahead -> model.places.firstOrNull { it.id == ahead.placeId }?.amenityId }
+                ?.let { model.amenityIcons[it] }
             when {
+                levelChange != null -> MapIcon(if (levelChange.featureType == "elevator") GadIcon.Elevator.glyph else GadIcon.Stairs.glyph, size = 20)
                 state == VisitCardState.Starting -> MapIcon(R.drawable.ic_map_straight, size = 16)
                 state == VisitCardState.Finished -> MapIcon(R.drawable.ic_checkmark, size = 16)
                 number != null && VisitCardText.showsStopNumber(state, galleryAhead) -> Text("$number", style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)
+                galleryAhead != null && galleryIcon != null -> Image(galleryIcon, null, Modifier.size(20.dp))
                 galleryAhead != null -> MapIcon(R.drawable.ic_gallery, size = 18)
                 else -> MapIcon(R.drawable.ic_map_straight, size = 16)
             }

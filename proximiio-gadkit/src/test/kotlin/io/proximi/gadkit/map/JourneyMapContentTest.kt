@@ -36,32 +36,6 @@ class JourneyMapContentTest {
     )
 
     @Test
-    fun theActiveStopsGalleryIsTheDestinationAndDoneStopsMarkTheirGalleryVisited() {
-        val journey = Journey(listOf(stop("1", a, StopState.DONE), stop("3", b, StopState.ACTIVE), stop("4", c)))
-        val fills = JourneyMapContent.fills(journey, "3", listOf(a, b, c))
-        assertEquals(listOf(GalleryFill(a, false), GalleryFill(b, true)), fills)
-    }
-
-    @Test
-    fun galleriesTheVisitorWasInAreVisitedAndTheDestinationWins() {
-        val journey = Journey(listOf(stop("3", b, StopState.ACTIVE)))
-        val fills = JourneyMapContent.fills(journey, "3", listOf(a, b, c), visitedGalleryIds = setOf("B", "C"))
-        assertEquals(listOf(GalleryFill(b, true), GalleryFill(c, false)), fills)
-    }
-
-    @Test
-    fun noActiveStopMeansNoDestinationFill() {
-        val journey = Journey(listOf(stop("1", a)))
-        assertEquals(emptyList(), JourneyMapContent.fills(journey, null, listOf(a, b, c)))
-    }
-
-    @Test
-    fun aStopOnAnotherLevelIsNotInTheGallery() {
-        val journey = Journey(listOf(stop("1", a, StopState.ACTIVE, level = 2.0)))
-        assertEquals(emptyList(), JourneyMapContent.fills(journey, "1", listOf(a)))
-    }
-
-    @Test
     fun fillsShowOnTheirLevelOnly() {
         val fills = listOf(GalleryFill(a, true), GalleryFill(gallery("D", 0.0, 0.0, level = 2.0), false))
         assertEquals(listOf("A"), JourneyMapContent.fillsOn(1.0, fills).map { it.gallery.id })

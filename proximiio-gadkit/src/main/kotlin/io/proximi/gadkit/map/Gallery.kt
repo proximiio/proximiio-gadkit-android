@@ -24,9 +24,15 @@ import kotlin.math.min
  *   the POI's, `ring` the geofence's outline.
  * @property entry the gallery's POI: where the route to the gallery ends.
  * @property placeId the id of the gallery's POI.
+ * @property polygon the gallery's polygon in the venue data, or `null`. The map fills it; [gallery]
+ *   (the geofence) decides whether the visitor is in the gallery (PM, Monday "Explore Museum view:
+ *   gallery highlighting", 2026-10-26).
  */
-internal data class GalleryDestination(val gallery: Gallery, val entry: Coordinate, val placeId: String) {
+internal data class GalleryDestination(val gallery: Gallery, val entry: Coordinate, val placeId: String, val polygon: Gallery? = null) {
     val id: String get() = gallery.id
+
+    /** The outline the map fills: the polygon, else the geofence. */
+    val shown: Gallery get() = polygon ?: gallery
 
     /** The text of the map marker: the first word of the name, such as "G303". */
     val label: String get() = gallery.name.split(' ').firstOrNull { it.isNotEmpty() } ?: gallery.name
@@ -120,12 +126,40 @@ internal data class Gallery(
             return ring?.takeIf { it.size >= 3 }
         }
 
+        /** The polygon features whose type starts with `gallery`, with their `metadata.gallery_id`. */
+        internal fun polygonOutlines(features: List<VenueFeature>): List<Pair<Gallery, String?>> =
+            features.mapNotNull { feature ->
+                if (!(feature.type ?: "").startsWith("gallery")) return@mapNotNull null
+                val geometry = feature.geometry ?: return@mapNotNull null
+                val level = feature.level ?: return@mapNotNull null
+                val ring = outerRing(geometry.type, geometry.coordinates) ?: return@mapNotNull null
+                val galleryId = ((feature.properties?.get("metadata") as? Map<*, *>)?.get("gallery_id") as? String)?.takeIf { it.isNotEmpty() }
+                Gallery(feature.id, "", level, ring) to galleryId
+            }
+
+        /**
+         * The outline of each gallery of [destinations] ([GalleryDestination.shown], named by its POI),
+         * by name, then the [outlines] that are none of them and hold none of their POIs. Pure; covered
+         * by tests.
+         */
+        internal fun merged(destinations: List<GalleryDestination>, outlines: List<Gallery>): List<Gallery> {
+            val shown = destinations.map { it.shown }.sortedWith(compareBy(StandardTitleOrder) { it.name })
+            val others = outlines.filter { outline ->
+                destinations.none { it.shown.id == outline.id || outline.contains(it.entry, it.gallery.level) }
+            }
+            return shown + others
+        }
+
         /**
          * The galleries a personalised journey leads to first, by `gallery_id` ([GalleryDestination]).
          * A gallery without a polygon geofence or a POI is left out. Geofence polygons are GeoJSON
          * `[longitude, latitude]` pairs. Pure; covered by tests.
+         *
+         * Each destination gets the polygon feature (`type` starting with `gallery`) whose
+         * `metadata.gallery_id` is the gallery's id, else the one on the POI's floor that contains the
+         * POI ([features]).
          */
-        internal fun destinations(geofences: List<VenueGeofence>, places: List<VenuePlace>): Map<String, GalleryDestination> {
+        internal fun destinations(geofences: List<VenueGeofence>, places: List<VenuePlace>, features: List<VenueFeature> = emptyList()): Map<String, GalleryDestination> {
             val pois = LinkedHashMap<String, VenuePlace>()
             for (place in places) {
                 if (place.isArtwork) continue
@@ -142,6 +176,13 @@ internal data class Gallery(
                 val ring = polygon.mapNotNull { pair -> if (pair.size >= 2) Coordinate(pair[1], pair[0]) else null }
                 if (ring.size < 3) continue
                 destinations[id] = GalleryDestination(Gallery(id, poi.title, poi.level, ring), poi.coordinate, poi.id)
+            }
+            val polygons = polygonOutlines(features)
+            for ((id, destination) in destinations.toList()) {
+                val polygon = polygons.firstOrNull { it.second == id }?.first
+                    ?: polygons.firstOrNull { it.second == null && it.first.contains(destination.entry, destination.gallery.level) }?.first
+                    ?: continue
+                destinations[id] = destination.copy(polygon = Gallery(polygon.id, destination.gallery.name, polygon.level, polygon.ring))
             }
             return destinations
         }

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
+import io.proximi.gadkit.map.galleryDestinations
 import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.AmenityKind
 import io.proximi.map.live.AmenityIcon
@@ -201,7 +202,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         val changerTitles = mapOf("elevator" to R.string.elevator, "staircase" to R.string.stairs)
             .filterKeys { it in changerTypes }
             .mapValues { (_, title) -> resources.getString(title) }
-        catalog = ExploreCatalog.of(places, Gallery.destinations(venue.venueGeofences(), places), categories, changerTitles, AmenityListing.facilities(amenities))
+        catalog = ExploreCatalog.of(places, venue.galleryDestinations(places), categories, changerTitles, AmenityListing.facilities(amenities))
         layers.updateLevelChangers(levelChangers)
         // The artworks are not drawn: the galleries and the Highlights list show them.
         session.hiddenFeatureIds = levelChangers.map { it.id }.toSet() + places.filter { it.isArtwork }.map { it.id }

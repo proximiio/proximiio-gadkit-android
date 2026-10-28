@@ -57,20 +57,37 @@ internal suspend fun VenueService.catalogue(): List<ProximiioAmenity> = try {
     emptyList()
 }
 
+/** The venue's features as core reads them. */
+internal suspend fun VenueService.venueFeatures(): List<VenueFeature> = withContext(Dispatchers.Default) {
+    sdk.features().map { it.toVenueFeature() }
+}
+
 /**
- * The venue's galleries, as iOS `VisitView` loads them: the `gallery` polygon features named
- * after the gallery place inside them, else the named gallery geofences.
+ * The galleries of gallery first ([Gallery.destinations]), each with its polygon feature when the
+ * venue data has one.
+ */
+internal suspend fun VenueService.galleryDestinations(places: List<VenuePlace>): Map<String, GalleryDestination> =
+    Gallery.destinations(venueGeofences(), places, venueFeatures())
+
+/**
+ * The venue's galleries, as iOS `Gallery.load`: the galleries with a `gallery_id` (named by their
+ * POI, outlined by their polygon), then the gallery outlines among the features (or the named gallery
+ * geofences when there are none) that hold none of their POIs. The outlines alone are named by a POI
+ * whose title says "gallery"; the GAD POIs renamed to "G101 Pop Culture" on 2026-10-28 left only three
+ * galleries (PM, Monday "Visited gallery visualization").
  */
 internal suspend fun VenueService.galleries(language: String?): List<Gallery> {
-    val outlines = withContext(Dispatchers.Default) {
-        val features = sdk.features().map { it.toVenueFeature() }
-        Gallery.all(features, VenuePlace.all(features, language))
+    val features = venueFeatures()
+    val places = withContext(Dispatchers.Default) { VenuePlace.all(features, language) }
+    val destinations = Gallery.destinations(venueGeofences(), places, features).values.toList()
+    var outlines = withContext(Dispatchers.Default) { Gallery.all(features, places) }
+    if (outlines.isEmpty()) {
+        // For a repeated id, the first floor is used, as on iOS.
+        val levels = buildMap { sdk.floors().forEach { putIfAbsent(it.id, it.level) } }
+        val geofences = sdk.geofences().filter { it.isGallery }.map { VenueGeofence(it.id, it.name, it.polygon, it.floorId) }
+        outlines = Gallery.all(geofences, levels)
     }
-    if (outlines.isNotEmpty()) return outlines
-    // For a repeated id, the first floor is used, as on iOS.
-    val levels = buildMap { sdk.floors().forEach { putIfAbsent(it.id, it.level) } }
-    val geofences = sdk.geofences().filter { it.isGallery }.map { VenueGeofence(it.id, it.name, it.polygon, it.floorId) }
-    return Gallery.all(geofences, levels)
+    return Gallery.merged(destinations, outlines)
 }
 
 /**

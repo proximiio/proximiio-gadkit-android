@@ -6,6 +6,9 @@ import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryDestination
 import io.proximi.gadkit.map.VenueGeofence
 import io.proximi.gadkit.map.VenuePlace
+import io.proximi.map.core.JourneyStop as MapJourneyStop
+import io.proximi.gadkit.map.Geometry
+import io.proximi.gadkit.map.VenueFeature
 import io.proximi.sdk.wayfinding.ComputedRoute
 import io.proximi.map.core.FloorKey
 import io.proximi.map.core.MapCoordinate
@@ -167,5 +170,68 @@ private class RecordingRouting : JourneyRouting {
     override suspend fun route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey, options: RouteOptions): RouteResult {
         destinations += destination
         return RouteResult.NoRoute(NoRouteReason.Disconnected)
+    }
+}
+
+/** Port of ProximiioGADKit `GalleryFirstTests` of 1.15.0 to 1.20.0: gallery polygons, the gallery list and visited galleries. */
+class GalleryPolygonTest {
+    private val square = listOf(Coordinate(0.0, 0.0), Coordinate(0.0, 1.0), Coordinate(1.0, 1.0), Coordinate(1.0, 0.0))
+
+    private fun geofence(remoteId: String) = VenueGeofence(
+        "geofence-$remoteId", "Gallery 303",
+        listOf(listOf(54.0, 24.0), listOf(54.1, 24.0), listOf(54.1, 24.1), listOf(54.0, 24.1)),
+        null, remoteId = remoteId, geofenceType = "gallery",
+    )
+
+    private fun polygon(id: String, level: Double, galleryId: String? = null): VenueFeature {
+        val ring = listOf(listOf(54.02, 24.02), listOf(54.08, 24.02), listOf(54.08, 24.08), listOf(54.02, 24.08))
+        val metadata: Map<String, Any?> = galleryId?.let { mapOf("gallery_id" to it) } ?: emptyMap()
+        return VenueFeature(id, "gallery", Geometry("Polygon", listOf(ring)), mapOf("metadata" to metadata), level)
+    }
+
+    /**
+     * The galleries with a `gallery_id` come first, named by their POI; an outline that holds one of
+     * their POIs is left out, another outline stays (PM, Monday "Visited gallery visualization",
+     * 2026-10-28: after the POIs were renamed, only three galleries were known).
+     */
+    @Test
+    fun theGalleriesWithAnIdComeFirstAndTheirOutlinesAreNotRepeated() {
+        val far = square.map { Coordinate(it.latitude + 5, it.longitude) }
+        val g101 = GalleryDestination(Gallery("e984", "G101 Pop Culture", 1.0, square), Coordinate(0.5, 0.5), "poi-g101")
+        val merged = Gallery.merged(
+            listOf(g101),
+            listOf(Gallery("feature-101", "Gallery 101", 1.0, square), Gallery("feature-306", "Gallery 306", 3.0, far)),
+        )
+        assertEquals(listOf("G101 Pop Culture", "Gallery 306"), merged.map { it.name })
+        assertEquals("e984", merged.first().id)
+    }
+
+    /** PM, Monday "Explore Museum view: gallery highlighting", 2026-10-26: the map fills the gallery's polygon, not its geofence. */
+    @Test
+    fun theGalleryPolygonIsTheOneWithTheGalleryIdElseTheOneAroundThePoi() {
+        val poi = VenuePlace(id = "poi-g303", title = "G303 Language", coordinate = Coordinate(24.05, 54.05), level = 3.0, remoteId = "e1d2cd21")
+        val around = Gallery.destinations(listOf(geofence("e1d2cd21")), listOf(poi), listOf(polygon("other-floor", 2.0), polygon("room", 3.0))).getValue("e1d2cd21")
+        assertEquals("room", around.polygon?.id)
+        assertEquals("room", around.shown.id)
+        assertEquals("e1d2cd21", around.gallery.id)
+        val byId = Gallery.destinations(listOf(geofence("e1d2cd21")), listOf(poi), listOf(polygon("room", 3.0), polygon("tagged", 2.0, galleryId = "e1d2cd21"))).getValue("e1d2cd21")
+        assertEquals("tagged", byId.polygon?.id)
+        val none = Gallery.destinations(listOf(geofence("e1d2cd21")), listOf(poi)).getValue("e1d2cd21")
+        assertNull(none.polygon)
+        assertEquals(none.gallery, none.shown)
+    }
+
+    /** A gallery is visited when its artworks of the journey are all visited or skipped, at least one visited (the customer, Monday "Visited gallery visualization", 2026-10-28). */
+    @Test
+    fun aGalleryIsVisitedWhenAllItsArtworksAreDoneOrSkipped() {
+        val visited = VisitViewModel.visitedGalleries(
+            listOf(
+                "g101" to MapJourneyStop.State.DONE, "g101" to MapJourneyStop.State.SKIPPED,
+                "g104" to MapJourneyStop.State.DONE, "g104" to MapJourneyStop.State.PENDING,
+                "g106" to MapJourneyStop.State.SKIPPED,
+                "g303" to MapJourneyStop.State.DONE,
+            ),
+        )
+        assertEquals(setOf("g101", "g303"), visited)
     }
 }

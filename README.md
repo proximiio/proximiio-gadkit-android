@@ -1040,6 +1040,22 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   fixes (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-28).
 - **BREAKING:** `GadSettings.followZoom` is 18.8 (was 21; RPR, Monday "Need to determine correct zoom
   levels on-site", 2026-10-28).
+- **Visible:** galleries are filled on their polygon in the venue data (`metadata.gallery_id`, else the
+  one around the gallery POI); the gallery geofence still decides whether the visitor is in it. The
+  journey map knows every gallery with a `gallery_id`, named by its POI, then the other gallery
+  outlines (PM, Monday "Explore Museum view: gallery highlighting", 2026-10-26, and "Visited gallery
+  visualization", 2026-10-28).
+- **Visible:** a gallery is visited when its artworks of the journey are all visited or skipped and at
+  least one is visited; being in the gallery no longer counts. A visited gallery is filled over the
+  venue's artworks, furniture and inner walls, and its marker is its amenity's icon in the white
+  circle with the red ring of a visited artwork, with its title under it (the customer, Monday
+  "Visited gallery visualization", 2026-10-28).
+- **Visible:** the gallery the leg ends at (gallery first) is a red pill with a white border and the
+  gallery's whole title in white, in place of the red label with its first word; it is filled over the
+  inner walls too (RPR, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+- **Visible:** the stop card's icon: while the leg ends at a gallery, the icon of the gallery POI's
+  amenity; while the next stop is on another floor, the lift or stairs of the next level change from
+  the visitor's floor (PM, Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27).
 - **Visible:** a place matches an amenity kind by its amenity, not by its title: the prayer room
   shortcut led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend views",
   2026-10-28). The search shortcuts, the Explore Museum amenities, the legend, the detour icon and the
