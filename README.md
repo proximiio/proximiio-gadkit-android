@@ -1061,6 +1061,16 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   size on the phone and in MapTap: 120 px at 0.2 is 24 dp. Before, an icon was drawn at the screen's
   density, about a third of that. The design's amenity markers and the Explore Museum gallery
   circles take the data icon's pixel size (PM, 2026-10-27).
+- **Visible:** Explore Museum: a picked place's card is over the map, with a line down to the place,
+  drawn as a black dot in a ring with its title under it; the map frames the place at 31 % / 75 % of
+  the map. A selected amenity is that dot too, not the red marker. The amenities' own icons are not
+  drawn on this map (PM, Monday "Explore Museum view: gallery POI view", 2026-10-26 and 2026-10-27).
+- **Visible:** Explore Museum: the floor changer opens a column of glass buttons, one per level,
+  highest first, the shown level in bold, and a chevron that closes it (PM, Monday "Explore museum:
+  Level selector dropdown", 2026-10-28).
+- **Visible:** Explore Museum: "Level N" is Regular 24, the card's title Bold 18 and its text Regular
+  16, the legend's title SemiBold 14; the lists fade out over 90 dp above the tab bar (was 30). New
+  `GadTextStyle.BodyRegular` and `BodySmallSemiBold`.
 - **Visible:** on the Explore Museum map a gallery's icon is the data icon on a white circle at 30 %
   with a white border (PM, Monday "Explore museum view: default map view", 2026-10-26).
 - **Visible:** a place matches an amenity kind by its amenity, not by its title: the prayer room

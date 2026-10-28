@@ -1,5 +1,19 @@
 package io.proximi.gadkit.explore
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.mutableIntStateOf
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.geometry.LatLng
+import io.proximi.map.kit.MapContentInsets
+import androidx.compose.ui.draw.rotate
+import androidx.compose.animation.animateContentSize
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.WindowInsets
@@ -53,8 +67,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -175,9 +187,19 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     // The place whose card is open.
     var selected by remember { mutableStateOf<ExploreItem?>(null) }
     var hasFramed by remember { mutableStateOf(false) }
+    // The features the map does not draw: artworks, level changers (drawn by `layers`) and the
+    // amenities of [AmenityKind].
+    var hiddenFeatureIds by remember { mutableStateOf(emptySet<String>()) }
+    // The size of the map, in px.
+    var mapSize by remember { mutableStateOf(IntSize.Zero) }
+    // The MapLibre map, to place the card's line and dot on the picked place.
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    // Counts the camera moves: the line and the dot follow the place when the visitor moves the map.
+    var cameraMoves by remember { mutableIntStateOf(0) }
+    val density = resources.displayMetrics.density
 
-    // The map area under the level title, the card and the tab bar.
-    val insets = FloorWithoutPositioningGuide.insets(resources.displayMetrics.density, top = 130, left = 30, bottom = 220, right = 30)
+    // The map area under the level title and above the tab bar.
+    val insets = FloorWithoutPositioningGuide.insets(density, top = 130, left = 30, bottom = 120, right = 30)
 
     /**
      * The lists, at the start and after a change of the venue data or the language. The map is
@@ -204,8 +226,11 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
             .mapValues { (_, title) -> resources.getString(title) }
         catalog = ExploreCatalog.of(places, venue.galleryDestinations(places), categories, changerTitles, AmenityListing.facilities(amenities))
         layers.updateLevelChangers(levelChangers)
-        // The artworks are not drawn: the galleries and the Highlights list show them.
-        session.hiddenFeatureIds = levelChangers.map { it.id }.toSet() + places.filter { it.isArtwork }.map { it.id }
+        // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
+        // amenities: the Amenities list and the card's dot show them (PM, Monday "Explore museum view:
+        // default map view", 2026-10-26).
+        val amenityPlaces = places.filter { place -> !place.isArtwork && AmenityKind.entries.any { it.matches(place) } }
+        hiddenFeatureIds = levelChangers.map { it.id }.toSet() + places.filter { it.isArtwork }.map { it.id } + amenityPlaces.map { it.id }
         selected = selected?.let { current -> catalog.all.firstOrNull { it.id == current.id } }
     }
 
@@ -215,13 +240,21 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         if (selected?.let { VenueLevel.same(it.level, newLevel) } == false) selected = null
     }
 
-    /** Closes the panel, shows [item]'s floor, frames it and opens its card. */
+    /**
+     * Closes the panel, shows [item]'s floor and opens its card. The place is framed around the card's
+     * target point ([ExploreCalloutLayout]).
+     */
     fun show(item: ExploreItem) {
         panel = null
         show(item.level)
         selected = item
-        val bounds = PlaceFraming.bounds(item.framedPoints, settings.amenityFramingMinimumMeters) ?: return
-        session.camera.fitBounds(bounds, insets, animated = true)
+        val bounds = PlaceFraming.bounds(ExploreCalloutLayout.framedPoints(item), settings.amenityFramingMinimumMeters) ?: return
+        val framing = ExploreCalloutLayout.framingInsets(mapSize.width / density, mapSize.height / density)
+        session.camera.fitBounds(
+            bounds,
+            MapContentInsets(topPx = framing.top * density.toDouble(), leftPx = framing.left * density.toDouble(), bottomPx = framing.bottom * density.toDouble(), rightPx = framing.right * density.toDouble()),
+            animated = true,
+        )
     }
 
     LaunchedEffect(session, language) {
@@ -251,20 +284,32 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         val focus = selected?.takeIf { it.kind == ExploreItem.Kind.Space }?.id
         val fills = catalog.spaces.mapNotNull { item -> item.gallery?.let { GalleryFill(it, isDestination = focus == null || focus == item.id) } }
         layers.update(fills, level)
-        val item = selected
-        val amenity = (item?.kind as? ExploreItem.Kind.Amenity)?.kind
-        layers.updateHighlight(if (item != null && amenity != null) JourneyMapLayers.Highlight(item.coordinate, item.level, amenity.gadIcon) else null)
+    }
+    // The selected place's own POI is not drawn: the card's dot marks it (PM, Monday "Explore Museum
+    // view: gallery POI view", 2026-10-27).
+    LaunchedEffect(hiddenFeatureIds, selected) { session.hiddenFeatureIds = hiddenFeatureIds + listOfNotNull(selected?.id) }
+    DisposableEffect(map) {
+        val loaded = map
+        val listener = MapLibreMap.OnCameraMoveListener { cameraMoves += 1 }
+        loaded?.addOnCameraMoveListener(listener)
+        onDispose { loaded?.removeOnCameraMoveListener(listener) }
     }
 
+    val currentShow by rememberUpdatedState<(ExploreItem) -> Unit> { item -> show(item) }
     val currentCatalog by rememberUpdatedState(catalog)
     val currentLevel by rememberUpdatedState(level)
     DisposableEffect(session) {
         // A tap on a POI of the lists or inside a gallery opens its card; elsewhere it closes the card.
         session.onFeatureTap = { identifiers, coordinate ->
             val all = currentCatalog.all
-            panel = null
-            selected = identifiers.firstNotNullOfOrNull { id -> all.firstOrNull { it.id == id } }
+            val item = identifiers.firstNotNullOfOrNull { id -> all.firstOrNull { it.id == id } }
                 ?: currentCatalog.space(Coordinate(coordinate.latitude, coordinate.longitude), currentLevel)
+            if (item != null) {
+                currentShow(item)
+            } else {
+                panel = null
+                selected = null
+            }
         }
         onDispose { session.onFeatureTap = null }
     }
@@ -282,16 +327,29 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     BackHandler(enabled = panel != null) { panel = null }
 
     val backdrop = rememberGlassBackdrop()
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().onSizeChanged { mapSize = it }) {
         ProximiioMap(
             session = session,
             modifier = Modifier.fillMaxSize().glassBackdrop(backdrop).softEdges(cornerRadius = 40.dp),
             configure = { canvas ->
                 layers.attach(canvas)
+                canvas.onStyleLoaded { loaded, _ -> map = loaded }
             },
         )
         ProvideGlassBackdrop(backdrop) {
             MapLoadingSpinner(session, settings.mapLoadingTimeout)
+            val card = selected
+            AnimatedVisibility(visible = panel == null && card != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+                val shown = remember { mutableStateOf(card) }
+                card?.let { shown.value = it }
+                shown.value?.let { item ->
+                    // Read on every camera move: the line and the dot follow the place.
+                    val point = remember(cameraMoves, item, map, mapSize) {
+                        map?.projection?.toScreenLocation(LatLng(item.coordinate.latitude, item.coordinate.longitude))?.let { Offset(it.x, it.y) }
+                    }
+                    ExploreCallout(item, amenityIcons, mapSize, point, onClose = { selected = null })
+                }
+            }
             Header(level, catalog.levels, onPick = ::show)
             AnimatedVisibility(
                 visible = panel != null,
@@ -307,12 +365,6 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
                 Modifier.fillMaxSize().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
             ) {
-                val card = selected
-                AnimatedVisibility(visible = panel == null && card != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
-                    val shown = remember { mutableStateOf(card) }
-                    card?.let { shown.value = it }
-                    shown.value?.let { ExploreCard(it, amenityIcons, onClose = { selected = null }) }
-                }
                 TabBar(panel, onToggle = ::toggle)
             }
         }
@@ -323,10 +375,11 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
 @Composable
 private fun Header(level: Double, levels: List<Double>, onPick: (Double) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.Top) {
+        // Regular 24 as in the Figma frame 12129:102006 (PM, Monday "Font size and style", 2026-10-26).
         Text(
             stringResource(R.string.level_n, level.roundToInt()),
             Modifier.padding(top = 8.dp).testTag("exploreLevel"),
-            style = GadTextStyle.CardTitle.textStyle,
+            style = GadTextStyle.H1Regular.textStyle,
             color = Palette.ink,
         )
         Spacer(Modifier.weight(1f))
@@ -337,41 +390,67 @@ private fun Header(level: Double, levels: List<Double>, onPick: (Double) -> Unit
 
 /**
  * The floor changer of the PM screens: the level in a tile of the level colour, a chevron under it,
- * in a frosted frame. Lists the museum's levels, highest first.
+ * in a frosted frame. Open, it shows a glass button for each of the museum's levels, highest first,
+ * the shown level in bold, and a chevron that closes it (PM, Monday "Explore museum: Level selector
+ * dropdown", 2026-10-28).
  */
 @Composable
 private fun FloorChanger(level: Double, levels: List<Double>, onPick: (Double) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
+    var isShowingLevels by remember { mutableStateOf(false) }
     val label = GuidanceText.floorLabel(level)
     val color = Palette.level(level.roundToInt())
     // From the bottom leading corner (100 %) to the top trailing corner (45 %).
     val tile = Brush.linearGradient(listOf(color, color.copy(alpha = 0.45f)), start = Offset(0f, Float.POSITIVE_INFINITY), end = Offset(Float.POSITIVE_INFINITY, 0f))
     val description = stringResource(R.string.floor_x, label)
-    Box {
-        Column(
-            Modifier
-                .glassSurface(RoundedCornerShape(14.dp), GlassStrength.Frosted)
-                .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Button) { expanded = true }
-                .semantics { contentDescription = description }
-                .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 4.dp)
-                .testTag("exploreFloorChanger"),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Box(Modifier.size(46.dp).background(tile, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Text(label, style = GadTextStyle.BodyBold.textStyle, color = Palette.ink)
-            }
-            Icon(painterResource(R.drawable.ic_chevron_down), contentDescription = null, Modifier.size(11.dp), tint = Palette.ink)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = Palette.white) {
+    val close = stringResource(R.string.close)
+    Column(
+        Modifier
+            .glassSurface(RoundedCornerShape(14.dp), GlassStrength.Frosted)
+            .animateContentSize(tween(200))
+            .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 4.dp)
+            .testTag("exploreFloorChanger"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(if (isShowingLevels) 8.dp else 4.dp),
+    ) {
+        if (isShowingLevels) {
             levels.asReversed().forEach { candidate ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.level_n, candidate.roundToInt()), style = GadTextStyle.BodyMedium.textStyle) },
+                val isShown = VenueLevel.same(candidate, level)
+                GlassSquareButton(
                     onClick = {
-                        expanded = false
+                        isShowingLevels = false
                         onPick(candidate)
                     },
-                )
+                    contentDescription = stringResource(R.string.level_n, candidate.roundToInt()),
+                    isSelected = isShown,
+                ) {
+                    Text(
+                        GuidanceText.floorLabel(candidate),
+                        style = (if (isShown) GadTextStyle.BodyBold else GadTextStyle.BodyRegular).textStyle,
+                        color = Palette.ink,
+                    )
+                }
+            }
+            Box(
+                Modifier
+                    .size(width = 50.dp, height = 18.dp)
+                    .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Button) { isShowingLevels = false }
+                    .semantics { contentDescription = close },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(R.drawable.ic_chevron_down), contentDescription = null, Modifier.size(11.dp).rotate(180f), tint = Palette.ink)
+            }
+        } else {
+            Column(
+                Modifier
+                    .clickable(remember { MutableInteractionSource() }, indication = ripple(), role = Role.Button) { isShowingLevels = true }
+                    .semantics { contentDescription = description },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(Modifier.size(46.dp).background(tile, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                    Text(label, style = GadTextStyle.BodyBold.textStyle, color = Palette.ink)
+                }
+                Icon(painterResource(R.drawable.ic_chevron_down), contentDescription = null, Modifier.size(11.dp), tint = Palette.ink)
             }
         }
     }
@@ -449,7 +528,8 @@ private fun Panel(panel: ExplorePanel, catalog: ExploreCatalog, icons: Map<Strin
                         is ExplorePanel.TabList -> stringResource(panel.tab.title)
                         ExplorePanel.Legend -> stringResource(R.string.map_legend)
                     }
-                    Text(title, Modifier.alignByBaseline(), style = GadTextStyle.CardTitle.textStyle, color = Palette.ink)
+                    val style = if (panel == ExplorePanel.Legend) GadTextStyle.BodySmallSemiBold else GadTextStyle.CardTitle
+                    Text(title, Modifier.alignByBaseline(), style = style.textStyle, color = Palette.ink)
                     Spacer(Modifier.weight(1f))
                     if (panel is ExplorePanel.TabList) {
                         Text(summary(panel.tab, catalog), Modifier.alignByBaseline(), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
@@ -459,9 +539,11 @@ private fun Panel(panel: ExplorePanel, catalog: ExploreCatalog, icons: Map<Strin
             // Each panel scrolls on its own: a list opened after another starts at its top.
             key(panel) {
                 val content = Modifier.fillMaxWidth().weight(1f).fadesOut(above = tabBarHeight)
+                // The last rows scroll up clear of the fade (RPR, Monday "Explore museum: list fade", 2026-10-28).
+                val bottom = tabBarHeight + LIST_FADE
                 when (panel) {
-                    is ExplorePanel.TabList -> TabList(items(panel.tab, catalog), icons, onPick, content)
-                    ExplorePanel.Legend -> Legend(catalog, icons, content)
+                    is ExplorePanel.TabList -> TabList(items(panel.tab, catalog), icons, onPick, content, bottom)
+                    ExplorePanel.Legend -> Legend(catalog, icons, content, bottom)
                 }
             }
         }
@@ -492,7 +574,7 @@ private fun summary(tab: ExploreTab, catalog: ExploreCatalog): String {
  * Fades the content out toward [above] dp from its bottom and leaves that part clear: the rows do
  * not show through the glass of the tab bar.
  */
-private fun Modifier.fadesOut(above: Dp, fade: Dp = 30.dp): Modifier =
+private fun Modifier.fadesOut(above: Dp, fade: Dp = LIST_FADE): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
@@ -507,12 +589,12 @@ private fun Modifier.fadesOut(above: Dp, fade: Dp = 30.dp): Modifier =
 
 /** The rows of a list, by level. */
 @Composable
-private fun TabList(items: List<ExploreItem>, icons: Map<String, ImageBitmap>, onPick: (ExploreItem) -> Unit, modifier: Modifier) {
+private fun TabList(items: List<ExploreItem>, icons: Map<String, ImageBitmap>, onPick: (ExploreItem) -> Unit, modifier: Modifier, bottom: Dp) {
     val groups = ExploreCatalog.byLevel(items)
     LazyColumn(
         modifier,
-        // Clear of the tab bar.
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 110.dp),
+        // Clear of the tab bar and the fade above it.
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = bottom),
     ) {
         if (groups.isEmpty()) {
             item {
@@ -560,12 +642,12 @@ private fun TabList(items: List<ExploreItem>, icons: Map<String, ImageBitmap>, o
  * their map icons.
  */
 @Composable
-private fun Legend(catalog: ExploreCatalog, icons: Map<String, ImageBitmap>, modifier: Modifier) {
+private fun Legend(catalog: ExploreCatalog, icons: Map<String, ImageBitmap>, modifier: Modifier, bottom: Dp) {
     Row(
         modifier
             .verticalScroll(rememberScrollState())
-            // Clear of the tab bar.
-            .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 110.dp)
+            // Clear of the tab bar and the fade above it.
+            .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = bottom)
             .testTag("exploreLegend"),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
         verticalAlignment = Alignment.Top,
@@ -605,6 +687,49 @@ private fun LegendGlyph(entry: ExploreLegendEntry, icons: Map<String, ImageBitma
     }
 }
 
+/**
+ * The card of a place picked on the map (PM, Monday "Explore Museum view: gallery POI view",
+ * 2026-10-26): over the map above the place, a line down to the place, and the place as a black dot
+ * in a translucent ring with its title under it. The map frames the place at
+ * [ExploreCalloutLayout.target]; the line and the dot follow the place ([point], in px) when the
+ * visitor moves the map.
+ */
+@Composable
+private fun ExploreCallout(item: ExploreItem, icons: Map<String, ImageBitmap>, mapSize: IntSize, point: Offset?, onClose: () -> Unit) {
+    val density = LocalDensity.current
+    val (targetX, targetY) = ExploreCalloutLayout.target(mapSize.width.toFloat(), mapSize.height.toFloat())
+    val place = point ?: Offset(targetX, targetY)
+    val cardBottom = targetY - with(density) { 55.dp.toPx() }
+    val ink = Palette.ink
+    Box(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize().clearAndSetSemantics {}) {
+            if (place.y > cardBottom) {
+                drawLine(ink, Offset(place.x, cardBottom), place, strokeWidth = 1.dp.toPx())
+            }
+            // The black dot in a ring at 30 % with a white border.
+            drawCircle(ink.copy(alpha = 0.3f), radius = 10.5.dp.toPx(), center = place)
+            drawCircle(Color.White.copy(alpha = 0.7f), radius = 11.dp.toPx(), center = place, style = Stroke(width = 1.dp.toPx()))
+            drawCircle(ink, radius = 4.135.dp.toPx(), center = place)
+        }
+        Text(
+            item.title,
+            Modifier
+                .offset { IntOffset((place.x - 70.dp.toPx()).roundToInt(), (place.y + 18.dp.toPx()).roundToInt()) }
+                .width(140.dp)
+                .clearAndSetSemantics {},
+            style = GadTextStyle.BodySmallBold.textStyle,
+            color = ink,
+            textAlign = TextAlign.Center,
+        )
+        Box(
+            Modifier.fillMaxWidth().height(with(density) { cardBottom.coerceAtLeast(0f).toDp() }).padding(horizontal = 32.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            ExploreCard(item, icons, onClose)
+        }
+    }
+}
+
 /** The card of a place on the map: the icon, the title and its lines, the level and a close button. */
 @Composable
 private fun ExploreCard(item: ExploreItem, icons: Map<String, ImageBitmap>, onClose: () -> Unit) {
@@ -623,7 +748,7 @@ private fun ExploreCard(item: ExploreItem, icons: Map<String, ImageBitmap>, onCl
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (item.kind != ExploreItem.Kind.Highlight) ExploreIcon(item, icons)
-            ExploreText(item, Modifier.weight(1f))
+            ExploreText(item, Modifier.weight(1f), isCard = true)
             Text(GuidanceText.floorLabel(item.level), style = GadTextStyle.BodyBold.textStyle, color = Palette.ink)
         }
         Box(
@@ -639,17 +764,21 @@ private fun ExploreCard(item: ExploreItem, icons: Map<String, ImageBitmap>, onCl
     }
 }
 
-/** The title (italic for an artwork) and the lines under it. */
+/**
+ * The title (italic for an artwork) and the lines under it. The card's text is larger than the list's:
+ * Bold 18 and Regular 16 (Figma frame 12129:102006).
+ */
 @Composable
-private fun ExploreText(item: ExploreItem, modifier: Modifier = Modifier) {
+private fun ExploreText(item: ExploreItem, modifier: Modifier = Modifier, isCard: Boolean = false) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             item.title,
-            style = GadTextStyle.BodyBold.textStyle,
+            style = (if (isCard) GadTextStyle.LargeBodyBold else GadTextStyle.BodyBold).textStyle,
             fontStyle = if (item.kind == ExploreItem.Kind.Highlight) FontStyle.Italic else FontStyle.Normal,
             color = Palette.ink,
         )
-        item.lines.forEach { line -> Text(line, style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink) }
+        val lineStyle = if (isCard) GadTextStyle.BodyRegular else GadTextStyle.BodySmallRegular
+        item.lines.forEach { line -> Text(line, style = lineStyle.textStyle, color = Palette.ink) }
     }
 }
 
@@ -683,3 +812,6 @@ private fun symbolIcon(symbol: ExploreItem.Symbol): Int = when (symbol) {
     ExploreItem.Symbol.STAR -> R.drawable.ic_explore_star
     ExploreItem.Symbol.COLUMNS -> R.drawable.ic_explore_columns
 }
+
+/** The height over which the lists fade out above the tab bar (RPR, Monday "Explore museum: list fade", 2026-10-28; was 30). */
+private val LIST_FADE = 90.dp

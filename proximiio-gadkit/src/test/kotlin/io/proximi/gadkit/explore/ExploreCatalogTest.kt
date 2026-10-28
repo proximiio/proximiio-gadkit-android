@@ -126,3 +126,30 @@ class ExploreCatalogTest {
         assertEquals(THEMATIC, catalog.spaces.first().amenityId)
     }
 }
+
+/** Port of ProximiioGADKit `ExploreCalloutTests`: where the card of a picked place puts the place. */
+class ExploreCalloutTest {
+    @Test
+    fun thePlaceGoesWhereTheDesignHasItAndIsFramedAroundIt() {
+        val (x, y) = ExploreCalloutLayout.target(402f, 874f)
+        assertEquals(124.5f, x, 0.01f)
+        assertEquals(657f, y, 0.01f)
+        val insets = ExploreCalloutLayout.framingInsets(402f, 874f)
+        // The padded box is centred on the target.
+        assertEquals(x, (insets.left + 402f - insets.right) / 2, 0.01f)
+        assertEquals(y, (insets.top + 874f - insets.bottom) / 2, 0.01f)
+        kotlin.test.assertTrue(insets.bottom >= 110 && insets.top >= 140)
+    }
+
+    @Test
+    fun theFrameIsCentredOnThePlace() {
+        val ring = listOf(Coordinate(24.0, 54.0), Coordinate(24.002, 54.004))
+        val item = ExploreItem(
+            id = "p", kind = ExploreItem.Kind.Space, title = "G101", lines = emptyList(), level = 1.0,
+            coordinate = Coordinate(24.0005, 54.001), gallery = Gallery("g", "G101", 1.0, ring),
+        )
+        val points = ExploreCalloutLayout.framedPoints(item)
+        assertEquals(24.0005, (points.minOf { it.latitude } + points.maxOf { it.latitude }) / 2, 1e-9)
+        assertEquals(54.001, (points.minOf { it.longitude } + points.maxOf { it.longitude }) / 2, 1e-9)
+    }
+}
