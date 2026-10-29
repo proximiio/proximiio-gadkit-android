@@ -201,8 +201,9 @@ private fun HostedExploreCheck(map: ProximiMap, venue: VenueService) {
  * pending stop visited, and "Remove" removes the last stop. "Host pause" and "Host resume" set
  * `isPaused`, as the audio guide's pause button (iOS "Host pause" / "Host resume"); "Go to café" sets
  * `destination` to the café's `properties.id`, as proximiio-mcp returns it. The lines at the top count
- * the stop states of its journey, list the navigators it got from `onNavigator` and the events of the
- * last one, and the view's latest events (test tag `hostedMapEvents`), for UI tests.
+ * the stop states of its journey, show its `destination` ("destination none", test tag
+ * `hostedDestination`), list the navigators it got from `onNavigator` and the events of the last one,
+ * and the view's latest events (test tag `hostedMapEvents`), for UI tests.
  */
 @Composable
 private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
@@ -223,7 +224,9 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     LaunchedEffect(places) {
         val title = map.hostedDestinationTitle ?: return@LaunchedEffect
         if (destination != null) return@LaunchedEffect
-        VenuePlace.matching(title, places).firstOrNull()?.let { destination = ProximiDestination(it.id.substringAfter(':')) }
+        // The place with that exact title first, as iOS: "Prayer room" also matches "DCT prayer room".
+        val place = places.firstOrNull { it.title == title } ?: VenuePlace.matching(title, places).firstOrNull()
+        place?.let { destination = ProximiDestination(it.id.substringAfter(':')) }
     }
     fun set(id: String, state: ProximiJourney.State) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
@@ -276,6 +279,11 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                         Text("Go to café", style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                Text(
+                    "destination ${destination?.poiId ?: "none"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.testTag("hostedDestination"),
+                )
             }
             Text(
                 "navigator $navigators: ${navigatorEvents.takeLast(6).joinToString(" ")}",
