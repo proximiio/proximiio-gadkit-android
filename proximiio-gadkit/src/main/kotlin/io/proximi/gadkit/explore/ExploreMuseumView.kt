@@ -1,5 +1,6 @@
 package io.proximi.gadkit.explore
 
+import io.proximi.gadkit.map.VenueCone
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
@@ -33,7 +34,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import io.proximi.gadkit.map.MapDiagnostics
-import io.proximi.gadkit.map.galleryDestinations
 import io.proximi.gadkit.map.venueFeatures
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.map.AmenityListing
@@ -191,6 +191,8 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     // The place whose card is open.
     var selected by remember { mutableStateOf<ExploreItem?>(null) }
     var hasFramed by remember { mutableStateOf(false) }
+    // The visitor picked a floor or a place: the first framing keeps it.
+    var hasPicked by remember { mutableStateOf(false) }
     // The features the map does not draw: artworks, level changers (drawn by `layers`) and the
     // amenities of [AmenityKind].
     var hiddenFeatureIds by remember { mutableStateOf(emptySet<String>()) }
@@ -228,14 +230,17 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         val changerTitles = mapOf("elevator" to R.string.elevator, "staircase" to R.string.stairs)
             .filterKeys { it in changerTypes }
             .mapValues { (_, title) -> resources.getString(title) }
-        val destinations = venue.galleryDestinations(places)
+        // The features once: the galleries, the field log and the cones.
+        val features = venue.venueFeatures()
+        val destinations = Gallery.destinations(venue.venueGeofences(), places, features)
         if (FieldLog.isEnabled) {
             val polygons = destinations.values.count { it.polygon != null }
-            val outlines = Gallery.polygonOutlines(venue.venueFeatures()).size
+            val outlines = Gallery.polygonOutlines(features).size
             FieldLog.log("explore: ${destinations.size} galleries · $polygons filled on their polygon, ${destinations.size - polygons} on their geofence · $outlines gallery polygons in the venue data")
         }
         catalog = ExploreCatalog.of(places, destinations, categories, changerTitles, AmenityListing.facilities(amenities))
         layers.updateLevelChangers(levelChangers)
+        layers.updateCones(VenueCone.all(features))
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the card's dot show them (PM, Monday "Explore museum view:
         // default map view", 2026-10-26).
@@ -271,6 +276,8 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         load()
         if (hasFramed) return@LaunchedEffect
         hasFramed = true
+        // A floor the visitor picked while the venue loaded stays.
+        if (hasPicked) return@LaunchedEffect
         withContext(Dispatchers.Main.immediate) {
             // The lowest floor with a gallery, framed on the whole museum.
             show(catalog.spaces.minOfOrNull { it.level } ?: catalog.levels.firstOrNull() ?: 0.0)
@@ -361,7 +368,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
                     ExploreCallout(item, amenityIcons, mapSize, point, onClose = { selected = null })
                 }
             }
-            Header(level, catalog.levels, onPick = ::show)
+            Header(level, catalog.levels, onPick = { hasPicked = true; show(it) })
             AnimatedVisibility(
                 visible = panel != null,
                 enter = slideInVertically(tween(250)) { it },
@@ -370,7 +377,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
                 // Keeps the closing panel on screen while it slides out.
                 val shown = remember { mutableStateOf(panel ?: ExplorePanel.Legend) }
                 panel?.let { shown.value = it }
-                Panel(shown.value, catalog, amenityIcons, onPick = ::show, onClose = { panel = null })
+                Panel(shown.value, catalog, amenityIcons, onPick = { hasPicked = true; show(it) }, onClose = { panel = null })
             }
             Column(
                 Modifier.fillMaxSize().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),

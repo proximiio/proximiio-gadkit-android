@@ -310,7 +310,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `BACKGROUND` | The library's background image around the map card. | Transparent. |
 | `PROMPTS` | All four prompts below (iOS `.prompts`). | Only the prompts named one by one. |
 | `SKIP_PROMPT` | "Skip this artwork?" after a swipe. "Skip artwork" reports `StopSkipped`; the stop is skipped with `PROGRESS`, else the host app skips it. | A swipe reports `SkipRequested` only. |
-| `OFF_ROUTE_PROMPT` | "Looks like you've left your route" with "Dismiss", in place of the stop card, `GadSettings.offRouteMeters` (12 m) off the route and before any routing. It stays `GadSettings.offRouteWarningDuration` (10 s). With `PROGRESS` a personalised journey keeps the leg until another open artwork is nearer, then the stops ahead are ordered again; other journeys are routed again from the visitor. A floor the route does not take counts as off the route after `GadSettings.wrongFloorAfter` (10 s). See "Journeys". | The route follows a visitor who left it; `OffRoute` reports it. |
+| `OFF_ROUTE_PROMPT` | "Looks like you've left your route" with "Dismiss", in place of the stop card, `GadSettings.offRouteMeters` (12 m) off the leg to the current destination, also where a later leg passes, and before any routing. It stays `GadSettings.offRouteWarningDuration` (10 s). With `PROGRESS` a personalised journey keeps the leg until another open artwork is nearer, then the stops ahead are ordered again; other journeys are routed again from the visitor. A floor the route does not take counts as off the route after `GadSettings.wrongFloorAfter` (10 s). See "Journeys". | The route follows a visitor who left it; `OffRoute` reports it. |
 | `UNCERTAIN_POSITION_PROMPT` | "Probably at …" when the position is uncertain near the active stop. | `PositionUncertain` reports it. |
 | `LEAVE_TOUR_PROMPT` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `onClose`). | Back calls `onClose` at once. |
 | `PROGRESS` | The view moves the journey on and reports it through `onJourneyChange`: an artwork is visited when the visitor enters its geofence (`ArtworkReached`) or, in a personalised journey, stays at it out of order (`ArtworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and reports no journey. |
@@ -768,7 +768,7 @@ val configuration = GadConfiguration(
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence or privacy zone before the SDK reports the exit. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.StopNearby`. |
-| `offRouteMeters`, `offRouteAfter` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
+| `offRouteMeters`, `offRouteAfter` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, also where a later leg passes, or off the route this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
@@ -1025,7 +1025,33 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.21.0.
+#### Added (iOS 1.22.0 to 1.22.2)
+
+- **Visible:** the journey map, the Explore Museum map and the museum map fill the building's cones
+  (polygon features of type `cone`, nine on each floor) as in the Figma kiosk: the design's floor
+  colour #FAFAFB, the metal gradient #D4DEE6, #F8FAFC, #E8EEF2, #CBD6DF, #AEBCC9 across the cone at
+  32 %, and a white edge inside the outline (PM, Monday "Cone visualization", 2026-10-29). A map style
+  fills a polygon with one colour only, so the library draws each cone as an image over the floor
+  plan, under the venue style's galleries (`proximiio-gallery`), so a cone that is a gallery keeps the
+  gallery's colour. The style's cone outlines (`proximiio-cones`) are #95A6B5 at 48 %, a hairline:
+  0.3 dp at zoom 16, 0.6 dp at 19, 1.2 dp at 21.
+
+#### Changed (iOS 1.21.1)
+
+- **Visible:** "Looks like you've left your route" also shows `GadSettings.offRouteMeters` (12 m) off
+  the leg to the current destination, where a later leg of the journey passes. The navigator's
+  `LeftRoute` measures against every leg still to walk, so a visitor heading to another artwork got
+  no warning (PM's log of 2026-10-28, 22:39 UTC: 56 m off the leg). Once per episode, only with
+  `OFF_ROUTE_PROMPT`, not while paused, during a detour or on a floor without positioning; the episode
+  ends within two thirds of the distance. A curated tour is then routed again from the visitor, and a
+  personalised journey is ordered again when another artwork is nearer, as after `LeftRoute`. The
+  legs' guidance rules use `GadSettings.offRouteMeters` (`RouteGuidance.isOffRoute`).
+
+#### Fixed
+
+- **Visible:** Explore Museum: a floor or a place the visitor picks while the venue loads stays. The
+  first framing showed the lowest floor with a gallery over it. Explore Museum reads the venue's
+  features once per load.
 
 ### [1.21.0] — 2026-10-29
 

@@ -90,8 +90,8 @@ public object ProximiMapView {
         SKIP_PROMPT,
 
         /**
-         * "Looks like you've left your route" with "Dismiss", [GadSettings.offRouteMeters] off the
-         * route and before any routing. After it, with [PROGRESS], a personalised journey keeps the leg
+         * "Looks like you've left your route" with "Dismiss", [GadSettings.offRouteMeters] off the leg
+         * to the current destination and before any routing. After it, with [PROGRESS], a personalised journey keeps the leg
          * where the visitor left it until another artwork is nearer; other journeys are routed again
          * from the visitor. Without it the view reports [ProximiMapEvent.OffRoute] only, and the route
          * follows the visitor who left it.

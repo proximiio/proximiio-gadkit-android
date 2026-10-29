@@ -97,4 +97,20 @@ class OffRouteTest {
         assertEquals(1.0, hidden.detour.opacity)
         assertTrue(hidden != MapStyle.journeyStops)
     }
+
+    /**
+     * The warning follows the leg to the current destination: 13 m off it warns also where a later
+     * leg passes, once per episode; back within 8 m the episode ends (PM's log of 2026-10-28, 22:39 UTC).
+     */
+    @Test
+    fun theLegOffRouteWarnsOncePerEpisode() {
+        fun deviation(isOffRoute: Boolean, meters: Double, isEpisode: Boolean, isLegEpisode: Boolean) =
+            VisitController.legDeviation(isOffRoute, meters, threshold = 12.0, isEpisode = isEpisode, isLegEpisode = isLegEpisode)
+        assertEquals(VisitController.LegDeviation.WARNS, deviation(true, 13.0, isEpisode = false, isLegEpisode = false))
+        assertEquals(VisitController.LegDeviation.NONE, deviation(true, 40.0, isEpisode = true, isLegEpisode = true))
+        assertEquals(VisitController.LegDeviation.NONE, deviation(false, 10.0, isEpisode = true, isLegEpisode = true))
+        assertEquals(VisitController.LegDeviation.ENDS, deviation(false, 7.0, isEpisode = true, isLegEpisode = true))
+        // An episode of the whole journey ends with the navigator's `ReturnedToRoute`, not here.
+        assertEquals(VisitController.LegDeviation.NONE, deviation(false, 2.0, isEpisode = true, isLegEpisode = false))
+    }
 }

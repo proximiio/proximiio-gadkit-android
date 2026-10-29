@@ -239,6 +239,7 @@ internal fun MuseumMapView(
     LaunchedEffect(dataVersion) {
         val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers)
+        layers.updateCones(VenueCone.all(venue.venueFeatures()))
         session.hiddenFeatureIds = levelChangers.map { it.id }.toSet()
     }
     if (debug?.galleryFills != true) {

@@ -1,5 +1,7 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.venueFeatures
+import io.proximi.gadkit.map.VenueCone
 import io.proximi.gadkit.map.galleryDestinations
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.map.VenueLevel
@@ -465,6 +467,7 @@ internal class VisitViewModel(
                 refreshLevelChanger()
                 updateNotification()
                 reportStopNearby(session.position.value, navigator.activeStop, guidance)
+                controller.checkLegDeviation(guidance, floorGuide.isActive)
             }
         }
         scope.launch {
@@ -681,6 +684,7 @@ internal class VisitViewModel(
         // every floor they serve.
         val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers)
+        layers.updateCones(VenueCone.all(venue.venueFeatures()))
         levelChangerPlaces = levelChangers
         hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
         val destinations = venue.galleryDestinations(places)

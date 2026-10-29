@@ -5,6 +5,7 @@ import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenueGeofence
 import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.FieldLog
+import java.util.Locale
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.visit.ArtworkArea
@@ -21,6 +22,7 @@ import io.proximi.map.core.JourneyOrderStrategy
 import io.proximi.map.core.JourneyRules
 import io.proximi.map.core.JourneyStop
 import io.proximi.map.core.RouteFollowRules
+import io.proximi.map.core.RouteGuidance
 import io.proximi.map.core.RouteSnapRules
 import io.proximi.map.core.RouteGeometry
 import io.proximi.gadkit.map.Gallery
@@ -81,8 +83,11 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  *
  * Off the route (PM, Monday "Personalized tour: off-route and re-route behaviour" and "Curated tour:
  * off-route and recalculation", 2026-10-26 and 2026-10-28): the visitor gets a warning ([isOffRoute])
- * once they are [GadSettings.offRouteMeters] (12 m) off the route to the current destination
- * (`LeftRoute`), far from it, or off it for too long. The warning comes before any routing: with
+ * once they are [GadSettings.offRouteMeters] (12 m) off the leg to the current destination
+ * ([checkLegDeviation]), also where a later leg of the journey passes, or off the whole journey
+ * (`LeftRoute`), far from it, or off it for too long. The navigator's `LeftRoute` measures against
+ * every leg still to walk, so a visitor heading to another artwork got no warning (PM's log of
+ * 2026-10-28, 22:39 UTC: 56 m off the leg). The warning comes before any routing: with
  * [io.proximi.gadkit.ProximiMapView.Option.OFF_ROUTE_PROMPT] the navigator routes nothing by itself
  * (`JourneyDeviationPolicy.ASK_APP`). After the warning a personalised journey keeps the leg where the
  * visitor left it; when another open artwork is now the nearest stop, the stops ahead are ordered
@@ -172,6 +177,12 @@ internal class VisitController(
     /** The navigator's legs (gallery first). */
     private val galleryRouting = GalleryFirstRouting(ProximiioJourneyRouting(checkNotNull(session.sdk)))
 
+    /**
+     * Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance off;
+     * the artwork geofence is the only arrival. Off the leg beyond [GadSettings.offRouteMeters].
+     */
+    private val artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds = Double.POSITIVE_INFINITY, offRouteMeters = settings.offRouteMeters)
+
     val navigator = JourneyNavigator(session, journey.toMap(), rules, artworkGuidanceRules, routing = galleryRouting)
 
     private val mutableGalleryAhead = MutableStateFlow<GalleryDestination?>(null)
@@ -195,6 +206,7 @@ internal class VisitController(
             maximumMeters = settings.amenityArrivalMaximumMeters,
         ),
         arrivalDwellSeconds = settings.amenityArrivalDwell.inWholeMilliseconds / 1000.0,
+        offRouteMeters = settings.offRouteMeters,
     )
 
     private val outOfOrderDwellMillis = settings.outOfOrderDwell.inWholeMilliseconds
@@ -263,6 +275,13 @@ internal class VisitController(
      * a new leg starts. The warning can be closed meanwhile.
      */
     private var isOffRouteEpisode = false
+        set(value) {
+            field = value
+            if (!value) isLegOffRouteEpisode = false
+        }
+
+    /** The episode started off the leg ([checkLegDeviation]); it ends when the visitor is back on it. */
+    private var isLegOffRouteEpisode = false
 
     /** Since when the fixes have been on a floor the route does not take (milliseconds). */
     private var wrongFloorSince: Long? = null
@@ -381,6 +400,44 @@ internal class VisitController(
         isOffRouteEpisode = true
         showOffRouteWarning()
         if (startsEpisode && reroutesAfterWarning) rerouteFromVisitor()
+    }
+
+    /**
+     * Called on every guidance update. The visitor [GadSettings.offRouteMeters] off the leg to the
+     * current destination (`RouteGuidance.isOffRoute`) gets the warning, as for the navigator's
+     * `LeftRoute`, also where a later leg of the journey passes (PM, Monday "Personalized tour:
+     * off-route and re-route behaviour", 2026-10-28). Back within two thirds of that distance the
+     * episode ends. Only with the warning (`ASK_APP`); not while paused, during a detour or on a floor
+     * without positioning.
+     */
+    fun checkLegDeviation(guidance: RouteGuidance?, isFloorGuideActive: Boolean) {
+        if (deviationPolicy != JourneyDeviationPolicy.ASK_APP || !isNavigating || mutablePaused.value || isFloorGuideActive ||
+            navigator.detourStop != null || guidance == null || guidance.hasArrived
+        ) {
+            return
+        }
+        when (legDeviation(guidance.isOffRoute, guidance.offRouteMeters, settings.offRouteMeters, isOffRouteEpisode, isLegOffRouteEpisode)) {
+            LegDeviation.NONE -> Unit
+            LegDeviation.ENDS -> isOffRouteEpisode = false
+            LegDeviation.WARNS -> {
+                FieldLog.log(String.format(Locale.ROOT, "off route: %.1f m off the leg to %s", guidance.offRouteMeters, navigator.activeStop?.title ?: "-"))
+                isOffRouteEpisode = true
+                isLegOffRouteEpisode = true
+                showOffRouteWarning()
+                if (reroutesAfterWarning) rerouteFromVisitor()
+            }
+        }
+    }
+
+    /** What one guidance update off or on the leg does ([legDeviation]). */
+    internal enum class LegDeviation {
+        NONE,
+
+        /** A new episode: the warning shows. */
+        WARNS,
+
+        /** The visitor is back on the leg: the episode [checkLegDeviation] started ends. */
+        ENDS,
     }
 
     /**
@@ -857,10 +914,14 @@ internal class VisitController(
 
     companion object {
         /**
-         * Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance
-         * off; the artwork geofence is the only arrival.
+         * What one guidance update off or on the leg does. An open episode, of the leg or of the whole
+         * journey, shows no second warning; the leg's episode ends within two thirds of [threshold], so
+         * a visitor on the boundary gets one warning. Pure; covered by tests.
          */
-        val artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds = Double.POSITIVE_INFINITY)
+        internal fun legDeviation(isOffRoute: Boolean, meters: Double, threshold: Double, isEpisode: Boolean, isLegEpisode: Boolean): LegDeviation {
+            if (isOffRoute) return if (isEpisode) LegDeviation.NONE else LegDeviation.WARNS
+            return if (isLegEpisode && meters <= threshold * 2 / 3) LegDeviation.ENDS else LegDeviation.NONE
+        }
 
         /** The closer-artwork check runs at most this often. */
         private const val CLOSER_ARTWORK_INTERVAL_MILLIS = 5_000L

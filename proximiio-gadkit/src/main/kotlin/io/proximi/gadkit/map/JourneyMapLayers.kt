@@ -30,6 +30,10 @@ import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.sources.ImageSource
+import org.maplibre.android.style.layers.RasterLayer
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngQuad
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
@@ -55,6 +59,10 @@ import org.maplibre.geojson.Polygon
  *   PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
  * - the visited and the destination galleries over the venue's artworks, furniture and inner walls
  *   (`proximiio-inner_wall`), under labels, POI icons, the route and the stop markers.
+ * - the building's cones on the shown floor, each an image of the design's metal gradient
+ *   ([VenueCone], [ConeShading]; PM, Monday "Cone visualization", 2026-10-29), over the floors and
+ *   under the venue's galleries ([updateCones]); the venue style's cone outlines in the design's
+ *   colour and width.
  *
  * The layers are added after each style load and show the selected floor only. The gallery fills
  * go over the venue's floor and room fills and under its walls, labels and POI icons
@@ -74,6 +82,13 @@ internal class JourneyMapLayers {
     private var levelChangers: List<LevelChangerPlace> = emptyList()
     private var highlight: Highlight? = null
     private var galleryMarkers: List<GalleryMarker> = emptyList()
+    private var cones: List<VenueCone> = emptyList()
+
+    /** The cones' images, drawn when their floor first shows. */
+    private var coneShadings: Map<String, ConeShading> = emptyMap()
+
+    /** The image each cone source holds, so an unchanged cone keeps its source as it is. */
+    private val coneSourceImages = mutableMapOf<String, Bitmap>()
 
     /** The level changer of the route's next level change: its anchor, the floor it leaves and its type. */
     data class LevelChanger(val coordinate: Coordinate, val level: Double, val featureType: String) {
@@ -131,7 +146,10 @@ internal class JourneyMapLayers {
         this.level = level
         val style = canvas?.style ?: return
         apply(style)
-        if (levelChanged) applyLevelChanger(style)
+        if (levelChanged) {
+            applyLevelChanger(style)
+            applyCones(style)
+        }
     }
 
     /** The venue's lifts, staircases and escalators. Each shows on the floors it serves. */
@@ -224,6 +242,80 @@ internal class JourneyMapLayers {
         apply(style)
         applyConnector(style)
         applyLevelChanger(style)
+        applyCones(style)
+        styleConeOutlines(style)
+    }
+
+    /** The venue's cones, at the start and after a change of the venue data. */
+    fun updateCones(cones: List<VenueCone>) {
+        if (cones == this.cones) return
+        val removed = this.cones.map { it.id }.toSet() - cones.map { it.id }.toSet()
+        val unchanged = cones.filter { it in this.cones }.map { it.id }.toSet()
+        coneShadings = coneShadings.filterKeys { it in unchanged }
+        val style = canvas?.style
+        for (id in removed) {
+            style?.removeLayer(coneId(id))
+            style?.removeSource(coneId(id))
+            coneSourceImages.remove(coneId(id))
+        }
+        this.cones = cones
+        style?.let(::applyCones)
+    }
+
+    /** The cones' outline in the design's colour and width, on each style. */
+    private fun styleConeOutlines(style: Style) {
+        val outline = style.getLayer(CONE_OUTLINE_LAYER) as? LineLayer ?: return
+        outline.setProperties(
+            PropertyFactory.lineColor(ConeShading.OUTLINE_COLOR),
+            PropertyFactory.lineOpacity(ConeShading.OUTLINE_OPACITY),
+            PropertyFactory.lineWidth(
+                Expression.interpolate(
+                    Expression.linear(),
+                    Expression.zoom(),
+                    *ConeShading.OUTLINE_WIDTHS.map { (zoom, width) -> Expression.stop(zoom, width) }.toTypedArray(),
+                ),
+            ),
+        )
+    }
+
+    /**
+     * Shows the cones of the shown floor and hides the others. A cone's image, source and layer are
+     * made when its floor first shows; a changed cone gets a new image.
+     */
+    private fun applyCones(style: Style) {
+        val canvas = canvas ?: return
+        for (cone in cones) {
+            val id = coneId(cone.id)
+            val layer = style.getLayer(id)
+            if (!VenueLevel.same(cone.level, level)) {
+                layer?.setProperties(PropertyFactory.visibility(Property.NONE))
+                continue
+            }
+            val shading = coneShadings[cone.id] ?: ConeShading.make(cone)?.also { coneShadings = coneShadings + (cone.id to it) } ?: continue
+            val quad = LatLngQuad(
+                LatLng(shading.north, shading.west),
+                LatLng(shading.north, shading.east),
+                LatLng(shading.south, shading.east),
+                LatLng(shading.south, shading.west),
+            )
+            val source = style.getSource(id) as? ImageSource
+            if (source == null) {
+                style.addSource(ImageSource(id, quad, shading.bitmap))
+            } else if (coneSourceImages[id] !== shading.bitmap) {
+                source.setCoordinates(quad)
+                source.setImage(shading.bitmap)
+            }
+            coneSourceImages[id] = shading.bitmap
+            if (layer != null) {
+                layer.setProperties(PropertyFactory.visibility(Property.VISIBLE))
+            } else {
+                val raster = RasterLayer(id, id).withProperties(PropertyFactory.rasterFadeDuration(0f))
+                // Over the floors, under the venue's galleries and the gallery fills of [apply]: a cone
+                // that is a gallery keeps the gallery's colour.
+                val anchor = if (style.getLayer(VENUE_GALLERY_LAYER) != null) MapCanvasLayerAnchor.Below(VENUE_GALLERY_LAYER) else MapCanvasLayerAnchor.AboveVenueFills
+                canvas.addLayer(raster, anchor)
+            }
+        }
     }
 
     private fun applyLevelChanger(style: Style) {
@@ -367,6 +459,14 @@ internal class JourneyMapLayers {
         }
 
         private data class PillColors(val fill: Int, val outline: Int, val outlineDp: Float, val text: Int)
+
+        private fun coneId(id: String): String = "gad-cone-$id"
+
+        /** The venue style's gallery fill; the cone images go under it. */
+        const val VENUE_GALLERY_LAYER = "proximiio-gallery"
+
+        /** The venue style's cone outlines. */
+        const val CONE_OUTLINE_LAYER = "proximiio-cones"
 
         /** The organisation style's inner walls, above its artworks and furniture. */
         const val INNER_WALL_LAYER = "proximiio-inner_wall"
