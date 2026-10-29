@@ -25,6 +25,7 @@ class GadSettingsTest {
         assertEquals(5.0, GadSettings.STANDARD.stopNearbyMeters)
         assertEquals(setOf(0), GadSettings.STANDARD.levelsWithoutPositioning)
         assertEquals(5.seconds, GadSettings.STANDARD.levelChangeViewDuration)
+        assertEquals(20.0, GadSettings.STANDARD.rideFloorHoldMeters)
         assertEquals(5.0, GadSettings.STANDARD.levelChangerReachedMeters)
         assertEquals(1800.seconds, GadSettings.STANDARD.floorWithoutPositioningMaximum)
         assertTrue(GadSettings.STANDARD.postsGeofenceNotifications)

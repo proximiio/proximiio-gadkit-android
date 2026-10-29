@@ -4,6 +4,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
+import kotlin.math.abs
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
@@ -477,37 +488,104 @@ internal object MapLoading {
 }
 
 /**
- * "Map | List" toggle: two buttons on glass, in place of the system's segmented button. 150 × 50 glass
- * with 16 dp corners; the selected part is white at 60 % with a 1.5 dp ink outline (Figma frame of the
- * PM, Monday "Native elements", 2026-10-28).
+ * "Map | List" toggle on glass, in place of the system's segmented button. 150 × 50 glass with 16 dp
+ * corners; the selected part is white at 60 % with a 1.5 dp ink outline (Figma frame of the PM, Monday
+ * "Native elements", 2026-10-28). A finger slides the selection to the other part, as on the system's
+ * segmented control (Monday "Native elements", 2026-10-28 evening). A tap picks the part under the
+ * finger; TalkBack and the UI tests see two tabs.
  */
 @Composable
 internal fun MapListToggle(showsList: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(
+    val density = LocalDensity.current
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val partWidth = with(density) { MapListSelection.PART_WIDTH.toPx() }
+    val threshold = with(density) { MapListSelection.SLIDE_THRESHOLD.toPx() }
+    // The finger's travel toward List while it slides the selection, in px; null without a slide.
+    var slide by remember { mutableStateOf<Float?>(null) }
+    val selection by animateFloatAsState(
+        MapListSelection.offset(showsList, slide ?: 0f, partWidth),
+        if (slide != null) snap() else spring(stiffness = Spring.StiffnessMediumLow),
+        label = "selection",
+    )
+    val shape = RoundedCornerShape(12.dp)
+    Box(
         modifier
             .size(width = 150.dp, height = 50.dp)
             .glassSurface(RoundedCornerShape(16.dp), GlassStrength.Frosted)
             .padding(4.dp)
-            .selectableGroup(),
+            .pointerInput(showsList, partWidth, isRtl) {
+                val forward = if (isRtl) -1f else 1f
+                var position = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { slide = 0f },
+                    onDragEnd = {
+                        val travel = slide ?: 0f
+                        slide = null
+                        onChange(MapListSelection.showsList(travel, position, showsList, partWidth, threshold))
+                    },
+                    onDragCancel = { slide = null },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        slide = (slide ?: 0f) + forward * amount
+                        // The finger's distance from the Map end.
+                        position = if (isRtl) 2 * partWidth - change.position.x else change.position.x
+                    },
+                )
+            },
     ) {
-        ToggleSegment(stringResource(R.string.map), isSelected = !showsList) { onChange(false) }
-        ToggleSegment(stringResource(R.string.list), isSelected = showsList) { onChange(true) }
+        // `offset` follows the layout direction: toward List on both.
+        Box(
+            Modifier
+                .offset { IntOffset(selection.roundToInt(), 0) }
+                .width(MapListSelection.PART_WIDTH)
+                .fillMaxHeight()
+                .background(Palette.white.copy(alpha = 0.6f), shape)
+                .border(1.5.dp, Palette.ink, shape),
+        )
+        Row(Modifier.fillMaxSize().selectableGroup()) {
+            ToggleSegment(stringResource(R.string.map), isSelected = !showsList) { onChange(false) }
+            ToggleSegment(stringResource(R.string.list), isSelected = showsList) { onChange(true) }
+        }
     }
 }
 
 @Composable
 private fun RowScope.ToggleSegment(title: String, isSelected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
     Box(
         Modifier
             .weight(1f)
             .fillMaxHeight()
-            .then(if (isSelected) Modifier.background(Palette.white.copy(alpha = 0.6f), shape).border(1.5.dp, Palette.ink, shape) else Modifier)
-            .clip(shape)
+            .clip(RoundedCornerShape(12.dp))
             .selectable(isSelected, remember { MutableInteractionSource() }, indication = ripple(), role = Role.Tab, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(title, style = GadTextStyle.LargeBodyRegular.textStyle, color = Palette.ink)
+    }
+}
+
+/** The selection of [MapListToggle] under a sliding finger. Pure; covered by tests. */
+internal object MapListSelection {
+    /** The width of one part: the control is 150 dp wide with 4 dp of padding. */
+    val PART_WIDTH = ((150 - 8) / 2).dp
+
+    /** A finger that travels less than this is a tap. */
+    val SLIDE_THRESHOLD = 8.dp
+
+    /**
+     * The selection's offset from the Map part toward the List part: the selected part, moved by
+     * [slide] and kept inside the control.
+     */
+    fun offset(showsList: Boolean, slide: Float, width: Float): Float =
+        ((if (showsList) width else 0f) + slide).coerceIn(0f, width)
+
+    /**
+     * Whether the control shows List when the finger lifts: a finger that travelled less than
+     * [threshold] picks the part under it, at [position] from the Map end; a slide picks the part the
+     * selection ends over.
+     */
+    fun showsList(slide: Float, position: Float, showsList: Boolean, width: Float, threshold: Float): Boolean {
+        if (abs(slide) < threshold) return position > width
+        return offset(showsList, slide, width) > width / 2
     }
 }
 

@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.34` and Map `6.0.0-beta.31` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.35` and Map `6.0.0-beta.31` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -780,6 +780,7 @@ val configuration = GadConfiguration(
 | `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
 | `levelChangerReachedMeters` | 5 m | Distance from the lift or stairs to a floor without positioning at which the lift or stairs view shows. |
 | `levelChangeViewDuration` | 5 s | How long the lift or stairs view shows before the map shows the floor without positioning. |
+| `rideFloorHoldMeters` | 20 m | After the lift or stairs view of a ride, the map shows the floor the ride ends on until a fix on another floor than the ride's start, or a fix on that floor this far from the lift or stairs. |
 | `floorWithoutPositioningMaximum` | 1800 s | After this time on a floor without positioning with the same destination, the map follows the visitor again. |
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
@@ -831,8 +832,13 @@ Journey Complete:
 The map follows the visitor again when the destination changes ("Resume your Journey", another stop
 or route), on "Centre on me" or "Follow my floor", or after `floorWithoutPositioningMaximum`. The
 journey screen sends `FloorWithoutPositioningEntered(level)` and `FloorWithoutPositioningLeft(level)`.
-The view shows the lift or stairs icon until the animation from the design team exists. The view
-has the test tag `floorChangeView`.
+The view plays RPR's animation of a lift or stairs and has the test tag `floorChangeView`.
+
+The journey map shows the lift or stairs view at every ride of the route, also to a floor with
+positioning. After it the map shows the floor the ride ends on and keeps it until a fix on another
+floor than the ride's start, or a fix on that floor more than `rideFloorHoldMeters` from the lift or
+stairs: the positioning still reports the old floor for a while. "Centre on me" and "Follow my floor"
+end it at once. The GAD lifts and stairs are privacy zones, so the dot is hidden during the ride.
 
 ## Accessibility
 
@@ -985,7 +991,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 | SDK 6.0.0-beta.34 and Map 6.0.0-beta.31 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 | SDK 6.0.0-beta.35 and Map 6.0.0-beta.31 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1019,7 +1025,39 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.20.1.
+The behaviour of the iOS package 1.21.0. No change for the host app's code, except a host app that
+declares the SDK itself (see "Changed").
+
+#### Added (iOS 1.21.0)
+
+- `GadSettings.rideFloorHoldMeters` (20 m). After the lift or stairs view the map shows the floor the
+  ride ends on and keeps it until a fix on another floor than the ride's start, or a fix on that floor
+  this far from the lift or stairs (PM, Monday "Elevator/Staircase animation", 2026-10-28). "Centre on
+  me" and "Follow my floor" end it. The PM drew privacy zones around the lifts and stairs, so the dot
+  is hidden during the ride.
+- **Visible:** the Map / List selection slides with the finger to the other part, as on the system's
+  segmented control (PM, Monday "Native elements", 2026-10-28 evening). A tap still picks the part
+  under the finger.
+- Field log: on each Explore Museum load, how many galleries are filled on their polygon and how many
+  on their geofence ("explore: 26 galleries · 26 filled on their polygon, 0 on their geofence · 41
+  gallery polygons in the venue data"; PM, Monday "Explore Museum view: gallery highlighting",
+  2026-10-29).
+
+#### Changed (iOS 1.21.0, SDK 6.0.0-beta.35)
+
+- **Visible:** every gallery's POI is a 30 dp pill with its title: red with a white border and white
+  text for the gallery the leg leads to, white with a red outline for a visited gallery, white with a
+  black outline for the others. The POIs' own icons are hidden, and the gallery the visitor is in has
+  no pill. A curated tour shows every pill in the white style. Before, only the destination and the
+  visited galleries had a marker, a visited one the amenity icon in a circle (PM, Monday "Gallery
+  numbers in gallery navigation", 2026-10-28).
+- **Visible:** the gallery the visitor is in has no destination fill: the venue's own gallery colour
+  shows, under the artworks and furniture, with the artwork numbers (PM, Monday "Navigation to a
+  gallery", 2026-10-28).
+- **BREAKING:** the library depends on SDK `6.0.0-beta.35` (was `6.0.0-beta.34`); Map stays
+  `6.0.0-beta.31`. A host app that declares the SDK itself moves to the same version. No source or
+  binary change. A configuration that scans for iBeacons or Eddystone (not `relayOnly`, which
+  `ProximiMap` uses) now gets beacon events and `bleTrilateration` fixes: MIGRATION.md section 1.
 
 ### [1.20.1] — 2026-10-29
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.cancel
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -52,6 +53,23 @@ class FloorWithoutPositioningTest {
         assertEquals(1, ride?.from)
         assertNull(FloorWithoutPositioningGuide.reachedRide(north(8.0), 1.0, toLevel4, standard))
         assertNull(FloorWithoutPositioningGuide.reachedChange(north(1.0), 1.0, toLevel4, standard))
+    }
+
+    /**
+     * After the view the map keeps the ride's end floor while fixes stay on the ride's floor near the
+     * lift or stairs (PM, Monday "Elevator/Staircase animation", 2026-10-28).
+     */
+    @Test
+    fun theRideFloorStaysUntilAFixOffTheStartFloor() {
+        val toLevel4 = listOf(marker("staircase", 1.0, 3.0), marker("staircase", 3.0, 4.0))
+        val ride = FloorWithoutPositioningGuide.reachedRide(north(1.0), 1.0, toLevel4, standard) ?: fail("no ride")
+        val meters = standard.rideFloorHoldMeters
+        assertEquals(20.0, meters)
+        assertFalse(FloorWithoutPositioningGuide.releasesRideFloor(ride, north(10.0), 1.0, meters))
+        assertFalse(FloorWithoutPositioningGuide.releasesRideFloor(ride, north(1.0), null, meters))
+        assertTrue(FloorWithoutPositioningGuide.releasesRideFloor(ride, north(30.0), 1.0, meters))
+        assertTrue(FloorWithoutPositioningGuide.releasesRideFloor(ride, north(1.0), 4.0, meters))
+        assertTrue(FloorWithoutPositioningGuide.releasesRideFloor(ride, north(1.0), 3.0, meters))
     }
 
     @Test

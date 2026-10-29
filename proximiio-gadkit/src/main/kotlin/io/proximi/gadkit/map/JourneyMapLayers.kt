@@ -50,10 +50,9 @@ import org.maplibre.geojson.Polygon
  *   ([updateLevelChangers], [LevelChangerPlace]; Monday "All level changers visible", 2026-10-15).
  * - the amenity picked in the menu: the red marker with its white icon ([updateHighlight],
  *   [PlaceFraming]).
- * - the gallery a leg leads to first: a red pill with the gallery's title at its POI; a visited
- *   gallery: its amenity icon in a white circle with a red ring and its title under it
- *   ([updateGalleryMarkers]; PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery
- *   visualization", 2026-10-28).
+ * - each gallery's title in a pill at its POI: red for the gallery a leg leads to, white with a red
+ *   outline for a visited gallery, white with a black outline for the others ([updateGalleryMarkers];
+ *   PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
  * - the visited and the destination galleries over the venue's artworks, furniture and inner walls
  *   (`proximiio-inner_wall`), under labels, POI icons, the route and the stop markers.
  *
@@ -76,12 +75,6 @@ internal class JourneyMapLayers {
     private var highlight: Highlight? = null
     private var galleryMarkers: List<GalleryMarker> = emptyList()
 
-    /** The amenity icons of the venue data, by amenity id, for the gallery markers. */
-    private var galleryIcons: Map<String, Bitmap> = emptyMap()
-
-    /** Counts the changes of [galleryIcons]: a changed icon gets a new image name. */
-    private var iconGeneration = 0
-
     /** The level changer of the route's next level change: its anchor, the floor it leaves and its type. */
     data class LevelChanger(val coordinate: Coordinate, val level: Double, val featureType: String) {
         /** The style image of the marker. Stairs and escalators share the stairs glyph. */
@@ -102,14 +95,18 @@ internal class JourneyMapLayers {
         }
     }
 
-    /**
-     * A gallery's marker at its POI: the gallery a leg leads to first (gallery first), or a visited
-     * gallery. [name] is the POI's title, such as "G303 Language"; [amenityId] the POI's amenity,
-     * whose icon a visited gallery's marker shows.
-     */
-    data class GalleryMarker(val coordinate: Coordinate, val level: Double, val name: String, val amenityId: String?, val isDestination: Boolean) {
-        fun imageName(iconGeneration: Int): String =
-            "gad-gallery-${if (isDestination) "destination" else "visited"}-$iconGeneration-${amenityId ?: "-"}-$name"
+    /** A gallery's title at its POI. [name] is the POI's title, such as "G303 Language". */
+    data class GalleryMarker(val coordinate: Coordinate, val level: Double, val name: String, val style: Style) {
+        enum class Style {
+            /** The gallery a leg leads to first (gallery first). */
+            DESTINATION,
+
+            /** A gallery whose artworks of the journey are done. */
+            VISITED,
+            STANDARD,
+        }
+
+        val imageName: String get() = "gad-gallery-${style.name.lowercase()}-$name"
     }
 
     /** Installs the layers on every style [canvas] loads, the loaded one included. */
@@ -166,17 +163,10 @@ internal class JourneyMapLayers {
         canvas?.style?.let(::applyLevelChanger)
     }
 
-    /** The galleries' markers: the gallery a leg leads to first and the visited galleries. */
+    /** The galleries' titles. */
     fun updateGalleryMarkers(markers: List<GalleryMarker>) {
         if (markers == galleryMarkers) return
         galleryMarkers = markers
-        canvas?.style?.let(::applyLevelChanger)
-    }
-
-    /** The amenity icons of the venue data, by amenity id, at the start and after a change. */
-    fun updateGalleryIcons(icons: Map<String, Bitmap>) {
-        galleryIcons = icons
-        iconGeneration += 1
         canvas?.style?.let(::applyLevelChanger)
     }
 
@@ -248,11 +238,16 @@ internal class JourneyMapLayers {
         val context = canvas?.context
         for (marker in galleryMarkers) {
             if (!VenueLevel.same(marker.level, level)) continue
-            val name = marker.imageName(iconGeneration)
+            val name = marker.imageName
             if (style.getImage(name) == null && context != null) {
-                style.addImage(name, galleryMarkerImage(context, marker.name, marker.amenityId?.let { galleryIcons[it] }, marker.isDestination))
+                style.addImage(name, galleryMarkerImage(context, marker.name, marker.style))
             }
-            features += point(marker.coordinate, name, sort = if (marker.isDestination) 3 else 0)
+            val sort = when (marker.style) {
+                GalleryMarker.Style.DESTINATION -> 3
+                GalleryMarker.Style.VISITED -> 1
+                GalleryMarker.Style.STANDARD -> 0
+            }
+            features += point(marker.coordinate, name, sort)
         }
         source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
@@ -335,61 +330,19 @@ internal class JourneyMapLayers {
         }
 
         /**
-         * A gallery's marker (PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery
-         * visualization", 2026-10-28). The destination is a red pill with a white border and the whole
-         * title in white, no icon, its middle on the POI. A visited gallery is its [icon] in the white
-         * 30 dp circle with the red border of a visited artwork, with its title under it; the circle is
-         * in the middle of the image, so it sits on the POI. Without [icon], the gallery glyph.
+         * A gallery's title in a 30 dp pill, its middle on the POI (PM, Monday "Gallery numbers in
+         * gallery navigation", 2026-10-28): the destination red with a white border and white text, a
+         * visited gallery white with a red outline, the others white with a black outline.
          */
-        fun galleryMarkerImage(context: Context, name: String, icon: Bitmap?, isDestination: Boolean): Bitmap {
-            if (isDestination) return galleryPill(context, name)
+        fun galleryMarkerImage(context: Context, name: String, style: GalleryMarker.Style): Bitmap {
             val density = context.resources.displayMetrics.density
+            val (fill, outline, outlineDp, textColor) = when (style) {
+                GalleryMarker.Style.DESTINATION -> PillColors(MARKER_COLOR, Color.WHITE, 2f, Color.WHITE)
+                GalleryMarker.Style.VISITED -> PillColors(Color.WHITE, MARKER_COLOR, 2f, INK_COLOR)
+                GalleryMarker.Style.STANDARD -> PillColors(Color.WHITE, INK_COLOR, 1.5f, INK_COLOR)
+            }
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = INK_COLOR
-                textSize = 12 * density
-                textAlign = Paint.Align.CENTER
-                typeface = ResourcesCompat.getFont(context, R.font.guggenheim_sans_display_semibold)
-            }
-            val labelWidth = minOf(paint.measureText(name), 120 * density) + 4 * density
-            val labelHeight = paint.fontSpacing
-            val circle = MARKER_DP * density
-            val gap = 2 * density
-            val width = maxOf(circle, labelWidth).roundToInt()
-            val height = (circle + 2 * (gap + labelHeight)).roundToInt()
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            val centerX = width / 2f
-            val circleTop = gap + labelHeight
-            val radius = circle / 2 - density
-            val disk = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-            canvas.drawCircle(centerX, circleTop + circle / 2, radius, disk)
-            val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = MARKER_COLOR
-                style = Paint.Style.STROKE
-                strokeWidth = 2 * density
-            }
-            canvas.drawCircle(centerX, circleTop + circle / 2, radius, ring)
-            val glyphRect = RectF(centerX - circle / 2 + 7 * density, circleTop + 7 * density, centerX + circle / 2 - 7 * density, circleTop + circle - 7 * density)
-            val glyph = icon ?: ContextCompat.getDrawable(context, R.drawable.ic_gallery)?.toBitmap(glyphRect.width().roundToInt(), glyphRect.height().roundToInt())
-            glyph?.let { canvas.drawBitmap(it, null, glyphRect, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)) }
-            val text = TextUtils.ellipsize(name, TextPaint(paint), 120 * density, TextUtils.TruncateAt.END).toString()
-            val baseline = circleTop + circle + gap - paint.ascent()
-            // The white halo of the venue style's labels, then the text.
-            val halo = Paint(paint).apply {
-                color = Color.WHITE
-                style = Paint.Style.STROKE
-                strokeWidth = 3 * density
-            }
-            canvas.drawText(text, centerX, baseline, halo)
-            canvas.drawText(text, centerX, baseline, paint)
-            return bitmap
-        }
-
-        /** The destination gallery's red pill: 30 dp high, the title in white. */
-        private fun galleryPill(context: Context, name: String): Bitmap {
-            val density = context.resources.displayMetrics.density
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE
+                color = textColor
                 textSize = 14 * density
                 typeface = ResourcesCompat.getFont(context, R.font.guggenheim_sans_display_semibold)
             }
@@ -401,17 +354,19 @@ internal class JourneyMapLayers {
             val canvas = Canvas(bitmap)
             val pill = RectF(density, density, width - density, height - density)
             val corner = height / 2f - density
-            canvas.drawRoundRect(pill, corner, corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = MARKER_COLOR })
+            canvas.drawRoundRect(pill, corner, corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill })
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE
-                style = Paint.Style.STROKE
-                strokeWidth = 2 * density
+                color = outline
+                this.style = Paint.Style.STROKE
+                strokeWidth = outlineDp * density
             }
             canvas.drawRoundRect(pill, corner, corner, stroke)
             val baseline = height / 2f - (paint.descent() + paint.ascent()) / 2
             canvas.drawText(text, inset + density, baseline, paint)
             return bitmap
         }
+
+        private data class PillColors(val fill: Int, val outline: Int, val outlineDp: Float, val text: Int)
 
         /** The organisation style's inner walls, above its artworks and furniture. */
         const val INNER_WALL_LAYER = "proximiio-inner_wall"

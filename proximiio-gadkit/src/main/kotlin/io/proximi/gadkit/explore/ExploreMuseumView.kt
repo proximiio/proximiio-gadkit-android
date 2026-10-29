@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import io.proximi.gadkit.map.MapDiagnostics
 import io.proximi.gadkit.map.galleryDestinations
+import io.proximi.gadkit.map.venueFeatures
+import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.AmenityKind
 import io.proximi.map.live.AmenityIcon
@@ -226,7 +228,13 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         val changerTitles = mapOf("elevator" to R.string.elevator, "staircase" to R.string.stairs)
             .filterKeys { it in changerTypes }
             .mapValues { (_, title) -> resources.getString(title) }
-        catalog = ExploreCatalog.of(places, venue.galleryDestinations(places), categories, changerTitles, AmenityListing.facilities(amenities))
+        val destinations = venue.galleryDestinations(places)
+        if (FieldLog.isEnabled) {
+            val polygons = destinations.values.count { it.polygon != null }
+            val outlines = Gallery.polygonOutlines(venue.venueFeatures()).size
+            FieldLog.log("explore: ${destinations.size} galleries · $polygons filled on their polygon, ${destinations.size - polygons} on their geofence · $outlines gallery polygons in the venue data")
+        }
+        catalog = ExploreCatalog.of(places, destinations, categories, changerTitles, AmenityListing.facilities(amenities))
         layers.updateLevelChangers(levelChangers)
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the card's dot show them (PM, Monday "Explore museum view:

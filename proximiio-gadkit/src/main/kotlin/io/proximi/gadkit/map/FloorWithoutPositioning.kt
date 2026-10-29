@@ -230,6 +230,17 @@ internal class FloorWithoutPositioningGuide(
         }
 
         /**
+         * Whether the map stops showing the floor [change] ends on after the lift or stairs view: a
+         * fix on another floor than the ride's start, or on that floor more than [meters] from the
+         * lift or stairs. A fix without a floor changes nothing. Pure; covered by tests.
+         */
+        fun releasesRideFloor(change: Change, coordinate: Coordinate, level: Double?, meters: Double): Boolean {
+            if (level == null) return false
+            if (!VenueLevel.same(level, change.from.toDouble())) return true
+            return coordinate.distanceTo(change.coordinate) > meters
+        }
+
+        /**
          * The lift or stairs on [level] nearest [origin] that also serves [target], for the way back.
          * Pure; covered by tests.
          */

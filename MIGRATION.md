@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.20.1 uses SDK
-6.0.0-beta.34 and Map 6.0.0-beta.31.
+6.0.0-beta.34 and Map 6.0.0-beta.31; the next release uses SDK 6.0.0-beta.35 and Map 6.0.0-beta.31.
 
 Each change has a mark:
 
@@ -66,6 +66,7 @@ built again: both have a new trailing parameter.
 | SDK 6.0.0-beta.33 | Only a clear 401 counts as a refused token. After three refusals over at least two hours the SDK emits `SyncFailed("unauthorized")`, stops and deletes the venue data, the offline packages, the waiting uploads and the token; `tokenStatus()` is `REJECTED`. A token of another application deletes the stored data before the first sync. An unclear 401 is `ProximiioAPIError.Server(401)`. | Start the SDK again after a new `authenticate()`. | **Check** |
 | SDK 6.0.0-beta.33 | `authenticate()` gives up after 30 s on a connection that does not answer. Waiting uploads survive an app kill (with consent, at most 500 of each kind). | | Info |
 | SDK 6.0.0-beta.34 | Places, floors, departments, geofences, privacy zones and inputs deleted on the server leave the phone within about 15 minutes, as `SyncEvent.Deleted` and in `venueDataChanges()`. Map features the server deleted by their bare UUID leave the map. | | Info |
+| SDK 6.0.0-beta.35 | Android phones see BLE beacons: the scan feeds the registry that the engine, `beaconEvents()` and the diagnostics read, as on iOS. A configuration that scans for iBeacons or Eddystone gets beacon events, `visibleBeaconCount` above 0 and `bleTrilateration` fixes with their floor. The scan also starts when Bluetooth access is granted, or Bluetooth is switched on, after `start()`. `relayOnly` (`ProximiMap`) scans for no beacon. | An app on its own configuration with beacon scanning checks its positions: beacon fixes now take part. `relayOnly` keeps the GAD behaviour. | **Check** |
 | Map 6.0.0-beta.28 | A map opened after the last fix shows the dot at once, at the fix's real age, and that fix frames the place and arms the follow. With a zoom range, every zoom the camera writes keeps to it. | | Info |
 | Map 6.0.0-beta.29 | The style's raster tiles (`proximiio:raster:*` metadata) are drawn below the floor fills: the GAD illustrated map. A journey layer style set to `null` takes its layer off the map. A level two places share is named by the visitor's place. | `MapOptions(rasterTiles = false)` keeps the vector plan alone. | **Check** |
 | Map 6.0.0-beta.30 | Requires SDK 6.0.0-beta.33. After the SDK refused the token for good, the session deletes the stored style and tiles, takes the venue off the map, shows `fallbackStyleUrl` or an empty style and ends a running `JourneyNavigator`. | After a new successful `authenticate()`, call `session.start()` and `navigator.start()` again. | **Check** |
@@ -131,8 +132,8 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.35 and later and Map 6.0.0-beta.32 and later are not used by ProximiioGADKit for
-Android 1.20.1. A host app that declares them gets them instead of the versions above.
+SDK 6.0.0-beta.36 and later and Map 6.0.0-beta.32 and later are not used by the next ProximiioGADKit
+for Android. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -154,7 +155,7 @@ Android 1.20.1. A host app that declares them gets them instead of the versions 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
   depend on `io.proximi.gadkit:proximiio-gadkit:1.20.1` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.34` and Map `6.0.0-beta.31` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.35` and Map `6.0.0-beta.31` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.

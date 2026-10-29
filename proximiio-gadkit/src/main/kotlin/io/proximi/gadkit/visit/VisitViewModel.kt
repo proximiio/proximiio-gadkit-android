@@ -52,6 +52,7 @@ import io.proximi.gadkit.IncomingJourney
 import io.proximi.gadkit.ProximiDestination
 import io.proximi.gadkit.ProximiMapView
 import io.proximi.gadkit.hasPrompt
+import io.proximi.map.core.FloorKey
 import io.proximi.map.core.JourneyDeviationPolicy
 import io.proximi.sdk.computeRoute
 import io.proximi.sdk.wayfinding.WayfindingRoutingError
@@ -255,6 +256,9 @@ internal class VisitViewModel(
 
     /** The rides whose view showed, so each lift or stairs and floors shows it once. */
     private val shownRides = mutableSetOf<String>()
+
+    /** The ride whose end floor the map shows after the lift or stairs view ([holdFloor]). */
+    private var rideFloor: FloorWithoutPositioningGuide.Change? = null
 
     /** "Rerouting you…": the journey has been routed again for longer than 0.5 s. */
     var showsRerouting by mutableStateOf(false)
@@ -475,6 +479,7 @@ internal class VisitViewModel(
                 // The map publishes guidance only on a leg with a route, so the arrival is checked on
                 // the position (field test 2026-10-19).
                 updateVisitorGallery(position)
+                releaseRideFloor(position)
                 floorGuide.positionReceived(position.timestampMillis)
                 checkArrival()
                 checkRide(position)
@@ -594,13 +599,37 @@ internal class VisitViewModel(
         ride = change
         scope.launch {
             delay(settings.levelChangeViewDuration)
-            if (ride == change) ride = null
+            if (ride == change) dismissRide()
         }
     }
 
-    /** A tap on the lift or stairs view. */
+    /** A tap on the lift or stairs view, or its time is over. */
     fun dismissRide() {
+        val shown = ride ?: return
         ride = null
+        holdFloor(shown)
+    }
+
+    /**
+     * After the lift or stairs view the map shows the floor the ride ends on, and keeps it while the
+     * visitor's fixes are still on the ride's floor near the lift or stairs (PM, Monday
+     * "Elevator/Staircase animation", 2026-10-28). The lifts and stairs are privacy zones: during the
+     * ride the dot is hidden.
+     */
+    private fun holdFloor(change: FloorWithoutPositioningGuide.Change) {
+        rideFloor = change
+        session.select(FloorKey(change.level.toDouble()))
+        FieldLog.log("ride: map shows L${change.level} until a fix off L${change.from} or ${settings.rideFloorHoldMeters.roundToInt()} m from the ${change.featureType}")
+    }
+
+    /** Follows the visitor's floor again after [holdFloor] on a fix that ends it. */
+    private fun releaseRideFloor(position: VenuePosition) {
+        val change = rideFloor ?: return
+        val here = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+        if (!FloorWithoutPositioningGuide.releasesRideFloor(change, here, position.floor?.level, settings.rideFloorHoldMeters)) return
+        rideFloor = null
+        FieldLog.log("ride: map follows the visitor again, fix on L${position.floor?.level?.roundToInt() ?: "?"}")
+        session.followMyFloor()
     }
 
     /** No dot while a privacy zone holds it (`MapStyle.hidingPosition`). */
@@ -644,7 +673,6 @@ internal class VisitViewModel(
         val icons = withContext(Dispatchers.Default) {
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
         }
-        layers.updateGalleryIcons(icons)
         amenityIcons = icons.mapValues { it.value.asImageBitmap() }
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }
         controller.artworkAreas = venue.artworkAreas()
@@ -751,21 +779,23 @@ internal class VisitViewModel(
         val active = controller.navigator.activeStop
         val destination = active?.let { Gallery.containing(Coordinate(it.coordinate.latitude, it.coordinate.longitude), it.floor?.level, galleries) }
         val visited = visitedGalleryIds
+        // The gallery the visitor is in has no destination fill: the venue's own gallery colour,
+        // under the artworks and furniture, with the artwork numbers (PM, Monday "Navigation to a
+        // gallery", 2026-10-28).
+        val visitorGallery = galleryDestinations.firstOrNull { it.placeId == visitorGalleryPlaceId }?.shown?.id
         // Gallery first: the outline of the gallery the leg ends at, in place of the outline that
         // holds the artwork.
         val galleryAhead = galleryAheadDestination
         val fills = galleries.mapNotNull { gallery ->
             when {
-                gallery.id == destination?.id && galleryAhead == null -> GalleryFill(gallery, isDestination = true)
+                gallery.id == destination?.id && galleryAhead == null ->
+                    if (gallery.id == visitorGallery) null else GalleryFill(gallery, isDestination = true)
                 gallery.id in visited -> GalleryFill(gallery, isDestination = false)
                 else -> null
             }
         } + listOfNotNull(galleryAhead?.let { GalleryFill(it.shown, isDestination = true) })
         layers.update(fills, session.selectedFloor.value.level)
-        layers.updateGalleryMarkers(
-            visitedGalleryPois(visited).map { galleryMarker(it, isDestination = false) } +
-                listOfNotNull(galleryAhead?.let { galleryMarker(it, isDestination = true) }),
-        )
+        layers.updateGalleryMarkers(galleryMarkers(visited))
         applyHiddenFeatures()
     }
 
@@ -781,21 +811,25 @@ internal class VisitViewModel(
             return visitedGalleries(stops)
         }
 
-    /** The POIs of the [visited] galleries, other than the gallery the leg ends at and the gallery the visitor is in. */
-    private fun visitedGalleryPois(visited: Set<String>): List<GalleryDestination> {
-        val shown = galleries.filter { it.id in visited }
-        if (shown.isEmpty()) return emptyList()
-        return galleryDestinations.filter { destination ->
-            destination.placeId != galleryAheadDestination?.placeId && destination.placeId != visitorGalleryPlaceId &&
-                shown.any { it.id == destination.shown.id || it.contains(destination.entry, destination.gallery.level) }
+    /**
+     * Each gallery's title at its POI, but not the gallery the visitor is in (PM, Monday "Navigation
+     * to a gallery", 2026-10-26). In a personalised journey the gallery the leg ends at is the
+     * destination and a [visited] gallery is visited; a curated tour shows every title in the standard
+     * style (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+     */
+    private fun galleryMarkers(visited: Set<String>): List<JourneyMapLayers.GalleryMarker> {
+        val visitedGalleries = if (kind.guidesToGalleryFirst) galleries.filter { it.id in visited } else emptyList()
+        val ahead = if (kind.guidesToGalleryFirst) galleryAheadDestination?.placeId else null
+        return galleryDestinations.filter { it.placeId != visitorGalleryPlaceId }.map { destination ->
+            val isVisited = visitedGalleries.any { it.id == destination.shown.id || it.contains(destination.entry, destination.gallery.level) }
+            val style = when {
+                destination.placeId == ahead -> JourneyMapLayers.GalleryMarker.Style.DESTINATION
+                isVisited -> JourneyMapLayers.GalleryMarker.Style.VISITED
+                else -> JourneyMapLayers.GalleryMarker.Style.STANDARD
+            }
+            JourneyMapLayers.GalleryMarker(destination.entry, destination.gallery.level, destination.gallery.name, style)
         }
     }
-
-    /** The marker of a gallery at its POI, with the icon of the POI's amenity. */
-    private fun galleryMarker(destination: GalleryDestination, isDestination: Boolean) = JourneyMapLayers.GalleryMarker(
-        destination.entry, destination.gallery.level, destination.gallery.name,
-        places.firstOrNull { it.id == destination.placeId }?.amenityId, isDestination,
-    )
 
     /**
      * The line from the visitor to the start of the route ahead, on the visitor's floor only. The
@@ -822,13 +856,11 @@ internal class VisitViewModel(
     }
 
     /**
-     * The features the map does not draw: the artworks and level changers ([hiddenFeatureIds]), the
-     * POI of the gallery the leg ends at (the red gallery marker takes its place) and the POI of the
-     * gallery the visitor is in.
+     * The features the map does not draw: the artworks and level changers ([hiddenFeatureIds]) and
+     * the galleries' POIs, whose titles [galleryMarkers] draws.
      */
     private fun applyHiddenFeatures() {
-        val hidden = hiddenFeatureIds + listOfNotNull(galleryAheadDestination?.placeId, visitorGalleryPlaceId) +
-            visitedGalleryPois(visitedGalleryIds).map { it.placeId }
+        val hidden = hiddenFeatureIds + galleryDestinations.map { it.placeId } + listOfNotNull(galleryAheadDestination?.placeId)
         if (session.hiddenFeatureIds != hidden) session.hiddenFeatureIds = hidden
     }
 
@@ -960,6 +992,7 @@ internal class VisitViewModel(
     /** "Centre on me": the map follows the visitor's floor again, also after a floor without positioning. */
     fun centreOnMe() {
         floorGuide.leave()
+        rideFloor = null
         session.followMyFloor()
         onEvent(VisitEvent.Recentred)
         recentre(reason = "Centre on me")
@@ -968,6 +1001,7 @@ internal class VisitViewModel(
     /** The floor button: the map follows the visitor's floor again, also after a floor without positioning. */
     fun followMyFloor() {
         floorGuide.leave()
+        rideFloor = null
         session.followMyFloor()
     }
 

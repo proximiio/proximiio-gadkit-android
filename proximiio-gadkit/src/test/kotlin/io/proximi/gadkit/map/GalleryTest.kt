@@ -151,4 +151,13 @@ class LevelChangerPlaceTest {
         )
         assertEquals(listOf(listOf(1.0, 2.0), listOf(3.0), listOf(2.0), listOf(1.0)), changers.map { it.levels })
     }
+
+    /** Each gallery style has its own style image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). */
+    @Test
+    fun eachGalleryStyleHasItsOwnImage() {
+        val names = JourneyMapLayers.GalleryMarker.Style.entries.map { style ->
+            JourneyMapLayers.GalleryMarker(Coordinate(0.0, 0.0), 3.0, "G303 Language", style).imageName
+        }
+        assertEquals(3, names.toSet().size)
+    }
 }

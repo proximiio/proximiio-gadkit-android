@@ -137,6 +137,12 @@ public data class GadSettings(
     /** Time of the lift or stairs view before the map shows the floor without positioning. iOS `levelChangeViewSeconds`. */
     val levelChangeViewDuration: Duration = 5.seconds,
     /**
+     * After the lift or stairs view the map shows the floor the ride ends on until a fix on another
+     * floor than the ride's start, or a fix on that floor this many metres from the lift or stairs
+     * (PM, Monday "Elevator/Staircase animation", 2026-10-28).
+     */
+    val rideFloorHoldMeters: Double = 20.0,
+    /**
      * Time after which the map follows the visitor again when the destination on a floor without
      * positioning did not change. iOS `floorWithoutPositioningMaximumSeconds`.
      */
