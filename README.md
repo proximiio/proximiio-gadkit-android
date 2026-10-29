@@ -1008,7 +1008,7 @@ approves it.
 
 The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/). Every change of
 the library adds an entry under `[Unreleased]` in the same commit. A release moves the entries
-under a heading with the version and the date. A tag `X.Y.0` has the behaviour of the iOS tag
+under a heading with the version and the date; `[Unreleased]` then says that nothing changed since. A tag `X.Y.0` has the behaviour of the iOS tag
 `X.Y.0`, except 1.15.0 (see its entry). Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
@@ -1018,6 +1018,8 @@ under a heading with the version and the date. A tag `X.Y.0` has the behaviour o
   whether the host app has to do something.
 
 ### [Unreleased]
+
+No changes since 1.20.1.
 
 ### [1.20.1] — 2026-10-29
 
