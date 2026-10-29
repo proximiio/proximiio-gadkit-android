@@ -1,7 +1,5 @@
 package io.proximi.gadkit.map
 
-import kotlinx.coroutines.CancellationException
-import io.proximi.sdk.amenities
 import io.proximi.sdk.core.model.ProximiioAmenity
 import io.proximi.gadkit.VenueService
 import io.proximi.gadkit.Coordinate
@@ -16,9 +14,7 @@ import io.proximi.gadkit.visit.VisitController
 import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioFeature
 import io.proximi.sdk.core.model.ProximiioGeofence
-import io.proximi.sdk.features
 import io.proximi.sdk.floors
-import io.proximi.sdk.geofences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -40,27 +36,21 @@ private fun JsonValue.decoded(): Any? = when (this) {
     else -> null
 }
 
+// The screens read the venue data from [VenueService.data], which reads each kind once and keeps it
+// in memory (iOS 1.23.0).
+
 /** Every point POI of the cached venue data, for [language] (an app language tag such as `ar`). */
 internal suspend fun VenueService.places(language: String?): List<VenuePlace> {
     val amenities = catalogue()
-    return withContext(Dispatchers.Default) {
-        VenuePlace.withAmenityKinds(VenuePlace.all(sdk.features().map { it.toVenueFeature() }, language), amenities)
-    }
+    val features = venueFeatures()
+    return withContext(Dispatchers.Default) { VenuePlace.withAmenityKinds(VenuePlace.all(features, language), amenities) }
 }
 
 /** The SDK's amenity catalogue, or none when it cannot be read. */
-internal suspend fun VenueService.catalogue(): List<ProximiioAmenity> = try {
-    sdk.amenities().distinctBy { it.id }
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (_: Exception) {
-    emptyList()
-}
+internal suspend fun VenueService.catalogue(): List<ProximiioAmenity> = data.amenities()
 
 /** The venue's features as core reads them. */
-internal suspend fun VenueService.venueFeatures(): List<VenueFeature> = withContext(Dispatchers.Default) {
-    sdk.features().map { it.toVenueFeature() }
-}
+internal suspend fun VenueService.venueFeatures(): List<VenueFeature> = data.venueFeatures()
 
 /**
  * The galleries of gallery first ([Gallery.destinations]), each with its polygon feature when the
@@ -84,7 +74,7 @@ internal suspend fun VenueService.galleries(language: String?): List<Gallery> {
     if (outlines.isEmpty()) {
         // For a repeated id, the first floor is used, as on iOS.
         val levels = buildMap { sdk.floors().forEach { putIfAbsent(it.id, it.level) } }
-        val geofences = sdk.geofences().filter { it.isGallery }.map { VenueGeofence(it.id, it.name, it.polygon, it.floorId) }
+        val geofences = data.geofences().filter { it.isGallery }.map { VenueGeofence(it.id, it.name, it.polygon, it.floorId) }
         outlines = Gallery.all(geofences, levels)
     }
     return Gallery.merged(destinations, outlines)
@@ -100,7 +90,7 @@ internal val ProximiioGeofence.isGallery: Boolean get() = metadata?.get("geofenc
 internal val ProximiioGeofence.isArtwork: Boolean get() = metadata?.get("geofence_type")?.stringValue == "artwork"
 
 /** The venue's geofences as core reads them. */
-internal suspend fun VenueService.venueGeofences(): List<VenueGeofence> = sdk.geofences().map {
+internal suspend fun VenueService.venueGeofences(): List<VenueGeofence> = data.geofences().map {
     VenueGeofence(
         it.id, it.name, it.polygon, it.floorId, it.remoteId, it.metadata?.get("geofence_type")?.stringValue,
         center = it.area?.let { area -> Coordinate(area.latitude, area.longitude) },
@@ -112,11 +102,13 @@ internal suspend fun VenueService.venueGeofences(): List<VenueGeofence> = sdk.ge
 internal suspend fun VenueService.artworkAreas(): Map<String, List<ArtworkArea>> = VisitController.artworkAreas(venueGeofences())
 
 /** The venue's lifts, staircases and escalators ([LevelChangerPlace]). */
-internal suspend fun VenueService.levelChangers(): List<LevelChangerPlace> = withContext(Dispatchers.Default) {
-    LevelChangerPlace.all(sdk.features().map { it.toVenueFeature() })
+internal suspend fun VenueService.levelChangers(): List<LevelChangerPlace> {
+    val features = venueFeatures()
+    return withContext(Dispatchers.Default) { LevelChangerPlace.all(features) }
 }
 
 /** The venue's lift cabin outlines (`elevator` polygon features), as iOS `LiftArea.all(features:)`. */
-internal suspend fun VenueService.lifts(): List<LiftArea> = withContext(Dispatchers.Default) {
-    LiftArea.all(sdk.features().map { it.toVenueFeature() })
+internal suspend fun VenueService.lifts(): List<LiftArea> {
+    val features = venueFeatures()
+    return withContext(Dispatchers.Default) { LiftArea.all(features) }
 }

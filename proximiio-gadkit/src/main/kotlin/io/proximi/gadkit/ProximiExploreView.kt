@@ -64,7 +64,7 @@ internal class HostedExploreModel : ViewModel() {
     private var isStarting = false
     private var isStopped = false
 
-    /** Loads the venue. After [stop], follows the venue data changes again with [settings]. */
+    /** Loads the venue. After [stop], uses [settings] and follows the venue data changes again if the SDK stopped in between. */
     suspend fun start(context: Context, sdk: Proximiio, settings: GadSettings) {
         venue?.let { venue ->
             if (isStopped) {
@@ -81,14 +81,12 @@ internal class HostedExploreModel : ViewModel() {
         FieldLog.log("hosted explore map: ready")
     }
 
-    /** Ends the venue data downloads. */
+    /**
+     * The view left the screen. The venue data stays in memory for the next view on the same SDK and
+     * follows `venueDataChanges()` (iOS 1.23.0).
+     */
     fun stop() {
         isStopped = true
-        venue?.stop()
-    }
-
-    override fun onCleared() {
-        venue?.stop()
     }
 
     companion object {

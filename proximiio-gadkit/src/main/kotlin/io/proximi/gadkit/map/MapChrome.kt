@@ -1,5 +1,8 @@
 package io.proximi.gadkit.map
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.pointerInput
@@ -170,14 +173,42 @@ internal fun MapIcon(icon: Int, modifier: Modifier = Modifier, size: Int = 24) {
     Icon(painterResource(icon), contentDescription = null, modifier.size(size.dp), tint = Palette.ink)
 }
 
-/** Amenity shortcuts as a trailing-aligned stack of small chips (Figma search state). */
+/**
+ * Amenity shortcuts as a trailing-aligned stack of small chips (Figma search state). A list taller
+ * than the space it gets scrolls and fades out at the bottom (PM, Monday "Amenity search when list is
+ * long", 2026-10-29; iOS 1.24.1).
+ */
 @Composable
-internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, onPick: (AmenityKind) -> Unit) {
-    Box {
+internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, modifier: Modifier = Modifier, onPick: (AmenityKind) -> Unit) {
+    val scroll = rememberScrollState()
+    val scrolls = AmenityChipListLayout.scrolls(contentHeight = scroll.maxValue + scroll.viewportSize, visibleHeight = scroll.viewportSize)
+    Box(modifier) {
         // A white haze behind the list, so the map behind it shows less (RPR, Monday "White blur
         // behind amenity list", 2026-10-28).
         Box(Modifier.matchParentSize().outset(12.dp).blur(18.dp, BlurredEdgeTreatment.Unbounded).background(Palette.white.copy(alpha = 0.8f)))
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(
+            Modifier
+                // Room inside the scroll's clip for the chips' shadows.
+                .bleed(AmenityChipListLayout.SHADOW_ROOM)
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (scroll.maxValue > 0) {
+                        val fade = AmenityChipListLayout.FADE_HEIGHT.toPx()
+                        drawRect(
+                            Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
+                            topLeft = Offset(0f, size.height - fade),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+                }
+                .verticalScroll(scroll)
+                .padding(AmenityChipListLayout.SHADOW_ROOM)
+                // The last chip scrolls out of the fade.
+                .padding(bottom = if (scrolls) AmenityChipListLayout.FADE_HEIGHT else 0.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
             kinds.forEach { kind ->
                 // Frosted: on the clear glass the titles were hard to read over the map
                 // (PM 2026-10-15, "Search menu transparency").
@@ -185,6 +216,32 @@ internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, o
             }
         }
     }
+}
+
+/** The scrolling of [AmenityChipList]. */
+internal object AmenityChipListLayout {
+    /** The height of the fade at the bottom of a list that scrolls. */
+    val FADE_HEIGHT = 44.dp
+
+    /** The room around the chips inside the scroll's clip, so their shadows show. */
+    val SHADOW_ROOM = 12.dp
+
+    /** Whether the chips need more height than the list has. Pure; covered by tests. */
+    fun scrolls(contentHeight: Int, visibleHeight: Int): Boolean = visibleHeight > 0 && contentHeight > visibleHeight
+}
+
+/** [this] laid out [amount] larger on every side, beyond its parent's bounds, and placed so its content stays put. */
+private fun Modifier.bleed(amount: Dp): Modifier = layout { measurable, constraints ->
+    val extra = amount.roundToPx()
+    val placeable = measurable.measure(
+        constraints.copy(
+            maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth + 2 * extra else constraints.maxWidth,
+            maxHeight = if (constraints.hasBoundedHeight) constraints.maxHeight + 2 * extra else constraints.maxHeight,
+        ),
+    )
+    val width = (placeable.width - 2 * extra).coerceAtLeast(0)
+    val height = (placeable.height - 2 * extra).coerceAtLeast(0)
+    layout(width, height) { placeable.place(-extra, -extra) }
 }
 
 /** [this] grown by [amount] on every side, beyond its parent's bounds. */

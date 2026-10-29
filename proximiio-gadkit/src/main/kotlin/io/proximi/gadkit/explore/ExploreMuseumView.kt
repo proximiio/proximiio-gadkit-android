@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import io.proximi.gadkit.map.MapDiagnostics
 import io.proximi.gadkit.map.venueFeatures
+import io.proximi.gadkit.map.catalogue
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.map.AmenityListing
 import io.proximi.gadkit.map.AmenityKind
@@ -135,9 +136,7 @@ import io.proximi.gadkit.map.venueGeofences
 import io.proximi.map.compose.ProximiioMap
 import io.proximi.map.compose.rememberProximiioMapSession
 import io.proximi.map.core.FloorKey
-import io.proximi.sdk.amenities
 import kotlin.math.roundToInt
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
@@ -214,13 +213,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
      */
     suspend fun load(): Unit = withContext(Dispatchers.Main.immediate) {
         val places = venue.places(language)
-        val amenities = try {
-            venue.sdk.amenities().distinctBy { it.id }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            emptyList()
-        }
+        val amenities = venue.catalogue()
         amenityIcons = withContext(Dispatchers.Default) {
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it.asImageBitmap() } }.toMap()
         }
@@ -300,7 +293,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     // The galleries of the shown floor and the marker of a selected amenity.
     LaunchedEffect(catalog, level, selected) {
         val focus = selected?.takeIf { it.kind == ExploreItem.Kind.Space }?.id
-        val fills = catalog.spaces.mapNotNull { item -> item.gallery?.let { GalleryFill(it, isDestination = focus == null || focus == item.id) } }
+        val fills = catalog.spaces.mapNotNull { item -> item.gallery?.let { GalleryFill(it, if (focus == null || focus == item.id) GalleryFill.Style.DESTINATION else GalleryFill.Style.VISITED) } }
         layers.update(fills, level)
     }
     // The selected place's own POI is not drawn: the card's dot marks it (PM, Monday "Explore Museum

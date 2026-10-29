@@ -218,17 +218,35 @@ internal class JourneyMapLayers {
             // walls (PM, Monday "Navigation to a gallery", 2026-10-27, and "Visited gallery
             // visualization", 2026-10-28), under labels, POI icons, the route and the stop markers. On
             // a style without inner walls the visited galleries are over the floor plan.
-            for ((id, isDestination) in listOf(VISITED_LAYER to false, DESTINATION_LAYER to true)) {
-                val layer = FillLayer(id, GALLERY_SOURCE).withFilter(
-                    Expression.eq(Expression.get(DESTINATION_PROPERTY), Expression.literal(isDestination)),
-                )
+            for ((id, fillStyle) in listOf(VISITED_LAYER to GalleryFill.Style.VISITED, DESTINATION_LAYER to GalleryFill.Style.DESTINATION)) {
+                val layer = FillLayer(id, GALLERY_SOURCE).withFilter(styleFilter(fillStyle))
                 val anchor = when {
-                    isDestination -> MapCanvasLayerAnchor.Above(VISITED_LAYER)
+                    fillStyle == GalleryFill.Style.DESTINATION -> MapCanvasLayerAnchor.Above(VISITED_LAYER)
                     style.getLayer(INNER_WALL_LAYER) != null -> MapCanvasLayerAnchor.Above(INNER_WALL_LAYER)
                     else -> MapCanvasLayerAnchor.AboveVenueFills
                 }
                 canvas.addLayer(layer, anchor)
             }
+            // The other galleries in the venue style's gallery colour over their artworks and
+            // furniture, under the inner walls (PM, Monday "Artwork + furniture polygons", 2026-10-29).
+            val standard = FillLayer(STANDARD_LAYER, GALLERY_SOURCE).withFilter(styleFilter(GalleryFill.Style.STANDARD))
+            val venueGallery = style.getLayer(VENUE_GALLERY_LAYER) as? FillLayer
+            val color = venueGallery?.fillColor
+            val opacity = venueGallery?.fillOpacity
+            standard.setProperties(
+                when {
+                    color?.isExpression == true -> PropertyFactory.fillColor(color.expression!!)
+                    color?.value != null -> PropertyFactory.fillColor(color.value!!)
+                    else -> PropertyFactory.fillColor(STANDARD_GALLERY_COLOR)
+                },
+                when {
+                    opacity?.isExpression == true -> PropertyFactory.fillOpacity(opacity.expression!!)
+                    opacity?.value != null -> PropertyFactory.fillOpacity(opacity.value!!)
+                    else -> PropertyFactory.fillOpacity(1f)
+                },
+            )
+            val anchor = if (style.getLayer(FURNITURE_LAYER) != null) MapCanvasLayerAnchor.Above(FURNITURE_LAYER) else MapCanvasLayerAnchor.Below(VISITED_LAYER)
+            canvas.addLayer(standard, anchor)
         }
         if (style.getSource(CONNECTOR_SOURCE) == null) {
             style.addSource(GeoJsonSource(CONNECTOR_SOURCE))
@@ -279,8 +297,11 @@ internal class JourneyMapLayers {
     }
 
     /**
-     * Shows the cones of the shown floor and hides the others. A cone's image, source and layer are
-     * made when its floor first shows; a changed cone gets a new image.
+     * Puts the cones of the shown floor on the map and takes the others off. A cone's image is made
+     * when its floor first shows and kept; a changed cone gets a new image. The other floors' cones are
+     * removed, not hidden: MapLibre does not load an image source whose layer is hidden, and an unloaded
+     * source keeps every frame from counting as fully rendered, so `venueDrawing` never became `DRAWN`
+     * (GADKit 1.22.2; iOS 1.23.0).
      */
     private fun applyCones(style: Style) {
         val canvas = canvas ?: return
@@ -288,7 +309,9 @@ internal class JourneyMapLayers {
             val id = coneId(cone.id)
             val layer = style.getLayer(id)
             if (!VenueLevel.same(cone.level, level)) {
-                layer?.setProperties(PropertyFactory.visibility(Property.NONE))
+                if (layer != null) style.removeLayer(layer)
+                style.getSource(id)?.let(style::removeSource)
+                coneSourceImages.remove(id)
                 continue
             }
             val shading = coneShadings[cone.id] ?: ConeShading.make(cone)?.also { coneShadings = coneShadings + (cone.id to it) } ?: continue
@@ -306,9 +329,7 @@ internal class JourneyMapLayers {
                 source.setImage(shading.bitmap)
             }
             coneSourceImages[id] = shading.bitmap
-            if (layer != null) {
-                layer.setProperties(PropertyFactory.visibility(Property.VISIBLE))
-            } else {
+            if (layer == null) {
                 val raster = RasterLayer(id, id).withProperties(PropertyFactory.rasterFadeDuration(0f))
                 // Over the floors, under the venue's galleries and the gallery fills of [apply]: a cone
                 // that is a gallery keeps the gallery's colour.
@@ -406,7 +427,7 @@ internal class JourneyMapLayers {
                     val ring = fill.gallery.ring.map { Point.fromLngLat(it.longitude, it.latitude) }
                     val closed = if (ring.first() == ring.last()) ring else ring + ring.first()
                     Feature.fromGeometry(Polygon.fromLngLats(listOf(closed))).apply {
-                        addBooleanProperty(DESTINATION_PROPERTY, fill.isDestination)
+                        addStringProperty(STYLE_PROPERTY, fill.style.value)
                     }
                 },
             ),
@@ -473,9 +494,19 @@ internal class JourneyMapLayers {
         const val GALLERY_SOURCE = "gad-journey-galleries"
         const val DESTINATION_LAYER = "gad-gallery-destination"
         const val VISITED_LAYER = "gad-gallery-visited"
+        const val STANDARD_LAYER = "gad-gallery-standard"
+
+        /** The organisation style's furniture, above its artworks. */
+        const val FURNITURE_LAYER = "proximiio-furniture"
+
+        /** The colour of the venue style's galleries, when the style has no `proximiio-gallery` fill. */
+        const val STANDARD_GALLERY_COLOR = 0xFFE6E6E6.toInt()
         const val CONNECTOR_SOURCE = "gad-route-connector"
         const val CONNECTOR_LAYER = "gad-route-connector"
-        const val DESTINATION_PROPERTY = "destination"
+        const val STYLE_PROPERTY = "style"
+
+        private fun styleFilter(style: GalleryFill.Style): Expression =
+            Expression.eq(Expression.get(STYLE_PROPERTY), Expression.literal(style.value))
         const val CONNECTOR_COLOR = 0xFF3F69FF.toInt()
         const val CONNECTOR_WIDTH_DP = 6f
         const val LEVEL_CHANGER_SOURCE = "gad-level-changer"

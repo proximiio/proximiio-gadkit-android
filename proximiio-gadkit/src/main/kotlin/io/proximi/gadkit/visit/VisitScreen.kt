@@ -261,7 +261,7 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
     val position by model.session.position.collectAsStateWithLifecycle()
     val isCameraReady by model.session.isCameraReady.collectAsStateWithLifecycle()
     val hasPosition = position != null
-    LaunchedEffect(hasPosition, isCameraReady) { if (hasPosition && isCameraReady) model.recentre(reason = "first position") }
+    LaunchedEffect(hasPosition, isCameraReady) { if (hasPosition && isCameraReady) model.showVisitorThenFollow(reason = "first position") }
 
     val backdrop = rememberGlassBackdrop()
     val mapBackdrop = rememberGlassBackdrop()
@@ -383,7 +383,8 @@ private fun CardOverlay(model: VisitViewModel) {
     // Without stops the map shows, whatever the mode is.
     val isMap = !model.showsList
     Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        // The free height above the bottom buttons: a long amenity list scrolls within it (iOS 1.24.1).
+        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.Top) {
             if (model.hasStops) MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP })
             Spacer(Modifier.weight(1f))
             if (isMap) {
@@ -403,7 +404,6 @@ private fun CardOverlay(model: VisitViewModel) {
                 }
             }
         }
-        Spacer(Modifier.weight(1f))
         if (isMap) {
             val selectedFloor by model.session.selectedFloor.collectAsStateWithLifecycle()
             Row(Modifier.fillMaxWidth()) {

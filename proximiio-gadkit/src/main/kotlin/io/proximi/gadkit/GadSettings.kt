@@ -96,6 +96,14 @@ public data class GadSettings(
      */
     val galleryFollowZoom: Double? = 20.0,
     /**
+     * The journey map shows the visitor at this zoom for [startZoomDuration] before it follows them:
+     * when the journey starts, on the first fix and when the position comes back. `null` follows at
+     * once (PM, Monday "Zoom level at start + navigation", 2026-10-29). iOS `startZoom`.
+     */
+    val startZoom: Double? = 18.0,
+    /** How long the journey map stays at [startZoom]. iOS `startZoomSeconds`. */
+    val startZoomDuration: Duration = 2.seconds,
+    /**
      * The farthest the visitor can zoom out, or `null` for the map library's limit. MapLibre zoom
      * levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
      */

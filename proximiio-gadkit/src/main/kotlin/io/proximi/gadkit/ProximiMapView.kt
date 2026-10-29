@@ -128,6 +128,23 @@ public object ProximiMapView {
             public val ALL: Set<Option> = entries.toSet()
         }
     }
+
+    /**
+     * Prepares the [ProximiMapView]s and [ProximiExploreView]s on [sdk] before the first one opens:
+     * installs the route network and reads the venue's features, geofences and amenities into memory,
+     * as iOS `ProximiMapView.prepare(sdk:)` (1.23.0). Optional. Without it the first view does this
+     * when it opens, and the map library's own read of the features waits behind it: with the GAD venue
+     * a read of the features took about 0.5 s on the iOS simulator (2026-10-29).
+     *
+     * Call it after the SDK started, for example when the visitor finishes onboarding. The views use
+     * the data until the SDK stops; a call while the data is in memory reads nothing.
+     */
+    public suspend fun prepare(context: Context, sdk: Proximiio) {
+        val venue = VenueService.hosted(context.applicationContext, sdk, GadSettings.STANDARD)
+        venue.data.features()
+        venue.data.geofences()
+        venue.data.amenities()
+    }
 }
 
 /** Whether [prompt] is on: its own option or [ProximiMapView.Option.PROMPTS]. */
@@ -288,8 +305,9 @@ internal class HostedMapModel : ViewModel() {
     private var isStopped = false
 
     /**
-     * Loads the venue and shows [journey]. After [stop], follows the venue data changes again and
-     * shows [journey] on a new screen: the screen of the view that left has ended.
+     * Loads the venue and shows [journey]. After [stop], shows [journey] on a new screen: the screen of
+     * the view that left has ended. It follows the venue data changes again if the SDK stopped in
+     * between.
      */
     suspend fun start(context: Context, sdk: Proximiio, settings: GadSettings, options: Set<ProximiMapView.Option>, journey: ProximiJourney, language: String?) {
         venue?.let { venue ->
@@ -389,14 +407,12 @@ internal class HostedMapModel : ViewModel() {
         ProximiMap.event(event, places)?.let(onEvent)
     }
 
-    /** Ends the venue data downloads. */
+    /**
+     * The view left the screen. The venue data stays in memory for the next view on the same SDK and
+     * follows `venueDataChanges()` (iOS 1.23.0).
+     */
     fun stop() {
         isStopped = true
-        venue?.stop()
-    }
-
-    override fun onCleared() {
-        venue?.stop()
     }
 
     companion object {

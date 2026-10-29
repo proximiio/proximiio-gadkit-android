@@ -26,6 +26,9 @@ class GadSettingsTest {
         assertEquals(setOf(0), GadSettings.STANDARD.levelsWithoutPositioning)
         assertEquals(5.seconds, GadSettings.STANDARD.levelChangeViewDuration)
         assertEquals(20.0, GadSettings.STANDARD.rideFloorHoldMeters)
+        // Zoom 18 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-29).
+        assertEquals(18.0, GadSettings.STANDARD.startZoom)
+        assertEquals(2.seconds, GadSettings.STANDARD.startZoomDuration)
         assertEquals(5.0, GadSettings.STANDARD.levelChangerReachedMeters)
         assertEquals(1800.seconds, GadSettings.STANDARD.floorWithoutPositioningMaximum)
         assertTrue(GadSettings.STANDARD.postsGeofenceNotifications)

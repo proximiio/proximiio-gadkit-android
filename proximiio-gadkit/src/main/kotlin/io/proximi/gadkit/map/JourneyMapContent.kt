@@ -1,7 +1,17 @@
 package io.proximi.gadkit.map
 
-/** A gallery drawn filled: with the level colour when [isDestination], with its tint when visited. */
-internal data class GalleryFill(val gallery: Gallery, val isDestination: Boolean)
+/**
+ * A gallery drawn filled: the destination with the level colour, a visited gallery with its tint, every
+ * other gallery in the venue style's gallery colour over its artworks and furniture (iOS 1.24.0).
+ */
+internal data class GalleryFill(val gallery: Gallery, val style: Style) {
+    enum class Style(val value: String) {
+        /** The venue style's gallery colour, over the artworks and furniture. */
+        STANDARD("standard"),
+        VISITED("visited"),
+        DESTINATION("destination"),
+    }
+}
 
 /** The journey map's gallery fills on a floor. `VisitViewModel` chooses them, as iOS `VisitView.refreshMapLayers`. */
 internal object JourneyMapContent {

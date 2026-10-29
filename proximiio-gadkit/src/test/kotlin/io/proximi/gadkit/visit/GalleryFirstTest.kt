@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.GalleryFill
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.map.Gallery
@@ -224,14 +225,29 @@ class GalleryPolygonTest {
     /** A gallery is visited when its artworks of the journey are all visited or skipped, at least one visited (the customer, Monday "Visited gallery visualization", 2026-10-28). */
     @Test
     fun aGalleryIsVisitedWhenAllItsArtworksAreDoneOrSkipped() {
-        val visited = VisitViewModel.visitedGalleries(
-            listOf(
-                "g101" to MapJourneyStop.State.DONE, "g101" to MapJourneyStop.State.SKIPPED,
-                "g104" to MapJourneyStop.State.DONE, "g104" to MapJourneyStop.State.PENDING,
-                "g106" to MapJourneyStop.State.SKIPPED,
-                "g303" to MapJourneyStop.State.DONE,
-            ),
+        val stops = listOf(
+            "g101" to MapJourneyStop.State.DONE, "g101" to MapJourneyStop.State.SKIPPED,
+            "g104" to MapJourneyStop.State.DONE, "g104" to MapJourneyStop.State.PENDING,
+            "g106" to MapJourneyStop.State.SKIPPED,
+            "g303" to MapJourneyStop.State.DONE,
         )
-        assertEquals(setOf("g101", "g303"), visited)
+        assertEquals(setOf("g101", "g303"), VisitViewModel.visitedGalleries(stops, visitorGallery = null))
+        // Not while the visitor is still in it (PM, 2026-10-29).
+        assertEquals(setOf("g303"), VisitViewModel.visitedGalleries(stops, visitorGallery = "g101"))
+    }
+
+    /**
+     * The gallery the visitor is in has no fill, so its artworks and furniture show; every other
+     * gallery is destination, visited or the standard colour (PM, Monday "Artwork + furniture
+     * polygons", 2026-10-29).
+     */
+    @Test
+    fun everyGalleryButTheVisitorsHasAFill() {
+        val visited = setOf("g101")
+        assertEquals(GalleryFill.Style.VISITED, VisitViewModel.fillStyle("g101", destination = "g303", visited = visited, visitorGallery = null))
+        assertEquals(GalleryFill.Style.DESTINATION, VisitViewModel.fillStyle("g303", destination = "g303", visited = visited, visitorGallery = null))
+        assertEquals(GalleryFill.Style.STANDARD, VisitViewModel.fillStyle("g104", destination = "g303", visited = visited, visitorGallery = null))
+        assertNull(VisitViewModel.fillStyle("g104", destination = "g303", visited = visited, visitorGallery = "g104"))
+        assertNull(VisitViewModel.fillStyle("g303", destination = "g303", visited = visited, visitorGallery = "g303"))
     }
 }

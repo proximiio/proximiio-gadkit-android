@@ -291,6 +291,18 @@ internal class VisitViewModel(
      */
     private var visitorGalleryPlaceId: String? = null
 
+    /**
+     * The gallery of [galleries] the visitor is in. Its artworks and furniture show; every other
+     * gallery has a fill (PM, Monday "Artwork + furniture polygons", 2026-10-29).
+     */
+    private var visitorGalleryId: String? = null
+
+    /** The last field-log line of the gallery fills. */
+    private var galleryFillLine: String? = null
+
+    /** The follow that starts after [GadSettings.startZoomDuration] at [GadSettings.startZoom]. */
+    private var startZoomFollow: Job? = null
+
     /** Galleries the visitor has been in during this visit. */
     /** The amenity icons of the venue data, by amenity id: the gallery icon of the stop card. */
     var amenityIcons by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
@@ -442,7 +454,7 @@ internal class VisitViewModel(
             // scale). A recentre before the camera is ready is lost.
             combine(session.position, session.isCameraReady) { position, ready -> position != null && ready }
                 .first { it }
-            recentre(withHeading = true, reason = "journey started")
+            showVisitorThenFollow(withHeading = true, reason = "journey started")
         }
         scope.launch {
             val navigator = controller.navigator
@@ -701,10 +713,36 @@ internal class VisitViewModel(
         }
     }
 
-    /** `recentre` with a field-log line naming the caller, as iOS `VisitView.recentre(withHeading:reason:)`. */
+    /**
+     * `recentre` with a field-log line naming the caller, as iOS `VisitView.recentre(withHeading:reason:)`.
+     * Ends a pending [showVisitorThenFollow].
+     */
     fun recentre(withHeading: Boolean? = null, reason: String) {
+        startZoomFollow?.cancel()
+        startZoomFollow = null
         FieldLog.log("recentre ($reason) · heading ${withHeading ?: "default"} · mode before ${session.cameraMode.value}")
         session.recentre(withHeading = withHeading)
+    }
+
+    /**
+     * Shows the visitor at [GadSettings.startZoom] for [GadSettings.startZoomDuration], then follows
+     * them at the follow zoom: when the journey starts, on the first fix and when the position comes
+     * back (PM, Monday "Zoom level at start + navigation", 2026-10-29). Without `startZoom` it follows
+     * at once.
+     */
+    fun showVisitorThenFollow(withHeading: Boolean? = null, reason: String) {
+        val zoom = settings.startZoom
+        val position = session.position.value
+        if (zoom == null || position == null) return recentre(withHeading, reason)
+        startZoomFollow?.cancel()
+        FieldLog.log("start zoom ($reason) · zoom $zoom for ${settings.startZoomDuration.inWholeMilliseconds / 1000.0} s")
+        // The camera command lets go of the follow; `recentre` takes it again.
+        session.camera.setCenter(position.coordinate, zoom, animated = true)
+        startZoomFollow = scope.launch {
+            delay(settings.startZoomDuration)
+            startZoomFollow = null
+            recentre(withHeading, "$reason, after the start zoom")
+        }
     }
 
     /** Field log: the route guidance once per second and the navigator's events, as iOS `VisitView`. */
@@ -780,24 +818,27 @@ internal class VisitViewModel(
     /** Gallery fills and the gallery marker for the current journey and floor. The map library draws the stop markers. */
     private fun refreshMapLayers() {
         if (isClosed) return
-        val active = controller.navigator.activeStop
-        val destination = active?.let { Gallery.containing(Coordinate(it.coordinate.latitude, it.coordinate.longitude), it.floor?.level, galleries) }
         val visited = visitedGalleryIds
-        // The gallery the visitor is in has no destination fill: the venue's own gallery colour,
-        // under the artworks and furniture, with the artwork numbers (PM, Monday "Navigation to a
-        // gallery", 2026-10-28).
-        val visitorGallery = galleryDestinations.firstOrNull { it.placeId == visitorGalleryPlaceId }?.shown?.id
         // Gallery first: the outline of the gallery the leg ends at, in place of the outline that
-        // holds the artwork.
+        // holds the artwork. The gallery the visitor is in has no fill: the venue's own gallery
+        // colour, under the artworks and furniture, with the artwork numbers (PM, Monday "Navigation
+        // to a gallery", 2026-10-28); every other gallery has one (PM, Monday "Artwork + furniture
+        // polygons", 2026-10-29).
         val galleryAhead = galleryAheadDestination
-        val fills = galleries.mapNotNull { gallery ->
-            when {
-                gallery.id == destination?.id && galleryAhead == null ->
-                    if (gallery.id == visitorGallery) null else GalleryFill(gallery, isDestination = true)
-                gallery.id in visited -> GalleryFill(gallery, isDestination = false)
-                else -> null
-            }
-        } + listOfNotNull(galleryAhead?.let { GalleryFill(it.shown, isDestination = true) })
+        val destination = galleryAhead?.shown?.id ?: activeStopGallery?.id
+        var fills = galleries.mapNotNull { gallery ->
+            fillStyle(gallery.id, destination, visited, visitorGalleryId)?.let { GalleryFill(gallery, it) }
+        }
+        if (galleryAhead != null && galleries.none { it.id == galleryAhead.shown.id }) {
+            fills = fills + GalleryFill(galleryAhead.shown, GalleryFill.Style.DESTINATION)
+        }
+        val line = "gallery fills: visitor in ${galleries.firstOrNull { it.id == visitorGalleryId }?.name ?: "none"} · destination " +
+            "${fills.firstOrNull { it.style == GalleryFill.Style.DESTINATION }?.gallery?.name ?: "none"} · " +
+            "${fills.count { it.style == GalleryFill.Style.VISITED }} visited · ${fills.count { it.style == GalleryFill.Style.STANDARD }} standard"
+        if (line != galleryFillLine) {
+            galleryFillLine = line
+            FieldLog.log(line)
+        }
         layers.update(fills, session.selectedFloor.value.level)
         layers.updateGalleryMarkers(galleryMarkers(visited))
         applyHiddenFeatures()
@@ -805,30 +846,41 @@ internal class VisitViewModel(
 
     /**
      * The galleries whose artworks of the journey are all visited or skipped, at least one visited
-     * (the customer, Monday "Visited gallery visualization", 2026-10-28).
+     * (the customer, Monday "Visited gallery visualization", 2026-10-28), once the visitor is out of
+     * them (PM, 2026-10-29).
      */
     private val visitedGalleryIds: Set<String>
         get() {
             val stops = controller.navigator.journey.value.stops.filter { it.kind != MapJourneyStop.Kind.DETOUR }.mapNotNull { stop ->
                 Gallery.containing(Coordinate(stop.coordinate.latitude, stop.coordinate.longitude), stop.floor?.level, galleries)?.id?.let { it to stop.state }
             }
-            return visitedGalleries(stops)
+            return visitedGalleries(stops, visitorGalleryId)
+        }
+
+    /** The gallery of the active stop, unless the visitor is in it. */
+    private val activeStopGallery: Gallery?
+        get() {
+            val active = controller.navigator.activeStop ?: return null
+            val gallery = Gallery.containing(Coordinate(active.coordinate.latitude, active.coordinate.longitude), active.floor?.level, galleries)
+            return gallery?.takeIf { it.id != visitorGalleryId }
         }
 
     /**
      * Each gallery's title at its POI, but not the gallery the visitor is in (PM, Monday "Navigation
-     * to a gallery", 2026-10-26). In a personalised journey the gallery the leg ends at is the
-     * destination and a [visited] gallery is visited; a curated tour shows every title in the standard
-     * style (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+     * to a gallery", 2026-10-26): the gallery the leg ends at, else the active artwork's gallery, is
+     * the destination, a [visited] gallery is visited. A curated tour shows them as a personalised
+     * journey does (PM, Monday "Gallery numbers in gallery navigation", 2026-10-29).
      */
     private fun galleryMarkers(visited: Set<String>): List<JourneyMapLayers.GalleryMarker> {
-        val visitedGalleries = if (kind.guidesToGalleryFirst) galleries.filter { it.id in visited } else emptyList()
-        val ahead = if (kind.guidesToGalleryFirst) galleryAheadDestination?.placeId else null
+        val visitedGalleries = galleries.filter { it.id in visited }
+        val ahead = galleryAheadDestination?.placeId
+        val destinationGallery = if (ahead == null) activeStopGallery else null
         return galleryDestinations.filter { it.placeId != visitorGalleryPlaceId }.map { destination ->
-            val isVisited = visitedGalleries.any { it.id == destination.shown.id || it.contains(destination.entry, destination.gallery.level) }
+            val isGallery = { gallery: Gallery -> gallery.id == destination.shown.id || gallery.contains(destination.entry, destination.gallery.level) }
+            val isDestination = destination.placeId == ahead || destinationGallery?.let(isGallery) == true
             val style = when {
-                destination.placeId == ahead -> JourneyMapLayers.GalleryMarker.Style.DESTINATION
-                isVisited -> JourneyMapLayers.GalleryMarker.Style.VISITED
+                isDestination -> JourneyMapLayers.GalleryMarker.Style.DESTINATION
+                visitedGalleries.any(isGallery) -> JourneyMapLayers.GalleryMarker.Style.VISITED
                 else -> JourneyMapLayers.GalleryMarker.Style.STANDARD
             }
             JourneyMapLayers.GalleryMarker(destination.entry, destination.gallery.level, destination.gallery.name, style)
@@ -889,8 +941,10 @@ internal class VisitViewModel(
         val placeId = position?.let { fix ->
             galleryDestinations.firstOrNull { it.gallery.contains(Coordinate(fix.coordinate.latitude, fix.coordinate.longitude), fix.floor?.level) }?.placeId
         }
-        if (placeId == visitorGalleryPlaceId) return
+        val galleryId = position?.let { Gallery.containing(Coordinate(it.coordinate.latitude, it.coordinate.longitude), it.floor?.level, galleries)?.id }
+        if (placeId == visitorGalleryPlaceId && galleryId == visitorGalleryId) return
         visitorGalleryPlaceId = placeId
+        visitorGalleryId = galleryId
         applyHiddenFeatures()
         refreshMapLayers()
         applyStopMarkers()
@@ -1307,11 +1361,27 @@ internal class VisitViewModel(
     companion object {
         private const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
 
-        /** The galleries of [stops] whose stops are all done or skipped, at least one done. Pure; covered by tests. */
-        internal fun visitedGalleries(stops: List<Pair<String, MapJourneyStop.State>>): Set<String> =
-            stops.groupBy({ it.first }, { it.second }).filterValues { states ->
-                states.all { it == MapJourneyStop.State.DONE || it == MapJourneyStop.State.SKIPPED } && MapJourneyStop.State.DONE in states
+        /**
+         * The galleries of [stops] whose stops are all done or skipped, at least one done, except
+         * [visitorGallery]. Pure; covered by tests.
+         */
+        internal fun visitedGalleries(stops: List<Pair<String, MapJourneyStop.State>>, visitorGallery: String?): Set<String> =
+            stops.groupBy({ it.first }, { it.second }).filter { (gallery, states) ->
+                gallery != visitorGallery &&
+                    states.all { it == MapJourneyStop.State.DONE || it == MapJourneyStop.State.SKIPPED } && MapJourneyStop.State.DONE in states
             }.keys
+
+        /**
+         * The fill of a gallery on the journey map: none for the gallery the visitor is in, so its
+         * artworks and furniture show, else destination, visited or the standard gallery colour. Pure;
+         * covered by tests.
+         */
+        internal fun fillStyle(gallery: String, destination: String?, visited: Set<String>, visitorGallery: String?): GalleryFill.Style? = when (gallery) {
+            visitorGallery -> null
+            destination -> GalleryFill.Style.DESTINATION
+            in visited -> GalleryFill.Style.VISITED
+            else -> GalleryFill.Style.STANDARD
+        }
 
         /** Whether the artworks' markers show. Pure; covered by tests. */
         internal fun showsArtworkMarkers(guidesToGalleryFirst: Boolean, hasGalleryAhead: Boolean, isInGallery: Boolean, isActiveStopInGallery: Boolean): Boolean {

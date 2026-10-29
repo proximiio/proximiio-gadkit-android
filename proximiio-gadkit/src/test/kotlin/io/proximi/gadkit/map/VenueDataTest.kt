@@ -83,11 +83,14 @@ class VenueDataTest {
         assertTrue(VenueDataRefresh.changes(old, old.reversed()).isEmpty)
     }
 
-    /** The open map redraws a changed style and amenity catalogue itself. */
+    /**
+     * The open map redraws a changed style itself. The screens read the amenity catalogue for the icons
+     * and lists, so a change of it reads it again (iOS 1.23.0).
+     */
     @Test
-    fun theScreensFollowFeaturesGeofencesFloorsAndPlaces() {
+    fun theScreensFollowFeaturesGeofencesFloorsPlacesAndAmenities() {
         assertEquals(
-            setOf(VenueDataKind.features, VenueDataKind.geofences, VenueDataKind.floors, VenueDataKind.places),
+            setOf(VenueDataKind.features, VenueDataKind.geofences, VenueDataKind.floors, VenueDataKind.places, VenueDataKind.amenities),
             VenueDataRefresh.WATCHED_KINDS,
         )
     }

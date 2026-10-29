@@ -475,6 +475,20 @@ destination = ProximiDestination(poiId = "c1f9…")   // feature id or propertie
 - "Add a stop" on an amenity reports `DetourStarted` and `JourneyPaused`; the journey waits for
   "Resume your Journey" (`JourneyResumed`). `isPaused` does not change for it.
 
+### Preparing the view
+
+The first `ProximiMapView` or `ProximiExploreView` on an SDK installs the route network and reads the
+venue's features, geofences and amenities into memory. The later views on the same SDK reuse them, and
+the data follows `venueDataChanges()` also while no view is open. After the SDK stopped, the next view
+starts again. Optional, after the SDK started, for example when the visitor finishes onboarding:
+
+```kotlin
+scope.launch { ProximiMapView.prepare(context, sdk) }
+```
+
+The first view then opens without that work; the map library's own read of the features waits behind
+it otherwise.
+
 ## Screens
 
 `ProximiMapHost(map, modifier, content)` shows the screen `open(screen)` asks for over `content`, the
@@ -770,7 +784,8 @@ val configuration = GadConfiguration(
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.StopNearby`. |
 | `offRouteMeters`, `offRouteAfter` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, also where a later leg passes, or off the route this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
-| `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
+| `followZoom`, `galleryFollowZoom` | 18.8, 20 | Zoom of "Centre on me" and of the follow; in a gallery of a personalised journey, `galleryFollowZoom` (`null` for `followZoom`). |
+| `startZoom`, `startZoomDuration` | 18, 2 s | When the journey starts, on the first fix and when the position comes back, the journey map shows the visitor at `startZoom` for `startZoomDuration`, then follows them. `null` follows at once. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
@@ -915,6 +930,7 @@ adb shell am start -n <applicationId>/<activity> --es gad.journey <journey id> -
 | `gad.mapGalleryFills true` | The museum map of Journey Complete fills every gallery. |
 | `gad.routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
 | `gad.hostedMap true` | With `gad.visit`: opens the journey in `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses it. The debug screen is the host app: it skips a swiped stop, "Visited" marks the first pending stop visited, and a line at the top (test tag `hostedJourneyStates`) counts the states. Without `gad.visit` the view shows the map alone. With `gad.openMap`: the museum map in `ProximiExploreView`, with "Close map". The debug host also has "Host pause" / "Host resume" (`isPaused`), "Go to café" (`destination` by `properties.id`) and a line of the view's events (test tag `hostedMapEvents`). |
+| `gad.hostedPrepare` | With `gad.hostedMap`: `ProximiMapView.prepare` before the view opens. |
 | `gad.hostedDestination <title>` | With `gad.hostedMap`: the debug host routes to the place with that title, else the first place whose title contains it (`destination`). |
 
 `gad.hubPage` is read by the Proximi GAD app; the library does not act on it.
@@ -1024,6 +1040,48 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Added (iOS 1.23.0, 1.24.0)
+
+- `ProximiMapView.prepare(context, sdk)`: installs the route network and reads the venue's features,
+  geofences and amenities into memory before the first `ProximiMapView` or `ProximiExploreView` on the
+  SDK opens. Optional; see "Preparing the view" (Nagarro: the map starts in 2 to 2.5 s).
+- `GadSettings.startZoom` (18) and `startZoomDuration` (2 s). **Visible:** when the journey starts, on
+  the first fix and when the position comes back, the journey map shows the visitor at zoom 18 for
+  2 s, then follows them at the follow zoom. "Centre on me" in the 2 s ends it. `null` follows at once
+  (PM, Monday "Zoom level at start + navigation", 2026-10-29).
+
+#### Changed (iOS 1.23.0 to 1.24.1)
+
+- The screens read the venue's features, geofences and amenities once and keep them in memory; a kind
+  is read again only when `venueDataChanges()` names it. The SDK decodes every stored row on each
+  `features()` call, and the map library's own read waited behind the screens' reads. A change of the
+  amenity catalogue now updates the screens' icons and lists. Field log: `venue data: <n> features read
+  in <s>` (also geofences and amenities) and `hosted map: route network <n> paths in <s>`.
+- `ProximiMapView` and `ProximiExploreView` keep the route network and the venue data for the next view
+  on the same SDK; they no longer stop following `venueDataChanges()` when they close.
+- **Visible:** every gallery but the one the visitor is in has a fill on the journey map: the
+  destination and the visited galleries as before, every other gallery in the venue style's gallery
+  colour (`proximiio-gallery`, #E6E6E6) over its artworks and furniture. The artworks and the
+  furniture show only in the visitor's gallery, from zoom 19 (PM, Monday "Artwork + furniture
+  polygons", 2026-10-29).
+- **Visible:** a curated tour shows the galleries' pills and fills as a personalised journey does; the
+  destination is the gallery of the active artwork, unless the visitor is in it (PM, Monday "Gallery
+  numbers in gallery navigation", 2026-10-29). A curated tour still routes straight to the artwork.
+- **Visible:** a gallery is visited only once the visitor is out of it (PM, Monday "Visited gallery
+  visualization", 2026-10-29: "when user exits the gallery").
+- **Visible:** a long amenity list under the search button scrolls and fades out at the bottom, above
+  the map's buttons, on the journey map and the museum map (PM, Monday "Amenity search when list is
+  long", 2026-10-29). A list that fits does not scroll.
+
+#### Fixed (iOS 1.23.0)
+
+- Since 1.22.2 the map did not report the venue as drawn after a floor change: the cones of the other
+  floors were hidden raster layers, MapLibre does not load the image source of a hidden layer, and an
+  unloaded source keeps every frame from counting as fully rendered. The other floors' cones are now
+  removed from the map. Only the field log's `map timing` line was affected.
+
+#### Changed (debuggable builds)
 
 - Debuggable builds: the debug host of `gad.hostedMap` shows its `destination` ("destination none",
   test tag `hostedDestination`), for the UI tests of the Proximi GAD app; `gad.hostedDestination`

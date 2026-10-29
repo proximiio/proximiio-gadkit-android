@@ -1,5 +1,7 @@
 package io.proximi.gadkit
 
+import kotlinx.coroutines.withContext
+import io.proximi.gadkit.map.MapDiagnostics
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import io.proximi.gadkit.map.VenueDataRefresh
@@ -51,6 +53,7 @@ internal class VenueService private constructor(
     /** True in a debuggable host build, as iOS `#if DEBUG`: journey playback and [DebugLaunch]. */
     internal val isDebugBuild: Boolean,
     settings: GadSettings,
+    data: VenueDataRefresh? = null,
 ) {
     /**
      * Times and distances of the screens, from [GadConfiguration.settings]. A screen reads them
@@ -59,8 +62,11 @@ internal class VenueService private constructor(
     @Volatile
     internal var settings: GadSettings = settings
 
-    /** Changes of the venue data while the app runs. Screens read the data again on a change. */
-    internal val data = VenueDataRefresh(sdk, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+    /**
+     * The venue's features, geofences and amenities in memory, and the changes of the venue data while
+     * the app runs (`Proximiio.venueDataChanges()`). Screens read the data again on a change.
+     */
+    internal val data: VenueDataRefresh = data ?: VenueDataRefresh(sdk, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
 
     /** Name of the attached position provider. Providers are detached by name. */
     private var attachedProvider: String? = null
@@ -158,11 +164,6 @@ internal class VenueService private constructor(
         }
     }
 
-    /** Ends the venue data downloads. `ProximiMapView` calls it when it closes. */
-    internal fun stop() {
-        data.stop()
-    }
-
     /**
      * Starts the SDK again after it stopped on a refused token (`tokenStatus()` is `REJECTED`). It
      * throws until the API accepts the token again. The binding's provider is attached again.
@@ -251,25 +252,43 @@ internal class VenueService private constructor(
             }
         }
 
+        /** The venue data of the hosted screens. The next hosted screen on the same SDK reuses it. Main thread only. */
+        private var hostedData: VenueDataRefresh? = null
+
         /**
-         * A venue on the host app's started SDK. Installs the route network from the SDK's feature
-         * cache, or downloads it when the cache has no path. Requests no permission and attaches no
-         * position provider. Call [stop] when the screen closes.
+         * A venue on the host app's started SDK. Requests no permission and attaches no position
+         * provider.
+         *
+         * The first call on an SDK installs the route network from the SDK's feature cache, or
+         * downloads it when the cache has no path, and starts reading the venue data. The later calls
+         * on the same SDK reuse the route network and the data in memory, which follows
+         * `venueDataChanges()` also while no screen is open. After the SDK stopped, which ends the
+         * stream of the changes, or when the SDK had no features, the next call starts again (iOS 1.23.0).
          */
-        internal suspend fun hosted(context: Context, sdk: Proximiio, settings: GadSettings): VenueService {
-            if (sdk.loadCachedRouteNetwork() == 0) {
+        internal suspend fun hosted(context: Context, sdk: Proximiio, settings: GadSettings): VenueService = withContext(Dispatchers.Main.immediate) {
+            val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            hostedData?.let { data ->
+                if (data.sdk === sdk && data.isFollowing && data.features().isNotEmpty()) {
+                    return@withContext VenueService(sdk, null, isDebugBuild, settings, data)
+                }
+            }
+            val started = System.nanoTime()
+            var paths = withContext(Dispatchers.Default) { sdk.loadCachedRouteNetwork() }
+            if (paths == 0) {
                 try {
-                    sdk.loadRouteNetwork()
+                    paths = sdk.loadRouteNetwork()
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {
                     FieldLog.log("hosted map: route network not loaded: ${error.message}")
                 }
             }
-            val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            val venue = VenueService(sdk, null, isDebugBuild, settings)
-            venue.data.start()
-            return venue
+            FieldLog.log("hosted map: route network $paths paths in ${MapDiagnostics.Timing.text(MapDiagnostics.seconds(started))}")
+            hostedData?.stop()
+            val data = VenueDataRefresh(sdk, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+            hostedData = data
+            data.start()
+            VenueService(sdk, null, isDebugBuild, settings, data)
         }
 
         /**

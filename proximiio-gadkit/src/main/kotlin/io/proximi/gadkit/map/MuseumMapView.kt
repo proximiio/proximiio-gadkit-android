@@ -311,7 +311,8 @@ internal fun MuseumMapView(
                     .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (destination == null && selectedPlace == null) 40.dp else 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(Modifier.fillMaxWidth()) {
+                // The free height above the bottom buttons: a long amenity list scrolls within it (iOS 1.24.1).
+                Row(Modifier.fillMaxWidth().weight(1f)) {
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         GlassSquareButton(
@@ -324,6 +325,8 @@ internal fun MuseumMapView(
                                 AmenityChipList(
                                     kinds = shortcuts,
                                     selected = selectedAmenity,
+                                    // "Search the museum" keeps its place under a long list.
+                                    modifier = Modifier.weight(1f, fill = false),
                                 ) { kind ->
                                     selectedAmenity = kind
                                     isShowingAmenities = false
@@ -334,7 +337,6 @@ internal fun MuseumMapView(
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Spacer(Modifier.weight(1f))
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -489,7 +491,7 @@ private fun DebugGalleryFills(venue: VenueService, session: ProximiioMapSession,
     LaunchedEffect(galleries, selectedFloor) {
         val level = selectedFloor.level
         val onFloor = galleries.filter { VenueLevel.same(it.level, level) }
-        val fills = onFloor.mapIndexed { index, gallery -> GalleryFill(gallery, isDestination = index == 0) }
+        val fills = onFloor.mapIndexed { index, gallery -> GalleryFill(gallery, if (index == 0) GalleryFill.Style.DESTINATION else GalleryFill.Style.VISITED) }
         layers.update(fills, level)
     }
 }

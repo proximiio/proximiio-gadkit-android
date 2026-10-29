@@ -602,6 +602,11 @@ public class ProximiMap(
     private suspend fun runDebugLaunch(venue: VenueService, options: DebugLaunch.Options?) {
         options ?: return
         DebugLaunch.run(options, venue, places.value, session)
+        if (options.hostedMap && options.hostedPrepare) {
+            val started = System.nanoTime()
+            ProximiMapView.prepare(context, venue.sdk)
+            DebugLaunch.log("hosted map: prepared in ${MapDiagnostics.Timing.text(MapDiagnostics.seconds(started))}")
+        }
         // With `gad.hostedMap` the museum map is `ProximiExploreView`.
         if (options.openMap && options.hostedMap) return presenter.replace { presenter.show(Presentation.HostedExplore) }
         if (options.openMap) open(Screen.MUSEUM_MAP)

@@ -37,7 +37,7 @@ class JourneyMapContentTest {
 
     @Test
     fun fillsShowOnTheirLevelOnly() {
-        val fills = listOf(GalleryFill(a, true), GalleryFill(gallery("D", 0.0, 0.0, level = 2.0), false))
+        val fills = listOf(GalleryFill(a, GalleryFill.Style.DESTINATION), GalleryFill(gallery("D", 0.0, 0.0, level = 2.0), GalleryFill.Style.VISITED))
         assertEquals(listOf("A"), JourneyMapContent.fillsOn(1.0, fills).map { it.gallery.id })
     }
 
