@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.20.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.21.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.20.1
+git -C gadkit checkout 1.21.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1025,8 +1025,14 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-The behaviour of the iOS package 1.21.0. No change for the host app's code, except a host app that
-declares the SDK itself (see "Changed").
+No changes since 1.21.0.
+
+### [1.21.0] — 2026-10-29
+
+The behaviour of the iOS package 1.21.0, on SDK 6.0.0-beta.35 and Map 6.0.0-beta.31: every gallery
+as a pill with its title, no destination fill in the visitor's gallery, the ride's end floor held
+after the lift or stairs view, Map / List slides with the finger. No change for the host app's code,
+except a host app that declares the SDK itself (see "Changed").
 
 #### Added (iOS 1.21.0)
 
