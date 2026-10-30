@@ -24,7 +24,17 @@ public data class GadSettings(
 
     // Arrival
 
-    /** Time between the arrival at an artwork (its geofence) and the route to the next stop. */
+    /**
+     * `true`: the journey moves to the next stop when the visitor leaves the geofence of the active
+     * artwork: on the SDK's exit event, or after [geofenceExitDelay] outside it without one (Nagarro,
+     * 2026-10-30: the next stop comes from the exit event). `false`: [artworkAdvanceDelay] after the
+     * visitor entered it. iOS `advancesOnArtworkExit`.
+     */
+    val advancesOnArtworkExit: Boolean = true,
+    /**
+     * With [advancesOnArtworkExit] `false`: the time between the arrival at an artwork (its geofence)
+     * and the route to the next stop.
+     */
     val artworkAdvanceDelay: Duration = 2.seconds,
     /**
      * Time inside the geofence of an artwork that is not the next stop before it counts as visited

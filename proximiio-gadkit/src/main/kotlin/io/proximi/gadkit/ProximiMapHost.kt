@@ -1,6 +1,10 @@
 package io.proximi.gadkit
 
 import android.Manifest
+import android.app.LocaleManager
+import android.content.res.Configuration
+import android.os.Build
+import android.os.LocaleList
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -23,6 +27,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -55,9 +60,11 @@ import io.proximi.gadkit.visit.VisitPlanPicker
 import io.proximi.gadkit.visit.VisitScreen
 import io.proximi.gadkit.visit.VisitStore
 import io.proximi.gadkit.wristband.LocationDialogHost
+import io.proximi.gadkit.ui.HostLanguage
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * Presents the screens and sheets of [map] over [content], as the iOS modifier `.proximiMap(_:)`.
@@ -111,7 +118,8 @@ public fun ProximiMapHost(map: ProximiMap, modifier: Modifier = Modifier, conten
             label = "proximiMap",
         ) { shown ->
             if (shown != null) {
-                Cover(map, shown)
+                // The texts follow the host app's locale while the cover shows (iOS 1.28.0).
+                HostLanguage { Cover(map, shown) }
                 // The cover has gone once its exit animation ends; a recreated activity shows it again.
                 DisposableEffect(shown.key) {
                     onDispose { if (activity?.isChangingConfigurations != true) map.presenter.dismissed(shown.key) }
@@ -120,14 +128,16 @@ public fun ProximiMapHost(map: ProximiMap, modifier: Modifier = Modifier, conten
         }
         (presentation as? Presentation.ManageJourney)?.let { sheet ->
             key(sheet) {
-                ManageJourneySheet(
-                    title = sheet.meta.title,
-                    summary = sheet.meta.summary,
-                    onEdit = map::editJourney,
-                    onCraftNew = map::craftNewJourney,
-                    onDelete = map::journeyDeleted,
-                    onClose = map.presenter::hide,
-                )
+                HostLanguage {
+                    ManageJourneySheet(
+                        title = sheet.meta.title,
+                        summary = sheet.meta.summary,
+                        onEdit = map::editJourney,
+                        onCraftNew = map::craftNewJourney,
+                        onDelete = map::journeyDeleted,
+                        onClose = map.presenter::hide,
+                    )
+                }
                 DisposableEffect(sheet.key) {
                     onDispose { if (activity?.isChangingConfigurations != true) map.presenter.dismissed(sheet.key) }
                 }
@@ -203,7 +213,10 @@ private fun HostedExploreCheck(map: ProximiMap, venue: VenueService) {
  * `destination` to the café's `properties.id`, as proximiio-mcp returns it. The lines at the top count
  * the stop states of its journey, show its `destination` ("destination none", test tag
  * `hostedDestination`), list the navigators it got from `onNavigator` and the events of the last one,
- * and the view's latest events (test tag `hostedMapEvents`), for UI tests.
+ * and the view's latest events (test tag `hostedMapEvents`), for UI tests. "Locale ar" and "Locale en"
+ * give the view a locale of its own (`LocalConfiguration`), as a host app that switches its language
+ * in its composition; "App ar" and "App en" set the app language (`LocaleManager`, Android 13 and
+ * later), which recreates the activity (iOS "Locale ar/en" and "Apple ar/en", GADKit 1.28.0).
  */
 @Composable
 private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
@@ -219,6 +232,13 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     var destination by remember { mutableStateOf<ProximiDestination?>(null) }
     /** The names of the view's events, oldest first. */
     var mapEvents by remember { mutableStateOf(emptyList<String>()) }
+    /** "Locale ar/en": the view's own locale, `null` for the activity's. */
+    var hostLocale by remember { mutableStateOf<String?>(null) }
+    val activityConfiguration = LocalConfiguration.current
+    val viewConfiguration = remember(activityConfiguration, hostLocale) {
+        hostLocale?.let { Configuration(activityConfiguration).apply { setLocale(Locale.forLanguageTag(it)) } } ?: activityConfiguration
+    }
+    val context = LocalContext.current
     val places by map.places.collectAsState()
     // `gad.hostedDestination`: the place, once the venue is loaded.
     LaunchedEffect(places) {
@@ -232,28 +252,30 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
     }
     Box(Modifier.fillMaxSize()) {
-        ProximiMapView(
-            sdk = sdk,
-            journey = journey,
-            onJourneyChange = { map.hostedJourney.value = it },
-            routeAccessibility = accessibility,
-            onEvent = { event ->
-                FieldLog.log("hosted map → host app: $event")
-                mapEvents = mapEvents + (event::class.simpleName ?: "?")
-                if (event is ProximiMapEvent.SkipRequested) set(event.stop.id, ProximiJourney.State.SKIPPED)
-            },
-            destination = destination,
-            onDestinationChange = { destination = it },
-            isPaused = isPaused,
-            onPausedChange = { isPaused = it },
-            onNavigator = { navigator ->
-                navigators += 1
-                navigatorJob?.cancel()
-                navigatorJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    navigator.events.collect { navigatorEvents = navigatorEvents + (it::class.simpleName ?: "?") }
-                }
-            },
-        )
+        CompositionLocalProvider(LocalConfiguration provides viewConfiguration) {
+            ProximiMapView(
+                sdk = sdk,
+                journey = journey,
+                onJourneyChange = { map.hostedJourney.value = it },
+                routeAccessibility = accessibility,
+                onEvent = { event ->
+                    FieldLog.log("hosted map → host app: $event")
+                    mapEvents = mapEvents + (event::class.simpleName ?: "?")
+                    if (event is ProximiMapEvent.SkipRequested) set(event.stop.id, ProximiJourney.State.SKIPPED)
+                },
+                destination = destination,
+                onDestinationChange = { destination = it },
+                isPaused = isPaused,
+                onPausedChange = { isPaused = it },
+                onNavigator = { navigator ->
+                    navigators += 1
+                    navigatorJob?.cancel()
+                    navigatorJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                        navigator.events.collect { navigatorEvents = navigatorEvents + (it::class.simpleName ?: "?") }
+                    }
+                },
+            )
+        }
         Column(
             Modifier.align(Alignment.TopCenter).statusBarsPadding().background(Color.White.copy(alpha = 0.8f)),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -285,6 +307,7 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                     modifier = Modifier.testTag("hostedDestination"),
                 )
             }
+
             Text(
                 "navigator $navigators: ${navigatorEvents.takeLast(6).joinToString(" ")}",
                 style = MaterialTheme.typography.labelSmall,
@@ -295,6 +318,20 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.testTag("hostedMapEvents"),
             )
+        }
+        // At the left edge, also in Arabic, so they cover neither the search shortcuts nor the stop card.
+        Column(Modifier.align(AbsoluteAlignment.CenterLeft).background(Color.White.copy(alpha = 0.8f))) {
+            for (language in listOf("ar", "en")) {
+                TextButton(onClick = { hostLocale = language }) { Text("Locale $language", style = MaterialTheme.typography.labelSmall) }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                for (language in listOf("ar", "en")) {
+                    TextButton(onClick = {
+                        hostLocale = null
+                        context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(language)
+                    }) { Text("App $language", style = MaterialTheme.typography.labelSmall) }
+                }
+            }
         }
     }
 }

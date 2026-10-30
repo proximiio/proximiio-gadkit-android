@@ -26,6 +26,8 @@ class GadSettingsTest {
         assertEquals(setOf(0), GadSettings.STANDARD.levelsWithoutPositioning)
         assertEquals(5.seconds, GadSettings.STANDARD.levelChangeViewDuration)
         assertEquals(20.0, GadSettings.STANDARD.rideFloorHoldMeters)
+        // The next stop at the exit of the artwork's geofence (Nagarro call, 2026-10-30).
+        assertTrue(GadSettings.STANDARD.advancesOnArtworkExit)
         // Zoom 18 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-29).
         assertEquals(18.0, GadSettings.STANDARD.startZoom)
         assertEquals(2.seconds, GadSettings.STANDARD.startZoomDuration)

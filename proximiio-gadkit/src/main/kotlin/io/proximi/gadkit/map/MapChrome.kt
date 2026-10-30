@@ -21,6 +21,19 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
@@ -339,7 +352,8 @@ internal fun StopInfoCard(
             }
             Text(title, style = GadTextStyle.LargeBodyBold.textStyle, color = Palette.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (instruction != null || remaining != null || keepsInstructionLine) {
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // The line is 18.5 dp high in the design (Figma 10889:108085).
+                Row(Modifier.heightIn(min = 18.5.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     // An empty line still takes the height of one line of text.
                     Text(
                         instruction ?: "",
@@ -465,23 +479,59 @@ internal fun MapHandleArea(onPullDown: (() -> Unit)?) {
 }
 
 /**
- * The map in a glass card with 50 dp corners, 10 dp from the screen edges, a white 1 dp edge and
- * a drag handle at the top. [content] is drawn clipped to the card: the map, then its overlays.
+ * The map in a glass card with 50 dp corners, 10 dp from the screen edges, a white 1 dp stroke
+ * outside its edge, the design's shadow outside it and a drag handle at the top (Figma frame
+ * 10889:108085, iOS 1.27.1 and 1.28.0). [content] is drawn clipped to the card: the map, then its
+ * overlays.
  */
 @Composable
 internal fun MapGlassFrame(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    Box(modifier.padding(horizontal = 10.dp)) {
+    Box(
+        modifier
+            .padding(horizontal = 10.dp)
+            .drawBehind { drawFrameShadow() }
+            .drawWithContent {
+                drawContent()
+                // A 1 dp white stroke outside the card, as in the design.
+                val stroke = 1.dp.toPx()
+                val outline = FrameShape.createOutline(Size(size.width + stroke, size.height + stroke), layoutDirection, this)
+                translate(-stroke / 2, -stroke / 2) { drawOutline(outline, Palette.white, style = Stroke(stroke)) }
+            },
+    ) {
         Box(Modifier.fillMaxSize().clip(FrameShape), content = content)
-        Box(Modifier.fillMaxSize().border(1.dp, Palette.white, FrameShape))
+        // Figma `Swipe`: 60 × 6 dp at 20 % black with a 2 dp white stroke outside it (64 × 10 dp in
+        // all), the fill 9 dp below the card's top edge.
         Box(
             Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 8.dp)
-                .size(width = 60.dp, height = 6.dp)
-                .background(Color.Black.copy(alpha = 0.2f), CircleShape)
+                .padding(top = 7.dp)
+                .size(width = 64.dp, height = 10.dp)
                 .border(2.dp, Palette.white, CircleShape)
+                .padding(2.dp)
+                .background(Color.Black.copy(alpha = 0.2f), CircleShape)
                 .clearAndSetSemantics {},
         )
+    }
+}
+
+/**
+ * The design's shadow of the map card (blur 50, y −3, 15 % black), only outside the card: Figma draws
+ * no shadow behind a translucent layer.
+ */
+private fun DrawScope.drawFrameShadow() {
+    val path = Path().apply { addOutline(FrameShape.createOutline(size, layoutDirection, this@drawFrameShadow)) }
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(38, 0, 0, 0)
+        maskFilter = BlurMaskFilter(25.dp.toPx(), BlurMaskFilter.Blur.NORMAL)
+    }
+    clipPath(path, ClipOp.Difference) {
+        drawIntoCanvas { canvas ->
+            val native = canvas.nativeCanvas
+            native.save()
+            native.translate(0f, -3.dp.toPx())
+            native.drawPath(path.asAndroidPath(), paint)
+            native.restore()
+        }
     }
 }
 
@@ -672,7 +722,7 @@ internal fun BottomGlassBar(modifier: Modifier = Modifier, leading: @Composable 
         modifier
             .padding(horizontal = 10.dp)
             .fillMaxWidth()
-            .height(93.dp)
+            .height(93.5.dp)
             .glassSurface(CircleShape, shadow = false)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,

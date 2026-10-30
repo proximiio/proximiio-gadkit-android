@@ -185,8 +185,9 @@ public sealed interface ProximiMapEvent {
     public data class StopPlaceDeleted(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
-     * [GadSettings.artworkAdvanceDelay] after the visitor reached the artwork of the active stop: the
-     * stop is done and the route leads to the next stop.
+     * The visitor left the geofence of the active stop's artwork ([GadSettings.advancesOnArtworkExit]),
+     * or [GadSettings.artworkAdvanceDelay] after they reached it without that setting: the stop is
+     * done and the route leads to the next stop.
      */
     public data class ArtworkReached(public val stop: ProximiStop) : ProximiMapEvent
 
@@ -234,15 +235,16 @@ public sealed interface ProximiMapEvent {
 
     /**
      * "Add a stop" on an amenity: the journey waits while the visitor goes there, until "Resume your
-     * Journey" ([JourneyResumed]). Sent after [DetourStarted]. A detour to the host app's
-     * `destination` sends none.
+     * Journey" ([JourneyResumed]). Sent after [DetourStarted], and after `onPausedChange(true)`: the
+     * host app's pause control shows the journey paused, and its resume ends the detour. A detour to
+     * the host app's `destination` sends none.
      */
     public data object JourneyPaused : ProximiMapEvent
 
     /**
      * "Resume your Journey": after a detour, or on the card of a journey the host app paused
      * ([ProximiMapView]'s `isPaused`, which the view then sets back to `false` through
-     * `onPausedChange`).
+     * `onPausedChange`). The host app's own `false` reports none.
      */
     public data object JourneyResumed : ProximiMapEvent
 

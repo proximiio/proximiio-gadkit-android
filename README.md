@@ -313,7 +313,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `OFF_ROUTE_PROMPT` | "Looks like you've left your route" with "Dismiss", in place of the stop card, `GadSettings.offRouteMeters` (12 m) off the leg to the current destination, also where a later leg passes, and before any routing. It stays `GadSettings.offRouteWarningDuration` (10 s). With `PROGRESS` a personalised journey keeps the leg until another open artwork is nearer, then the stops ahead are ordered again; other journeys are routed again from the visitor. A floor the route does not take counts as off the route after `GadSettings.wrongFloorAfter` (10 s). See "Journeys". | The route follows a visitor who left it; `OffRoute` reports it. |
 | `UNCERTAIN_POSITION_PROMPT` | "Probably at …" when the position is uncertain near the active stop. | `PositionUncertain` reports it. |
 | `LEAVE_TOUR_PROMPT` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `onClose`). | Back calls `onClose` at once. |
-| `PROGRESS` | The view moves the journey on and reports it through `onJourneyChange`: an artwork is visited when the visitor enters its geofence (`ArtworkReached`) or, in a personalised journey, stays at it out of order (`ArtworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and reports no journey. |
+| `PROGRESS` | The view moves the journey on and reports it through `onJourneyChange`: an artwork is visited when the visitor leaves its geofence (`ArtworkReached`, `GadSettings.advancesOnArtworkExit`) or, in a personalised journey, stays at it out of order (`ArtworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and reports no journey. |
 | `JOURNEY_NOTIFICATION` | The ongoing journey notification (iOS `.liveActivity`). It needs the notification permission; the view asks for it. | No journey notification. |
 | `JOURNEY_COMPLETE` | Journey Complete when the last stop is done. | No screen; `JourneyFinished` reports the end. |
 
@@ -352,8 +352,8 @@ With `PROGRESS` the view also reports through `onJourneyChange`:
 
 - the journey after every change of the order or of a stop state. A personalised journey is ordered
   from the visitor at the start, so the first report can be the new order;
-- `VISITED` `artworkAdvanceDelay` after the arrival at an artwork. The stop the route leads to is
-  `PENDING`;
+- `VISITED` when the visitor leaves the artwork's geofence (`advancesOnArtworkExit`), or
+  `artworkAdvanceDelay` after the arrival without it. The stop the route leads to is `PENDING`;
 - the stops that match no POI unchanged, after the other stops;
 - nothing at Journey Complete: the journey already holds the last states.
 
@@ -740,7 +740,7 @@ lists:
 | `StopNearby(stop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The library posts no notification for it. |
 | `PositionUncertain(stop)` | `ProximiMapView` without `PROMPTS`: the position is uncertain near the active stop, where the prompt would ask "Probably at …". At most once per `locationQuestionQuietPeriod`. |
 | `StopPlaceDeleted(stop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. See "Venue data changes". |
-| `ArtworkReached(stop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, stood in its area, or opened the journey inside it: the stop is done and the route leads to the next stop. `GeofenceEntered` arrives at the enter. |
+| `ArtworkReached(stop)` | The visitor was in the artwork geofence of the active stop (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it) and left it: on the SDK's exit event, after `geofenceExitDelay` outside it without one, or at a fix in another open artwork's geofence (`advancesOnArtworkExit`). Without that setting: `artworkAdvanceDelay` after the arrival. The stop is done and the route leads to the next stop. `GeofenceEntered` arrives at the enter. |
 | `ArtworkVisitedOutOfOrder(stop)` | Personalised journeys only: the visitor stayed at an artwork further down the journey. It counts as visited, and the stops ahead are ordered again. A curated tour ignores such an artwork. |
 | `SkipRequested`, `StopSkipped`, `SkipCancelled` (`stop`) | A swipe on a stop in the list (or its "Skip" TalkBack action), "Skip artwork", "Keep it". `SkipUndone` is deprecated and not sent: the list has no "Undo skip". |
 | `AmenitySelected(stop)` | An amenity picked on the map. A card shows it with "Go here"; the amenity gets the red marker with its white icon, and the map shows the visitor and the amenity (on another floor: the amenity's floor around it). |
@@ -777,7 +777,8 @@ val configuration = GadConfiguration(
 |---|---|---|
 | `trackingLostAfter` | 110 s | Time without positioning before `ProximiMapEvent.TrackingChanged(LOST_PLACE)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
 | `trackingStoppedAfter` | 170 s | Time without positioning before `TrackingChanged(STOPPED_RESPONDING)` (about 3 min). |
-| `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
+| `advancesOnArtworkExit` | `true` | The route leads to the next stop when the visitor leaves the active artwork's geofence (Nagarro, 2026-10-30). `false`: `artworkAdvanceDelay` after entering it. |
+| `artworkAdvanceDelay` | 2 s | With `advancesOnArtworkExit` `false`: from the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence or privacy zone before the SDK reports the exit. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
@@ -1065,6 +1066,53 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   turns more slowly and does not turn for a heading change under 5° (Nagarro: the rotation was too fast,
   2026-10-29). The map library's defaults are 0.9 s and 0°. The heading arrow of the position dot stays
   live.
+
+#### Changed (iOS 1.27.1, 1.28.0)
+
+- **Visible:** the journey map screen is laid out as the Figma frame 10889:108085 (Nagarro, 2026-10-30:
+  the Map / List control and search sat too close to the drag handle; the owner asked for the screen as
+  close to Figma as possible):
+  - The Map / List control and search are 32 dp below the map card's top edge (were 22 dp), 17 dp below
+    the drag handle.
+  - The drag handle is 60 × 6 dp at 20 % black with a 2 dp white stroke outside it, its fill 9 dp below
+    the card's top edge.
+  - The map card is 3 dp below the status bar (was 8 dp), with a 1 dp white stroke outside its edge and
+    the design's shadow outside it (blur 50, y −3, 15 % black).
+  - The bottom bar is 11.5 dp under the card, 93.5 dp high, and 21 dp into the navigation bar inset.
+  - The controls in the card are 21 dp from its sides, with 12 dp between the buttons and the stop card.
+  - The stop card is 23 dp above the card's bottom edge, and its instruction line is 18.5 dp high.
+- **Visible:** "Add a stop" sets `isPaused` to `true` itself (`onPausedChange(true)`, before
+  `JourneyPaused`), and the view does not treat its own write as the host app's pause: the card shows
+  the detour. The host app's `false` then does what "Resume your Journey" on the detour's card does: the
+  detour ends (on a floor without positioning the map goes back to the visitor's floor first), with no
+  event. "Resume your Journey" on the detour's card, and the end of the detour, set it back to `false`.
+  "Add a stop" during the host app's own pause keeps the detour after the resume and sets `isPaused` to
+  `true` again. Before, the host app's resume after "Add a stop" left the detour, and its card offered
+  "Resume your Journey" again (Nagarro, 2026-10-30). A host app that passes `onPausedChange` back as
+  `isPaused`, as the docs ask, needs no change.
+- **Visible:** the library's texts follow the host app's language while a view is open. The language
+  is the first locale of the composition's `LocalConfiguration`: the one the host app gives
+  `ProximiMapView`, `ProximiExploreView` or `ProximiMapHost`, or the activity's (the app language,
+  `LocaleManager`). "ar" for Arabic, else "en". The texts, the layout direction (right to left in
+  Arabic), the journey notification and the error messages of `ProximiMap` follow it; the map labels
+  followed it before. Before, a host app that changed the locale only in its composition got the map
+  labels in the new language and the texts in the old one (Nagarro, 2026-10-30: the language changed
+  wrongly while the app ran).
+- Debuggable builds: the debug host of `gad.hostedMap` has "Locale ar/en" (the view's own locale) and
+  "App ar/en" (the app language, Android 13 and later), for the UI tests of the Proximi GAD app.
+
+#### Added (iOS 1.29.0)
+
+- `GadSettings.advancesOnArtworkExit` (`true`). **Visible:** the journey moves to the next stop when the
+  visitor leaves the active artwork's geofence, not 2 s after they entered it (Nagarro call, 2026-10-30:
+  the next stop comes from the exit event). The audio guide can play while the visitor is at the
+  artwork. The visitor leaves on the SDK's `GeofenceEvent.Exited`, after `geofenceExitDelay` (5 s)
+  outside it without that event, or at once at a fix in another open artwork's geofence.
+  `ArtworkReached` and the stop's `VISITED` come at that moment. While the visitor is at the artwork, the
+  card and the route still show it as the next stop. `false` keeps the move `artworkAdvanceDelay` after
+  the enter.
+- Field log: `artwork geofence arrival: … · next stop at the exit` and `artwork left (<exit event |
+  outside for n s | in another artwork>): … · next stop`.
 
 #### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.32; iOS 1.25.0, 1.27.0)
 

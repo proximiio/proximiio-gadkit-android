@@ -17,6 +17,7 @@ import io.proximi.gadkit.R
 import io.proximi.gadkit.visit.VisitActivity
 import io.proximi.gadkit.visit.VisitActivityState
 import io.proximi.gadkit.map.mapText
+import io.proximi.gadkit.ui.AppLanguage
 
 /**
  * The visit's ongoing notification, in place of the iOS Live Activity (`VisitLiveActivity`,
@@ -37,6 +38,9 @@ internal class VisitNotification(
 ) {
     private val context = context.applicationContext
     private val manager = NotificationManagerCompat.from(this.context)
+    /** The language of the texts, "ar" or "en" ([io.proximi.gadkit.ui.AppLanguage]), or `null` for the app's own. */
+    var language: String? = null
+
     private var lastState: VisitActivityState? = null
     private var lastUpdate = 0L
     private var isShowing = false
@@ -75,7 +79,7 @@ internal class VisitNotification(
 
     /** Title, "Your journey · Stop 1 of 2", instruction (or empty). */
     private fun render(state: VisitActivityState): List<String> {
-        val resources = context.resources
+        val resources = language?.let { AppLanguage.resources(context, it) } ?: context.resources
         return listOf(
             state.title.mapText(resources),
             resources.getString(R.string.your_journey_2) + " · " + state.progress.mapText(resources),

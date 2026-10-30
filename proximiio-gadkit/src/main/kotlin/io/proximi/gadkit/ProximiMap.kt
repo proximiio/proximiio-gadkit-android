@@ -1,7 +1,9 @@
 package io.proximi.gadkit
 
 import android.content.Context
+import android.content.res.Resources
 import io.proximi.gadkit.map.MapDiagnostics
+import io.proximi.gadkit.map.MapLanguage
 import io.proximi.gadkit.map.GeofenceNotifier
 import io.proximi.gadkit.map.LocalNotice
 import io.proximi.gadkit.map.LocalNotices
@@ -11,6 +13,7 @@ import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.map.galleries
 import io.proximi.gadkit.map.isArtwork
 import io.proximi.gadkit.map.places
+import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.ui.resolve
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyKind
@@ -629,9 +632,12 @@ public class ProximiMap(
 
     // Text
 
-    private fun text(id: Int): String = context.getString(id)
+    /** The resources in the app's language ([setLanguage]; iOS 1.28.0). */
+    private val resources: Resources get() = AppLanguage.resources(context, MapLanguage.forAppLanguage(language))
 
-    private fun text(text: UiText): String = text.resolve(context)
+    private fun text(id: Int): String = resources.getString(id)
+
+    private fun text(text: UiText): String = text.resolve(resources)
 
     private fun stopsText(count: Int): String = context.resources.getQuantityString(R.plurals.n_stops, count, count)
 

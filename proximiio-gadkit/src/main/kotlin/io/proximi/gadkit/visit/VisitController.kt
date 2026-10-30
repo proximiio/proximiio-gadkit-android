@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
+import kotlin.time.Duration
 import io.proximi.gadkit.visit.Journey as CoreJourney
 
 /**
@@ -62,7 +63,11 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  *   only `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
  *   [GadSettings.geofenceExitDelay], 5 s; the SDK default is 3 s), so an artwork counts as inside
  *   up to that long after the visitor left it.
- * - The journey moves to the next artwork 2 s after the arrival.
+ * - The journey moves to the next stop when the visitor leaves the artwork's geofence
+ *   ([GadSettings.advancesOnArtworkExit]; Nagarro, 2026-10-30): on the SDK's exit event
+ *   ([artworkGeofenceExited]), after [GadSettings.geofenceExitDelay] outside it without one, or at
+ *   once when the visitor is in another open artwork's geofence. Without the setting it moves on
+ *   [GadSettings.artworkAdvanceDelay] (2 s) after the arrival.
  * - Artwork legs have no arrival by distance ([artworkGuidanceRules]). An artwork the visitor walks
  *   past without entering its geofence stays unvisited until it is skipped.
  * - Out of order: a visitor inside the geofence of another open artwork for
@@ -254,6 +259,15 @@ internal class VisitController(
     /** Stops whose move to the next artwork is scheduled. */
     private val scheduledDone = mutableSetOf<String>()
 
+    /**
+     * With [GadSettings.advancesOnArtworkExit]: the active artwork whose geofence the visitor entered.
+     * The journey moves on when they leave it.
+     */
+    private var arrivedStopId: String? = null
+
+    /** The first fix outside the geofence of [arrivedStopId], for a leave without an exit event (ms). */
+    private var outsideArrivedSince: Long? = null
+
     /** Time inside the geofence of each open artwork that is not the active stop. */
     private val outOfOrderDwell = GeofenceDwell()
 
@@ -385,7 +399,7 @@ internal class VisitController(
     private fun handle(event: JourneyEvent) {
         refreshGalleryAhead()
         when (event) {
-            is JourneyEvent.StopReached -> if (event.stop.kind != JourneyStop.Kind.DETOUR) scheduleDone(event.stop.id)
+            is JourneyEvent.StopReached -> if (event.stop.kind != JourneyStop.Kind.DETOUR) scheduleDone(event.stop.id, settings.artworkAdvanceDelay)
             is JourneyEvent.DetourEnded -> if (event.completed) doneJobs += scope.launch { serially { rerouting { orderRemaining() } } }
             is JourneyEvent.LeftRoute, is JourneyEvent.FarFromRoute, is JourneyEvent.OffRouteTooLong -> offRouteEpisode()
             JourneyEvent.ReturnedToRoute, is JourneyEvent.LegChanged, is JourneyEvent.Rerouted -> isOffRouteEpisode = false
@@ -559,15 +573,45 @@ internal class VisitController(
     }
 
     /**
-     * The visitor entered an artwork geofence. The active artwork moves on after 2 s. The
+     * The visitor entered an artwork geofence. With [GadSettings.advancesOnArtworkExit] the active
+     * artwork moves on when the visitor leaves it, else after [GadSettings.artworkAdvanceDelay]. The
      * geofence of any other artwork is ignored, and every artwork geofence is ignored during a
      * detour.
      */
     fun artworkGeofenceEntered(remoteId: String?) {
         if (!managesProgress || mutablePaused.value || navigator.detourStop != null) return
         val id = ArtworkArrival.activeStopId(remoteId, journey, artworkRemoteIds) ?: return
-        FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"}")
-        scheduleDone(id)
+        if (!settings.advancesOnArtworkExit) {
+            FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"}")
+            return scheduleDone(id, settings.artworkAdvanceDelay)
+        }
+        outsideArrivedSince = null
+        if (arrivedStopId == id) return
+        arrivedStopId = id
+        FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"} · next stop at the exit")
+    }
+
+    /**
+     * The SDK reports that the visitor left an artwork geofence. Leaving the active artwork they
+     * arrived at moves the journey to the next stop ([GadSettings.advancesOnArtworkExit]).
+     */
+    fun artworkGeofenceExited(remoteId: String?) {
+        if (!managesProgress || mutablePaused.value) return
+        val arrived = arrivedStopId ?: return
+        if (remoteId == null) return
+        val stop = navigator.journey.value.stops.firstOrNull { it.id == arrived }
+        if (artworkRemoteIds[stop?.poiId ?: arrived] != remoteId) return
+        leaveArrivedArtwork("exit event")
+    }
+
+    /** The visitor left the active artwork they arrived at: the journey moves to the next stop. */
+    private fun leaveArrivedArtwork(reason: String) {
+        val id = arrivedStopId ?: return
+        arrivedStopId = null
+        outsideArrivedSince = null
+        if (navigator.activeStop?.id != id) return
+        FieldLog.log("artwork left ($reason): $id · next stop")
+        scheduleDone(id, Duration.ZERO)
     }
 
     /**
@@ -589,7 +633,8 @@ internal class VisitController(
         val point = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
         val level = position.floor?.level
         val activeId = navigator.activeStop?.id
-        val inside = mutableSetOf<String>()
+        var inside = mutableSetOf<String>()
+        var isInsideActive = false
         for (stop in navigator.journey.value.stops) {
             if (stop.kind == JourneyStop.Kind.DETOUR) continue
             if (stop.state != JourneyStop.State.PENDING && stop.state != JourneyStop.State.ACTIVE && stop.state != JourneyStop.State.REACHED) continue
@@ -598,7 +643,36 @@ internal class VisitController(
             val stopLevel = stop.floor?.level
             if (!VenueLevel.matches(stopLevel, level)) continue
             if (areas.none { it.id in enteredGeofenceIds || it.contains(point) }) continue
-            if (stop.id == activeId) artworkGeofenceEntered(remoteId) else if (countsOutOfOrder) inside += stop.id
+            if (stop.id == activeId) {
+                isInsideActive = true
+                artworkGeofenceEntered(remoteId)
+            } else if (countsOutOfOrder) {
+                inside += stop.id
+            }
+        }
+        val arrived = arrivedStopId
+        if (arrived != null) {
+            when {
+                // Skipped, reordered or visited otherwise.
+                arrived != activeId -> {
+                    arrivedStopId = null
+                    outsideArrivedSince = null
+                }
+                // In another open artwork: the visitor has moved on. That artwork counts from the next
+                // fix, after the journey moved on.
+                inside.isNotEmpty() -> {
+                    leaveArrivedArtwork("in another artwork")
+                    inside = mutableSetOf()
+                }
+                // No exit event: the SDK did not count the visitor inside, or the event was missed.
+                !isInsideActive -> {
+                    val now = System.currentTimeMillis()
+                    val since = outsideArrivedSince ?: now.also { outsideArrivedSince = it }
+                    if (now - since >= settings.geofenceExitDelay.inWholeMilliseconds) {
+                        leaveArrivedArtwork("outside for ${settings.geofenceExitDelay.inWholeSeconds} s")
+                    }
+                }
+            }
         }
         for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) markOutOfOrder(id)
     }
@@ -695,12 +769,12 @@ internal class VisitController(
         }
     }
 
-    /** Marks [stopId] visited after 2 s if it is still the active stop. The leg to the next artwork is drawn. */
-    private fun scheduleDone(stopId: String) {
+    /** Marks [stopId] visited after [after] if it is still the active stop. The leg to the next artwork is drawn. */
+    private fun scheduleDone(stopId: String, after: Duration) {
         if (!scheduledDone.add(stopId)) return
         doneJobs += scope.launch {
             try {
-                delay(settings.artworkAdvanceDelay)
+                delay(after)
             } catch (cancelled: CancellationException) {
                 scheduledDone.remove(stopId)
                 throw cancelled

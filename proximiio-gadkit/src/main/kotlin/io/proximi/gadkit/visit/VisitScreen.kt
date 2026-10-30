@@ -269,11 +269,12 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
             Image(painterResource(R.drawable.background_map), null, Modifier.fillMaxSize().glassBackdrop(backdrop), contentScale = ContentScale.Crop)
         }
         ProvideGlassBackdrop(backdrop) {
-            // As iOS: the card 8 dp under the status bar, the bar 14 dp into the navigation bar inset (at least 4 dp).
+            // As the Figma frame 10889:108085 (iOS 1.28.0): the card 3 dp under the status bar, the bar
+            // 11.5 dp under the card and 21 dp into the navigation bar inset (at least 4 dp).
             val navigationBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             Column(
-                Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp, bottom = maxOf(navigationBottom - 14.dp, 4.dp)),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                Modifier.fillMaxSize().statusBarsPadding().padding(top = 3.dp, bottom = maxOf(navigationBottom - 21.dp, 4.dp)),
+                verticalArrangement = Arrangement.spacedBy(11.5.dp),
             ) {
                 MapGlassFrame(Modifier.weight(1f)) {
                     ProximiioMap(
@@ -381,7 +382,10 @@ private fun ListOverlay(model: VisitViewModel) {
 private fun CardOverlay(model: VisitViewModel) {
     // Without stops the map shows, whatever the mode is.
     val isMap = !model.showsList
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // As the Figma frame 10889:108085 (iOS 1.27.1, 1.28.0): 21 dp from the card's sides, the controls
+    // 32 dp below its top edge (17 dp below the drag handle; Nagarro, 2026-10-30: they sat too close to
+    // it), the stop card 23 dp above its bottom edge and 12 dp under the buttons.
+    Column(Modifier.fillMaxSize().padding(start = 21.dp, end = 21.dp, top = 32.dp, bottom = 23.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // The free height above the bottom buttons: a long amenity list scrolls within it (iOS 1.24.1).
         Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.Top) {
             if (model.hasStops) MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP })

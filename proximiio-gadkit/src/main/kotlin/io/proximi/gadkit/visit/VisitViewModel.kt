@@ -146,9 +146,21 @@ internal class VisitViewModel(
     private val onDestinationChange: (ProximiDestination?) -> Unit = {},
     /** The host app's pause when the screen opens (`ProximiMapView`'s `isPaused`). */
     private val isPausedAtStart: Boolean = false,
-    /** Sets the host app's pause back to `false` after "Resume your Journey" on the paused card. */
+    /**
+     * Sets the host app's pause: `true` on "Add a stop", `false` on "Resume your Journey" and when the
+     * detour ends.
+     */
     private val onPausedChange: (Boolean) -> Unit = {},
 ) {
+    /** The host app's `isPaused` as last seen or written. */
+    private var hostPaused: Boolean = isPausedAtStart
+
+    /** `isPaused` is `true` because of "Add a stop": the host app's `false` resumes the journey as "Resume your Journey" does. */
+    private var detourPausesJourney = false
+
+    /** The value the view wrote to `isPaused` last. The [pausedChanged] that follows is not the host app's. */
+    private var pausedWrite: Boolean? = null
+
     /** What the navigator reports, read on each change of its journey. */
     data class Progress(
         val journey: Journey,
@@ -411,6 +423,11 @@ internal class VisitViewModel(
                 if (controller.isPaused.value && isRouteDeviation(event)) return@collect
                 onEvent(VisitEvent.Journey(event))
                 if (event is JourneyEvent.DetourEnded && routedDestination?.placeId == (event.stop.poiId ?: event.stop.id)) clearDestination()
+                // A second "Add a stop" ends the first detour and starts another.
+                if (event is JourneyEvent.DetourEnded && detourPausesJourney && controller.navigator.detourStop == null) {
+                    detourPausesJourney = false
+                    setPaused(controller.isPaused.value)
+                }
             }
         }
         scope.launch {
@@ -556,6 +573,8 @@ internal class VisitViewModel(
                         if (currentGallery == event.geofence.name) currentGallery = null
                     event is GeofenceEvent.Entered && event.geofence.isArtwork ->
                         controller.artworkGeofenceEntered(event.geofence.remoteId)
+                    event is GeofenceEvent.Exited && event.geofence.isArtwork ->
+                        controller.artworkGeofenceExited(event.geofence.remoteId)
                 }
             }
         }
@@ -679,6 +698,7 @@ internal class VisitViewModel(
         val language = MapLanguage.forAppLanguage(appLanguage)
         if (language == this.language) return
         this.language = language
+        notification?.language = language
         session.options = session.options.copy(language = language)
         scope.launch {
             loadVenue()
@@ -1026,13 +1046,21 @@ internal class VisitViewModel(
         refreshLevelChanger()
     }
 
-    /** "Resume your Journey" on the stop card: on the floor without positioning the way back starts first. */
+    /** "Resume your Journey" on the detour's card: on the floor without positioning the way back starts first. */
     fun resumeFromCard() {
+        detourPausesJourney = false
+        setPaused(false)
+        onEvent(VisitEvent.JourneyResumed)
+        returnFromDetour()
+    }
+
+    /** Ends the detour. On the floor without positioning the map goes back to the visitor's floor first. Reports no event. */
+    private fun returnFromDetour() {
         if (floorGuide.phase.value is FloorWithoutPositioningGuide.Phase.OnFloor) {
             returnOrigin = floorDestination?.coordinate
             floorGuide.returnFromFloor()
         }
-        resumeJourney()
+        scope.launch { controller.resumeJourney() }
     }
 
     /** Marks the lift or stairs of the route's next level change on the shown floor in red. */
@@ -1067,12 +1095,6 @@ internal class VisitViewModel(
     }
 
     // Card and list actions
-
-    /** "Resume your Journey" after a detour and "Show the route from here" after leaving the route. */
-    fun resumeJourney() {
-        onEvent(VisitEvent.JourneyResumed)
-        scope.launch { controller.resumeJourney() }
-    }
 
     /** "Centre on me": the map follows the visitor's floor again, also after a floor without positioning. */
     fun centreOnMe() {
@@ -1143,6 +1165,10 @@ internal class VisitViewModel(
         }
         scope.launch { controller.detour(place) }
         onEvent(VisitEvent.DetourStarted(place))
+        // The host app's pause control shows the journey paused, and its resume is "Resume your
+        // Journey" (Nagarro, 2026-10-30).
+        detourPausesJourney = true
+        setPaused(true)
         onEvent(VisitEvent.JourneyPaused)
         session.followMyFloor()
         recentre(reason = "stop added")
@@ -1283,16 +1309,54 @@ internal class VisitViewModel(
 
     // Pause
 
-    /** The host app paused (`true`) or resumed (`false`) the journey. Reports no event. */
+    /**
+     * The host app paused (`true`) or resumed (`false`) the journey. Reports no event. The value the
+     * view wrote itself ([setPaused]) is not the host app's change.
+     */
     fun pausedChanged(isPaused: Boolean) {
+        if (pausedWrite == isPaused) {
+            pausedWrite = null
+            return
+        }
+        pausedWrite = null
+        hostPaused = isPaused
         // Before the start too: the controller starts paused, and a resume before it changes nothing.
         if (!hasStops) return
-        if (isPaused) controller.pause() else scope.launch { controller.resumeFromPause() }
+        if (isPaused) controller.pause() else scope.launch { resumeAfterHostPause() }
+    }
+
+    /** Writes `isPaused` for the host app (`onPausedChange`). The view does not act on it as the host app's change. */
+    private fun setPaused(paused: Boolean) {
+        if (hostPaused == paused) return
+        pausedWrite = paused
+        hostPaused = paused
+        onPausedChange(paused)
+    }
+
+    /**
+     * The host app set `isPaused` to `false`. After "Add a stop" this is "Resume your Journey": the
+     * detour ends and the journey goes on (Nagarro, 2026-10-30: after their play button the card still
+     * offered "Resume your Journey"). The host app's change reports no event.
+     */
+    private suspend fun resumeAfterHostPause() {
+        FieldLog.log("host app resumed the journey · detour ${controller.navigator.detourStop?.id ?: "-"}")
+        val wasPaused = controller.isPaused.value
+        controller.resumeFromPause()
+        if (!detourPausesJourney) return
+        if (wasPaused) {
+            // "Add a stop" during the host app's pause: the detour's card shows now, and the journey
+            // waits for it.
+            setPaused(true)
+            return
+        }
+        detourPausesJourney = false
+        if (controller.navigator.detourStop != null) returnFromDetour()
     }
 
     /** "Resume your Journey" on the card of a paused journey. */
     fun resumeFromPause() {
-        onPausedChange(false)
+        // A detour added during the pause keeps the journey paused.
+        setPaused(detourPausesJourney)
         scope.launch { controller.resumeFromPause() }
         onEvent(VisitEvent.JourneyResumed)
     }

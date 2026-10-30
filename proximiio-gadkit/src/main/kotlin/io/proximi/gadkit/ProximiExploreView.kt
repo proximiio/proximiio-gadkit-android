@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.explore.ExploreMuseumView
+import io.proximi.gadkit.ui.HostLanguage
 import io.proximi.sdk.Proximiio
 
 /**
@@ -43,12 +44,15 @@ public fun ProximiExploreView(sdk: Proximiio, modifier: Modifier = Modifier, set
         // A recreated activity shows the same map again.
         onDispose { if (activity?.isChangingConfigurations != true) model.stop() }
     }
-    Box(modifier) {
-        val venue = model.venue
-        if (venue != null) {
-            ExploreMuseumView(venue)
-        } else {
-            CircularProgressIndicator(Modifier.align(Alignment.Center), color = Palette.ink)
+    // The texts follow the host app's locale while the view is open (iOS 1.28.0).
+    HostLanguage {
+        Box(modifier) {
+            val venue = model.venue
+            if (venue != null) {
+                ExploreMuseumView(venue)
+            } else {
+                CircularProgressIndicator(Modifier.align(Alignment.Center), color = Palette.ink)
+            }
         }
     }
 }

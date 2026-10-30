@@ -82,9 +82,11 @@ internal sealed interface VisitEvent {
     data class PositionUncertain(val stop: JourneyStop) : VisitEvent
 
     /**
-     * The visitor reached the artwork of the active stop: they entered its geofence or stand in its
-     * area. The stop is done 2 s later, when this event arrives, and the route leads to the next
-     * stop. The navigator reports no `StopReached` for artworks.
+     * The visitor left the geofence of the active stop's artwork
+     * ([io.proximi.gadkit.GadSettings.advancesOnArtworkExit]),
+     * or 2 s after they entered it or stood in its area without that setting. The stop is done when
+     * this event arrives, and the route leads to the next stop. The navigator reports no
+     * `StopReached` for artworks.
      */
     data class ArtworkReached(val stop: JourneyStop) : VisitEvent
 

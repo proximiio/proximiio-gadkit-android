@@ -47,6 +47,7 @@ import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.VisitEvent
 import io.proximi.gadkit.visit.VisitMode
 import io.proximi.gadkit.visit.VisitScreen
+import io.proximi.gadkit.ui.HostLanguage
 import io.proximi.map.live.JourneyNavigator
 import io.proximi.sdk.Proximiio
 import kotlinx.coroutines.launch
@@ -184,9 +185,11 @@ internal fun Set<ProximiMapView.Option>.hasPrompt(prompt: ProximiMapView.Option)
  *   not routed again. The stop card shows "Journey paused" with "Resume your Journey". `false`
  *   resumes it: the leg is drawn again from the visitor, and a personalised journey with
  *   [ProximiMapView.Option.PROGRESS] is ordered again from the visitor first. A change of the host app
- *   reports no event.
- * @param onPausedChange `false` after "Resume your Journey" on the card of a paused journey, which
- *   also reports [ProximiMapEvent.JourneyResumed]. Pass it back as [isPaused].
+ *   reports no event. After "Add a stop" the view sets it to `true` itself; the host app's `false` then
+ *   ends the detour as "Resume your Journey" on its card does (Nagarro, 2026-10-30).
+ * @param onPausedChange `true` on "Add a stop" (before [ProximiMapEvent.JourneyPaused]); `false` after
+ *   "Resume your Journey" on the card of a paused journey or of a detour, which also reports
+ *   [ProximiMapEvent.JourneyResumed], and when the detour ends. Pass it back as [isPaused].
  * @param onNavigator called on the main thread with the `JourneyNavigator` that draws the journey,
  *   before the journey starts, and again with a new navigator each time the screen starts again (a
  *   new journey kind, a journey without a stop on the map, the first journey on an empty map). Start
@@ -230,29 +233,32 @@ public fun ProximiMapView(
         // A recreated activity shows the same screen again.
         onDispose { if (activity?.isChangingConfigurations != true) model.stop() }
     }
-    Box(modifier) {
-        val loaded = model.loaded
-        if (loaded != null) {
-            CompositionLocalProvider(LocalRouteAccessibility provides routeAccessibility) {
-                VisitScreen(
-                    loaded.venue,
-                    loaded.journey,
-                    onClose = onClose,
-                    kind = loaded.kind,
-                    options = loaded.options,
-                    mode = mode,
-                    incoming = model.incoming,
-                    persist = { model.write(it, loaded.generation) },
-                    onVisitEvent = model::handle,
-                    onNavigator = { model.onNavigator(it) },
-                    destination = destination,
-                    onDestinationChange = onDestinationChange,
-                    isPaused = isPaused,
-                    onPausedChange = onPausedChange,
-                )
+    // The texts follow the host app's locale while the view is open (iOS 1.28.0).
+    HostLanguage {
+        Box(modifier) {
+            val loaded = model.loaded
+            if (loaded != null) {
+                CompositionLocalProvider(LocalRouteAccessibility provides routeAccessibility) {
+                    VisitScreen(
+                        loaded.venue,
+                        loaded.journey,
+                        onClose = onClose,
+                        kind = loaded.kind,
+                        options = loaded.options,
+                        mode = mode,
+                        incoming = model.incoming,
+                        persist = { model.write(it, loaded.generation) },
+                        onVisitEvent = model::handle,
+                        onNavigator = { model.onNavigator(it) },
+                        destination = destination,
+                        onDestinationChange = onDestinationChange,
+                        isPaused = isPaused,
+                        onPausedChange = onPausedChange,
+                    )
+                }
+            } else {
+                HostedMapLoading(options, onClose)
             }
-        } else {
-            HostedMapLoading(options, onClose)
         }
     }
 }
