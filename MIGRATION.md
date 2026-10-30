@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.22.2 uses SDK
-6.0.0-beta.35 and Map 6.0.0-beta.31; the next release uses SDK 6.0.0-beta.36 and Map 6.0.0-beta.36.
+6.0.0-beta.35 and Map 6.0.0-beta.31; the next release uses SDK 6.0.0-beta.36 and Map 6.0.0-beta.37.
 
 Each change has a mark:
 
@@ -76,6 +76,7 @@ built again: both have a new trailing parameter.
 | Map 6.0.0-beta.34 | MapLibre asks the API host for up to 20 requests at once, not 5, as MapLibre's own HTTP client does: a first open with an empty map cache gets its style, sprite, glyphs and floor-plan tiles sooner. Nothing is drawn differently. A timing log, silent unless `adb shell setprop log.tag.ProximiioMapTiming DEBUG`. There is no Map 6.0.0-beta.33 on Maven. | | Info |
 | Map 6.0.0-beta.35 | The timing log also counts the feature pushes and shows the main thread's longest hold. Nothing runs with the log off. | | Info |
 | Map 6.0.0-beta.36 | A feature push encodes its changed features in parallel from 64 on, with the same result; a push overtaken before its encode is skipped. The first map open draws sooner. Nothing is drawn differently. | | Info |
+| Map 6.0.0-beta.37 | The venue's features are encoded once per app process, as soon as the session has them, so a map opened again draws sooner; a few MB stay in memory after the map closes. New and off by default: `JourneyNavigator.markReached(stopId)`, `upcomingStop`, `drawsNextLegWhileReached`, `RouteFollowRules.progressCorridorMeters`. | | Info |
 
 ### Added
 
@@ -140,7 +141,7 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.37 and later and Map 6.0.0-beta.37 and later are not used by the next ProximiioGADKit
+SDK 6.0.0-beta.37 and later and Map 6.0.0-beta.38 and later are not used by the next ProximiioGADKit
 for Android. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
@@ -163,7 +164,7 @@ for Android. A host app that declares them gets them instead of the versions abo
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
   depend on `io.proximi.gadkit:proximiio-gadkit:1.22.2` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.36` and Map `6.0.0-beta.36` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.36` and Map `6.0.0-beta.37` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.

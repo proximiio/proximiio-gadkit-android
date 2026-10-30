@@ -27,8 +27,10 @@ public data class GadSettings(
     /**
      * `true`: the journey moves to the next stop when the visitor leaves the geofence of the active
      * artwork: on the SDK's exit event, or after [geofenceExitDelay] outside it without one (Nagarro,
-     * 2026-10-30: the next stop comes from the exit event). `false`: [artworkAdvanceDelay] after the
-     * visitor entered it. iOS `advancesOnArtworkExit`.
+     * 2026-10-30: the next stop comes from the exit event). Inside the geofence the artwork is reached:
+     * the card and the destination marker keep the artwork, and the route shows the leg to the next
+     * stop (`JourneyNavigator.drawsNextLegWhileReached`; GAD PM and Nagarro, 2026-10-30). `false`:
+     * [artworkAdvanceDelay] after the visitor entered it. iOS `advancesOnArtworkExit`.
      */
     val advancesOnArtworkExit: Boolean = true,
     /**
@@ -92,6 +94,14 @@ public data class GadSettings(
      * only; guidance and arrival use the real position.
      */
     val routeSnapMeters: Double = 0.5,
+    /**
+     * The walked part of the route moves only while the position is within this many metres of the
+     * leg; further away it stays where it was (`RouteFollowRules.progressCorridorMeters`). The remaining
+     * distance and the instructions follow every position. `null`: the walked part follows the position
+     * at any distance (PM, Monday "Route marked as walked too far", 2026-10-30). iOS
+     * `progressCorridorMeters`.
+     */
+    val progressCorridorMeters: Double? = 3.0,
 
     // Map
 

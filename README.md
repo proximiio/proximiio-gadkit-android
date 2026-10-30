@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.36` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.37` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -777,8 +777,9 @@ val configuration = GadConfiguration(
 |---|---|---|
 | `trackingLostAfter` | 110 s | Time without positioning before `ProximiMapEvent.TrackingChanged(LOST_PLACE)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
 | `trackingStoppedAfter` | 170 s | Time without positioning before `TrackingChanged(STOPPED_RESPONDING)` (about 3 min). |
-| `advancesOnArtworkExit` | `true` | The route leads to the next stop when the visitor leaves the active artwork's geofence (Nagarro, 2026-10-30). `false`: `artworkAdvanceDelay` after entering it. |
+| `advancesOnArtworkExit` | `true` | The journey moves to the next stop when the visitor leaves the active artwork's geofence (Nagarro, 2026-10-30). Inside it the card and the destination marker keep the artwork, with no instruction or distance, and the route shows the leg to the next stop. `false`: `artworkAdvanceDelay` after entering it. |
 | `artworkAdvanceDelay` | 2 s | With `advancesOnArtworkExit` `false`: from the arrival at an artwork (its geofence) to the route to the next stop. |
+| `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `null`: at any distance. The remaining distance and the instructions follow every position. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence or privacy zone before the SDK reports the exit. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
@@ -1010,7 +1011,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.68 and Map 6.0.0-beta.59 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.36 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.68 and Map 6.0.0-beta.60 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.37 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1101,6 +1102,30 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - Debuggable builds: the debug host of `gad.hostedMap` has "Locale ar/en" (the view's own locale) and
   "App ar/en" (the app language, Android 13 and later), for the UI tests of the Proximi GAD app.
 
+#### Changed (iOS 1.30.1, 1.31.0, 1.31.1)
+
+- **Visible:** with `advancesOnArtworkExit`, entering the active artwork's geofence marks the stop reached
+  (`JourneyNavigator.markReached`, Map 6.0.0-beta.37). The card keeps the artwork, without an instruction or a
+  distance, and the artwork's marker stays the destination. The route shows the leg to the next stop from the
+  visitor (`drawsNextLegWhileReached`). At the exit the stop is visited and that leg is the live leg, routed again
+  only when the visitor is off it. `ArtworkReached` and the stop's `VISITED` still come at the exit. At a reached
+  artwork the off-route warning of `OFF_ROUTE_PROMPT` is off, there is no gallery ahead, and `StopNearby` measures
+  the straight line to it (GAD PM and Nagarro, 2026-10-30).
+- **Visible:** a detour or a stop chosen in the list while the visitor is at the artwork makes it visited, with
+  `ArtworkReached`. At a reached amenity the route waits for "Resume your Journey", as before.
+- A visitor who reached the artwork inside the gallery of the next one gets no second route to that artwork at the
+  first fix after the exit (iOS 1.31.1).
+- **Visible:** the amenity list under the search button may reach under the Map / List control's column instead
+  of sharing a row with it, so the widest chip no longer squeezes it on a narrow screen (iOS 1.30.1).
+
+#### Added (iOS 1.31.0)
+
+- `GadSettings.progressCorridorMeters` (3 m). **Visible:** the walked part of the route moves only while the
+  position is within this distance of the leg (`RouteFollowRules.progressCorridorMeters`). Before, a visitor a few
+  metres beside the path, or cutting a corner, marked the route walked ahead of them (PM, Monday "Route marked as
+  walked too far", 2026-10-30). `null` keeps the old behaviour.
+- Field log: `artwork reached: … · route to …` and `artwork left (the journey moved on): …`.
+
 #### Added (iOS 1.29.0)
 
 - `GadSettings.advancesOnArtworkExit` (`true`). **Visible:** the journey moves to the next stop when the
@@ -1114,9 +1139,9 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - Field log: `artwork geofence arrival: … · next stop at the exit` and `artwork left (<exit event |
   outside for n s | in another artwork>): … · next stop`.
 
-#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.36; iOS 1.25.0, 1.27.0)
+#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.37; iOS 1.25.0, 1.27.0)
 
-- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.36`
+- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.37`
   (was `6.0.0-beta.31`). A host app that declares them itself moves to the same versions. No source or
   binary change. The SDK's lists of the stored venue data are read-only: code that changes a returned
   list in place gets `UnsupportedOperationException` (MIGRATION.md section 1).
@@ -1131,6 +1156,9 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - The journey map is drawn sooner: the map encodes the venue's features in parallel (Map 6.0.0-beta.36).
   On the Pixel 9 Pro the first map in the app process is drawn 2.0–2.4 s after it opens (was 3.0–3.4 s),
   and a later one 1.0–1.1 s after it opens (was 1.4–1.5 s).
+- A map opened again draws sooner still: the map encodes the venue's features once per app process, as soon as
+  it has them (Map 6.0.0-beta.37); a few MB stay in memory after the map closes. On the Pixel 9 Pro the first
+  journey map in the process is drawn 1.5–2.0 s after it opens, a later one 0.7 s after it opens.
 
 #### Changed (iOS 1.23.0 to 1.24.1)
 

@@ -66,8 +66,12 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * - The journey moves to the next stop when the visitor leaves the artwork's geofence
  *   ([GadSettings.advancesOnArtworkExit]; Nagarro, 2026-10-30): on the SDK's exit event
  *   ([artworkGeofenceExited]), after [GadSettings.geofenceExitDelay] outside it without one, or at
- *   once when the visitor is in another open artwork's geofence. Without the setting it moves on
- *   [GadSettings.artworkAdvanceDelay] (2 s) after the arrival.
+ *   once when the visitor is in another open artwork's geofence. Until then the artwork is reached
+ *   (`JourneyNavigator.markReached`): it stays the active stop with the destination marker, and the
+ *   navigator draws the leg to the next stop from the visitor (`drawsNextLegWhileReached`; GAD PM and
+ *   Nagarro, 2026-10-30). A reached artwork that the navigator moves past (a detour, a chosen stop) is
+ *   reported visited too. Without the setting it moves on [GadSettings.artworkAdvanceDelay] (2 s) after
+ *   the arrival.
  * - Artwork legs have no arrival by distance ([artworkGuidanceRules]). An artwork the visitor walks
  *   past without entering its geofence stays unvisited until it is skipped.
  * - Out of order: a visitor inside the geofence of another open artwork for
@@ -182,13 +186,12 @@ internal class VisitController(
     /** The navigator's legs (gallery first). */
     private val galleryRouting = GalleryFirstRouting(ProximiioJourneyRouting(checkNotNull(session.sdk)))
 
-    /**
-     * Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance off;
-     * the artwork geofence is the only arrival. Off the leg beyond [GadSettings.offRouteMeters].
-     */
-    private val artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds = Double.POSITIVE_INFINITY, offRouteMeters = settings.offRouteMeters)
+    /** Guidance on a leg to an artwork ([artworkGuidanceRules]). */
+    private val artworkGuidanceRules = artworkGuidanceRules(settings)
 
-    val navigator = JourneyNavigator(session, journey.toMap(), rules, artworkGuidanceRules, routing = galleryRouting)
+    val navigator = JourneyNavigator(session, journey.toMap(), rules, artworkGuidanceRules, routing = galleryRouting).apply {
+        drawsNextLegWhileReached = settings.advancesOnArtworkExit
+    }
 
     private val mutableGalleryAhead = MutableStateFlow<GalleryDestination?>(null)
 
@@ -198,21 +201,8 @@ internal class VisitController(
     /** The journey changes that run one after another ([serially]). */
     private val journeyEdits = Mutex()
 
-    /**
-     * Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, within
-     * [GadSettings.amenityArrivalMinimumMeters] and [GadSettings.amenityArrivalMaximumMeters], for
-     * [GadSettings.amenityArrivalDwell]. The SDK default (at least 3 m, 2 s) missed visitors who
-     * walked past a stop with relay fixes.
-     */
-    private val detourGuidanceRules = RouteFollowRules(
-        arrival = RouteFollowRules.ArrivalRadius.FromAccuracy(
-            multiplier = JourneyConstants.ARRIVAL_ACCURACY_MULTIPLIER,
-            minimumMeters = settings.amenityArrivalMinimumMeters,
-            maximumMeters = settings.amenityArrivalMaximumMeters,
-        ),
-        arrivalDwellSeconds = settings.amenityArrivalDwell.inWholeMilliseconds / 1000.0,
-        offRouteMeters = settings.offRouteMeters,
-    )
+    /** Guidance on a leg to an amenity detour ([detourGuidanceRules]). */
+    private val detourGuidanceRules = detourGuidanceRules(settings)
 
     private val outOfOrderDwellMillis = settings.outOfOrderDwell.inWholeMilliseconds
 
@@ -267,6 +257,9 @@ internal class VisitController(
 
     /** The first fix outside the geofence of [arrivedStopId], for a leave without an exit event (ms). */
     private var outsideArrivedSince: Long? = null
+
+    /** The artwork the navigator holds reached (`markReached`) and that is not yet reported visited. */
+    private var reachedStopId: String? = null
 
     /** Time inside the geofence of each open artwork that is not the active stop. */
     private val outOfOrderDwell = GeofenceDwell()
@@ -399,10 +392,16 @@ internal class VisitController(
     private fun handle(event: JourneyEvent) {
         refreshGalleryAhead()
         when (event) {
-            is JourneyEvent.StopReached -> if (event.stop.kind != JourneyStop.Kind.DETOUR) scheduleDone(event.stop.id, settings.artworkAdvanceDelay)
+            is JourneyEvent.StopReached ->
+                if (event.stop.kind != JourneyStop.Kind.DETOUR && !settings.advancesOnArtworkExit) scheduleDone(event.stop.id, settings.artworkAdvanceDelay)
             is JourneyEvent.DetourEnded -> if (event.completed) doneJobs += scope.launch { serially { rerouting { orderRemaining() } } }
             is JourneyEvent.LeftRoute, is JourneyEvent.FarFromRoute, is JourneyEvent.OffRouteTooLong -> offRouteEpisode()
-            JourneyEvent.ReturnedToRoute, is JourneyEvent.LegChanged, is JourneyEvent.Rerouted -> isOffRouteEpisode = false
+            is JourneyEvent.LegChanged -> {
+                isOffRouteEpisode = false
+                reportReachedStopDone()
+            }
+            JourneyEvent.ReturnedToRoute, is JourneyEvent.Rerouted -> isOffRouteEpisode = false
+            JourneyEvent.JourneyFinished -> reportReachedStopDone()
             else -> Unit
         }
     }
@@ -426,7 +425,7 @@ internal class VisitController(
      */
     fun checkLegDeviation(guidance: RouteGuidance?, isFloorGuideActive: Boolean) {
         if (deviationPolicy != JourneyDeviationPolicy.ASK_APP || !isNavigating || mutablePaused.value || isFloorGuideActive ||
-            navigator.detourStop != null || guidance == null || guidance.hasArrived
+            navigator.detourStop != null || navigator.hasArrived || guidance == null || guidance.hasArrived
         ) {
             return
         }
@@ -460,7 +459,7 @@ internal class VisitController(
      * that artwork. At most every 5 s.
      */
     fun checkCloserArtwork() {
-        if (!managesProgress || keepsOrder || !isNavigating || mutablePaused.value || !isOffRouteEpisode || navigator.detourStop != null) return
+        if (!managesProgress || keepsOrder || !isNavigating || mutablePaused.value || !isOffRouteEpisode || navigator.detourStop != null || navigator.hasArrived) return
         val active = navigator.activeStop ?: return
         val now = System.currentTimeMillis()
         if (now - lastCloserArtworkCheck < CLOSER_ARTWORK_INTERVAL_MILLIS) return
@@ -589,6 +588,39 @@ internal class VisitController(
         if (arrivedStopId == id) return
         arrivedStopId = id
         FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"} · next stop at the exit")
+        doneJobs += scope.launch {
+            serially {
+                if (arrivedStopId != id || navigator.activeStop?.id != id) return@serially
+                // A detour turns it off ([detour]).
+                navigator.drawsNextLegWhileReached = true
+                if (!navigator.markReached(id)) return@serially
+                reachedStopId = id
+                // A next leg from inside the next artwork's gallery ends at the artwork. Without the mark,
+                // `checkGalleryFirst` routed that leg again at the first fix after the exit (iOS 1.31.1).
+                val next = navigator.upcomingStop
+                val position = session.position.value
+                if (next != null && position != null) {
+                    val gallery = galleryRouting.gallery(next.coordinate)
+                    val point = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+                    if (gallery != null && gallery.gallery.contains(point, position.floor?.level)) galleryRouting.markReached(next.coordinate)
+                }
+                FieldLog.log("artwork reached: $id · route to ${navigator.upcomingStop?.title ?: "-"}")
+                save()
+            }
+        }
+    }
+
+    /**
+     * Reports the reached artwork visited once the navigator has moved past it without [scheduleDone]:
+     * a detour or a chosen stop makes a reached stop done.
+     */
+    private fun reportReachedStopDone() {
+        val id = reachedStopId ?: return
+        val stop = doneStop(id) ?: return
+        if (stop.state != JourneyStop.State.DONE) return
+        reachedStopId = null
+        FieldLog.log("artwork left (the journey moved on): $id")
+        onArtworkDone?.invoke(stop, true)
     }
 
     /**
@@ -633,6 +665,11 @@ internal class VisitController(
         val point = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
         val level = position.floor?.level
         val activeId = navigator.activeStop?.id
+        if (settings.advancesOnArtworkExit && arrivedStopId == null && navigator.hasArrived) {
+            // A journey restored with the artwork reached: it moves on when the visitor is outside.
+            arrivedStopId = activeId
+            reachedStopId = activeId
+        }
         var inside = mutableSetOf<String>()
         var isInsideActive = false
         for (stop in navigator.journey.value.stops) {
@@ -731,8 +768,9 @@ internal class VisitController(
         journeyEdits.withLock { edit() }
     }
 
+    /** No gallery during a detour or at a reached artwork: the card names the stop. */
     private fun refreshGalleryAhead() {
-        mutableGalleryAhead.value = if (navigator.detourStop == null) navigator.activeStop?.let { galleryRouting.gallery(it.coordinate) } else null
+        mutableGalleryAhead.value = if (navigator.detourStop == null && !navigator.hasArrived) navigator.activeStop?.let { galleryRouting.gallery(it.coordinate) } else null
     }
 
     /** Marks a pending artwork visited out of order and orders the stops still ahead again from the visitor. */
@@ -782,6 +820,8 @@ internal class VisitController(
             serially {
                 scheduledDone.remove(stopId)
                 if (navigator.activeStop?.id != stopId) return@serially
+                // Reported here, not by [reportReachedStopDone] on the leg change.
+                if (reachedStopId == stopId) reachedStopId = null
                 val changed = navigator.markDone(stopId)
                 save()
                 if (changed) doneStop(stopId)?.let { onArtworkDone?.invoke(it, true) }
@@ -891,6 +931,9 @@ internal class VisitController(
         if (navigator.journey.value.stops.any { it.id == stop.id }) stop = stop.copy(id = "detour:${place.id}")
         closeOffRouteWarning()
         navigator.guidanceRules = detourGuidanceRules
+        // At the reached amenity the route waits for "Resume your Journey"; the next artwork's arrival
+        // turns the next leg on again.
+        navigator.drawsNextLegWhileReached = false
         navigator.detour(stop)
         navigator.guidanceRules = artworkGuidanceRules
         return stop.id
@@ -987,6 +1030,33 @@ internal class VisitController(
     }
 
     companion object {
+        /**
+         * Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance off;
+         * the artwork geofence is the only arrival. Off the leg beyond [GadSettings.offRouteMeters]. The
+         * walked part of the route moves only within [GadSettings.progressCorridorMeters] of the leg.
+         * Pure; covered by tests.
+         */
+        internal fun artworkGuidanceRules(settings: GadSettings): RouteFollowRules = RouteFollowRules(
+            arrivalDwellSeconds = Double.POSITIVE_INFINITY,
+            offRouteMeters = settings.offRouteMeters,
+        ).copy(progressCorridorMeters = settings.progressCorridorMeters)
+
+        /**
+         * Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, within
+         * [GadSettings.amenityArrivalMinimumMeters] and [GadSettings.amenityArrivalMaximumMeters], for
+         * [GadSettings.amenityArrivalDwell]. The SDK default (at least 3 m, 2 s) missed visitors who
+         * walked past a stop with relay fixes. Pure; covered by tests.
+         */
+        internal fun detourGuidanceRules(settings: GadSettings): RouteFollowRules = RouteFollowRules(
+            arrival = RouteFollowRules.ArrivalRadius.FromAccuracy(
+                multiplier = JourneyConstants.ARRIVAL_ACCURACY_MULTIPLIER,
+                minimumMeters = settings.amenityArrivalMinimumMeters,
+                maximumMeters = settings.amenityArrivalMaximumMeters,
+            ),
+            arrivalDwellSeconds = settings.amenityArrivalDwell.inWholeMilliseconds / 1000.0,
+            offRouteMeters = settings.offRouteMeters,
+        ).copy(progressCorridorMeters = settings.progressCorridorMeters)
+
         /**
          * What one guidance update off or on the leg does. An open episode, of the leg or of the whole
          * journey, shows no second warning; the leg's episode ends within two thirds of [threshold], so

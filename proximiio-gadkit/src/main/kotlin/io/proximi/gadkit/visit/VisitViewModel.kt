@@ -598,8 +598,13 @@ internal class VisitViewModel(
         controller.checkGalleryFirst()
     }
 
+    /**
+     * Reports `StopNearby` once per stop. At a reached artwork the guidance is the leg to the next stop,
+     * so the distance is the straight line.
+     */
     private fun reportStopNearby(position: VenuePosition?, stop: MapJourneyStop?, guidance: RouteGuidance?) {
-        stopNearby.update(position, stop, guidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
+        val legGuidance = guidance.takeUnless { controller.navigator.hasArrived }
+        stopNearby.update(position, stop, legGuidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
     }
 
     /** The host app's journey after a change, applied to the open screen ([VisitController.apply]). */
@@ -1088,6 +1093,9 @@ internal class VisitViewModel(
         if (isClosed) return
         val instruction = if (hasNoAccessibleRoute) {
             UiText.Resource("visit_no_accessible_route")
+        } else if (controller.navigator.hasArrived) {
+            // At a reached artwork the guidance is the leg to the next stop.
+            null
         } else {
             guidance?.let { GuidanceText.instruction(it.toCore(), levelChangeMarkers) }
         }

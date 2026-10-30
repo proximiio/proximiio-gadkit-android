@@ -1,6 +1,7 @@
 package io.proximi.gadkit
 
 import io.proximi.gadkit.visit.JourneyKind
+import io.proximi.gadkit.visit.VisitController
 import io.proximi.gadkit.visit.VisitViewModel
 import io.proximi.gadkit.map.MapLoading
 import io.proximi.gadkit.map.MapStyle
@@ -12,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
@@ -106,6 +108,22 @@ class GadSettingsTest {
         val changed = MapStyle.options("en", settings = GadSettings.STANDARD.copy(bearingSettlingTime = 2.seconds, bearingDeadband = 0.0))
         assertEquals(2.0, changed.bearingSettlingTime)
         assertEquals(0.0, changed.bearingDeadband)
+    }
+
+    /**
+     * The walked part of the route moves only within 3 m of the leg, on the way to an artwork and to an
+     * amenity (PM, Monday "Route marked as walked too far", 2026-10-30; map 6.0.0-beta.37).
+     */
+    @Test
+    fun theWalkedPartMovesOnlyNearTheRoute() {
+        val settings = GadSettings.STANDARD
+        assertEquals(3.0, settings.progressCorridorMeters)
+        assertEquals(3.0, VisitController.artworkGuidanceRules(settings).progressCorridorMeters)
+        assertEquals(3.0, VisitController.detourGuidanceRules(settings).progressCorridorMeters)
+        assertEquals(Double.POSITIVE_INFINITY, VisitController.artworkGuidanceRules(settings).arrivalDwellSeconds)
+        val off = settings.copy(progressCorridorMeters = null)
+        assertNull(VisitController.artworkGuidanceRules(off).progressCorridorMeters)
+        assertNull(VisitController.detourGuidanceRules(off).progressCorridorMeters)
     }
 
     /** Overlapping stop markers show as one with a count badge, but not while they are hidden (PM, Monday "Clustering", 2026-10-29). */

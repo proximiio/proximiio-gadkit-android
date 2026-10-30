@@ -387,11 +387,19 @@ private fun CardOverlay(model: VisitViewModel) {
     // it), the stop card 23 dp above its bottom edge and 12 dp under the buttons.
     Column(Modifier.fillMaxSize().padding(start = 21.dp, end = 21.dp, top = 32.dp, bottom = 23.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // The free height above the bottom buttons: a long amenity list scrolls within it (iOS 1.24.1).
-        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.Top) {
-            if (model.hasStops) MapListToggle(showsList = !isMap, onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP })
-            Spacer(Modifier.weight(1f))
+        // A box, not a row: the amenity list under search may reach under the toggle's column, so its
+        // width does not add to the toggle's (iOS 1.30.1: in a row the two were wider than a narrow
+        // screen).
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            if (model.hasStops) {
+                MapListToggle(
+                    showsList = !isMap,
+                    onChange = { model.mode = if (it) VisitMode.LIST else VisitMode.MAP },
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
             if (isMap) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.align(Alignment.TopEnd), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     GlassSquareButton(
                         onClick = { model.isShowingAmenities = !model.isShowingAmenities },
                         contentDescription = stringResource(R.string.search),
@@ -524,6 +532,9 @@ private fun VisitCard(model: VisitViewModel) {
         GuidanceText.levelChangeTitle(markers, model.visitorLevel, it.level)
     }
     val title = VisitCardText.title(state, galleryAhead, levelChangeTitle)
+    // At a reached artwork the guidance is the leg to the next stop; the card names the artwork until the
+    // visitor leaves it (GAD PM and Nagarro, 2026-10-30). Not a flow: read when the card recomposes.
+    val isReached = model.controller.navigator.hasArrived
     // The way back from a floor without positioning: "NEXT STOP IS LEVEL 1", "Head to Level 1 by lift or stairs".
     val returningToLevel = model.returningToLevel
     val instruction = if (returningToLevel != null) {
@@ -534,11 +545,13 @@ private fun VisitCard(model: VisitViewModel) {
         // The navigator keeps a stop that no route with the visitor's accessibility needs
         // reaches, with no route line. In a personalised journey the visitor can skip it.
         stringResource(R.string.no_route_to_this_stop_with_your)
+    } else if (isReached) {
+        null
     } else {
         VisitCardText.instruction(state, guidance?.let { GuidanceText.instruction(it.toCore(), markers) }, title)?.mapText()
     }
     val remaining = guidance
-        ?.takeIf { showsGuidance && !isOnFloorWithoutPositioning && !model.hasNoAccessibleRoute && !it.isOffRoute && !it.hasArrived }
+        ?.takeIf { showsGuidance && !isOnFloorWithoutPositioning && !model.hasNoAccessibleRoute && !isReached && !it.isOffRoute && !it.hasArrived }
         ?.let { remainingText(it.remainingMeters, resources) }
     val number = model.activeStopNumber
     StopInfoCard(
