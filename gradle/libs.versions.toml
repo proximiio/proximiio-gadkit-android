@@ -8,7 +8,7 @@ targetSdk = "36"
 minSdk = "26"
 
 proximiioSdk = "6.0.0-beta.36"
-proximiioMap = "6.0.0-beta.32"
+proximiioMap = "6.0.0-beta.34"
 
 coroutines = "1.11.0"
 androidxCore = "1.18.0"
