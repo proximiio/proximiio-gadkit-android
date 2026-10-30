@@ -958,7 +958,8 @@ internal class VisitViewModel(
             isInGallery = visitorGalleryPlaceId != null,
             isActiveStopInGallery = controller.navigator.activeStop?.group != null,
         )
-        val style = if (shows) MapStyle.journeyStops else MapStyle.journeyStopsHidden
+        val style = (if (shows) MapStyle.journeyStops else MapStyle.journeyStopsHidden)
+            .let { if (settings.groupsStopMarkers) it else it.copy(groupsOverlapping = false) }
         if (session.journeyStopMarkerStyle != style) session.journeyStopMarkerStyle = style
     }
 

@@ -202,6 +202,10 @@ internal object MapStyle {
             // The camera keeps to the range in every frame the map sets too (map 6.0.0-beta.28).
             minimumZoom = settings.minimumZoom,
             maximumZoom = settings.maximumZoom,
+            // The heading-up map turns more slowly and ignores small heading changes (Nagarro: the
+            // rotation is too fast; map 6.0.0-beta.32).
+            bearingSettlingTime = settings.bearingSettlingTime.inWholeMilliseconds / 1000.0,
+            bearingDeadband = settings.bearingDeadband,
         )
     }
 
@@ -244,7 +248,9 @@ internal object MapStyle {
      * 2 dp ring; pending white with a `#EEEDED` 1 dp ring. 30 dp, number 14 in GuggenheimSansDisplay
      * Medium. A detour is red with the amenity's icon and no number. Skipped stops have no marker.
      * The markers, the detour included, are drawn over the visitor's dot (RPR, Monday "Stop markers.",
-     * 2026-10-28; map 6.0.0-beta.31).
+     * 2026-10-28; map 6.0.0-beta.31). Markers that would overlap show as one, with a 16 dp `#2B2B2B`
+     * badge, a 1 dp white ring and a white count in GuggenheimSansDisplay Medium 10
+     * ([GadSettings.groupsStopMarkers]).
      */
     val journeyStops: JourneyStopMarkerStyle = run {
         val ink = MapColor.hex(0x2B2B2B)
@@ -263,6 +269,13 @@ internal object MapStyle {
             labelWeight = JourneyStopMarkerStyle.LabelWeight.MEDIUM,
             labelFontName = "guggenheim_sans_display_medium",
             drawsAbovePosition = true,
+            // Markers that would overlap show as one, with a black badge holding the number of the
+            // others in white (RPR design, PM Monday "Clustering", 2026-10-29; map 6.0.0-beta.32).
+            groupsOverlapping = true,
+            groupBadge = JourneyStopMarkerStyle.Appearance(fillColor = ink, strokeColor = white, strokeWidthDp = 1.0, labelColor = white),
+            groupBadgeDiameterDp = 16.0,
+            groupBadgeFontSize = 10.0,
+            groupBadgeFontName = "guggenheim_sans_display_medium",
         )
     }
 
@@ -292,5 +305,7 @@ internal object MapStyle {
         pending = journeyStops.pending.copy(opacity = 0.0),
         passed = journeyStops.passed.copy(opacity = 0.0),
         skipped = journeyStops.skipped.copy(opacity = 0.0),
+        // No badge over the invisible markers.
+        groupsOverlapping = false,
     )
 }

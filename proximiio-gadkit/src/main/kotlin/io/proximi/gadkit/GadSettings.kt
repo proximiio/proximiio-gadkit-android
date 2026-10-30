@@ -117,6 +117,21 @@ public data class GadSettings(
      */
     val smoothsPosition: Boolean = false,
     /**
+     * `true` shows journey stop markers that would overlap as one marker with a badge holding the
+     * number of the others (PM, Monday "Clustering", 2026-10-29). iOS `groupsStopMarkers`.
+     */
+    val groupsStopMarkers: Boolean = true,
+    /**
+     * The time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`,
+     * map default 0.9 s). Nagarro found the rotation too fast (2026-10-29). iOS `bearingSettlingTime`.
+     */
+    val bearingSettlingTime: Duration = 1.5.seconds,
+    /**
+     * Heading changes smaller than this, in degrees, do not turn the map (`MapOptions.bearingDeadband`,
+     * map default 0). iOS `bearingDeadband`.
+     */
+    val bearingDeadband: Double = 5.0,
+    /**
      * The longest time the maps show their spinner while the map library draws the venue. The
      * spinner goes when the venue's features are on the map, when the map reports an error, or
      * after this time.

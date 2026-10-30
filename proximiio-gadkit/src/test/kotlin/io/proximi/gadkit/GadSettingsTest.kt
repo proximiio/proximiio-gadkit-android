@@ -94,4 +94,23 @@ class GadSettingsTest {
         val withoutGalleryZoom = settings.copy(galleryFollowZoom = null)
         assertEquals(18.8, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = withoutGalleryZoom))
     }
+
+    /** The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map 6.0.0-beta.32). */
+    @Test
+    fun theMapTurnsSlowlyAndIgnoresSmallHeadingChanges() {
+        val standard = MapStyle.options("en", settings = GadSettings.STANDARD)
+        assertEquals(1.5, standard.bearingSettlingTime)
+        assertEquals(5.0, standard.bearingDeadband)
+        val changed = MapStyle.options("en", settings = GadSettings.STANDARD.copy(bearingSettlingTime = 2.seconds, bearingDeadband = 0.0))
+        assertEquals(2.0, changed.bearingSettlingTime)
+        assertEquals(0.0, changed.bearingDeadband)
+    }
+
+    /** Overlapping stop markers show as one with a count badge, but not while they are hidden (PM, Monday "Clustering", 2026-10-29). */
+    @Test
+    fun overlappingStopMarkersAreGrouped() {
+        assertTrue(GadSettings.STANDARD.groupsStopMarkers)
+        assertTrue(MapStyle.journeyStops.groupsOverlapping)
+        assertFalse(MapStyle.journeyStopsHidden.groupsOverlapping)
+    }
 }

@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.35` and Map `6.0.0-beta.31` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.32` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -787,6 +787,8 @@ val configuration = GadConfiguration(
 | `followZoom`, `galleryFollowZoom` | 18.8, 20 | Zoom of "Centre on me" and of the follow; in a gallery of a personalised journey, `galleryFollowZoom` (`null` for `followZoom`). |
 | `startZoom`, `startZoomDuration` | 18, 2 s | When the journey starts, on the first fix and when the position comes back, the journey map shows the visitor at `startZoom` for `startZoomDuration`, then follows them. `null` follows at once. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
+| `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker with a badge holding the number of the others (PM, Monday "Clustering", 2026-10-29). |
+| `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
@@ -1007,7 +1009,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 | SDK 6.0.0-beta.35 and Map 6.0.0-beta.31 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.68 and Map 6.0.0-beta.59 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.32 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1050,6 +1052,31 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   the first fix and when the position comes back, the journey map shows the visitor at zoom 18 for
   2 s, then follows them at the follow zoom. "Centre on me" in the 2 s ends it. `null` follows at once
   (PM, Monday "Zoom level at start + navigation", 2026-10-29).
+
+#### Added (iOS 1.25.0)
+
+- `GadSettings.groupsStopMarkers` (`true`). **Visible:** journey stop markers that would overlap show as
+  one: the active stop when it is in the group, else the first in journey order, with a 16 dp black
+  badge at its top-right holding the number of the others in white (RPR design; PM, Monday
+  "Clustering", 2026-10-29; Map 6.0.0-beta.32). Only stops on the same floor group; a detour never does.
+  A tap on a group zooms in until it splits. The markers hidden by gallery first never group. `false`
+  draws every marker.
+- `GadSettings.bearingSettlingTime` (1.5 s) and `bearingDeadband` (5°). **Visible:** the heading-up map
+  turns more slowly and does not turn for a heading change under 5° (Nagarro: the rotation was too fast,
+  2026-10-29). The map library's defaults are 0.9 s and 0°. The heading arrow of the position dot stays
+  live.
+
+#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.32; iOS 1.25.0, 1.27.0)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.32`
+  (was `6.0.0-beta.31`). A host app that declares them itself moves to the same versions. No source or
+  binary change. The SDK's lists of the stored venue data are read-only: code that changes a returned
+  list in place gets `UnsupportedOperationException` (MIGRATION.md section 1).
+- The SDK answers repeated reads of the stored venue data from memory until the data changes, and the
+  map reads the venue's features once per open, not twice. On the Pixel 9 Pro one `features()` call of
+  the GAD venue took about 0.5 s.
+- The map asks for no floor-plan tile outside the style's `proximiio:raster:bounds` (the GAD style has
+  it since 2026-10-30). Those tiles answered 403 and drew nothing; the first drawn frame waited for them.
 
 #### Changed (iOS 1.23.0 to 1.24.1)
 

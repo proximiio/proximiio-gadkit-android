@@ -3,7 +3,7 @@
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
 Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.22.2 uses SDK
-6.0.0-beta.35 and Map 6.0.0-beta.31.
+6.0.0-beta.35 and Map 6.0.0-beta.31; the next release uses SDK 6.0.0-beta.36 and Map 6.0.0-beta.32.
 
 Each change has a mark:
 
@@ -71,6 +71,8 @@ built again: both have a new trailing parameter.
 | Map 6.0.0-beta.29 | The style's raster tiles (`proximiio:raster:*` metadata) are drawn below the floor fills: the GAD illustrated map. A journey layer style set to `null` takes its layer off the map. A level two places share is named by the visitor's place. | `MapOptions(rasterTiles = false)` keeps the vector plan alone. | **Check** |
 | Map 6.0.0-beta.30 | Requires SDK 6.0.0-beta.33. After the SDK refused the token for good, the session deletes the stored style and tiles, takes the venue off the map, shows `fallbackStyleUrl` or an empty style and ends a running `JourneyNavigator`. | After a new successful `authenticate()`, call `session.start()` and `navigator.start()` again. | **Check** |
 | Map 6.0.0-beta.31 | After the refused-token venue drop, a canvas attached again starts no fix stream until `session.start()`. | | Info |
+| SDK 6.0.0-beta.36 | `features()`, `geofences()`, `places()`, `floors()`, `amenities()` and the other reads of the stored venue data answer from memory until that data changes; `loadCachedRouteNetwork()` does not read the stored features again when they have not changed. The lists are read-only. | Code that casts a returned list to `MutableList` or sorts it in place (Java `Collections.sort`) gets `UnsupportedOperationException`: copy the list first (`toMutableList()`). Code that only reads the lists needs no change. | **Check** |
+| Map 6.0.0-beta.32 | A map open reads the venue's features once, not twice. With `proximiio:raster:bounds` in the style (the GAD style has it), MapLibre asks for no raster tile outside the box; those answered 403 and drew nothing. Stop groups and the heading-up settings are off by default. | | Info |
 
 ### Added
 
@@ -102,6 +104,9 @@ All Info.
 - Map 6.0.0-beta.29: `MapOptions.rasterTiles`, `ProximiioMapSession.unavailableFontStacks`.
 - Map 6.0.0-beta.31: `ProximiioMapSession.venueDrawing` (`PENDING`, `DRAWN`, `IDLE`),
   `JourneyStopMarkerStyle.drawsAbovePosition`.
+- Map 6.0.0-beta.32: `JourneyStopMarkerStyle.groupsOverlapping`, `groupingSpacingDp`, `groupBadge`,
+  `groupBadgeDiameterDp`, `groupBadgeFontSize`, `groupBadgeFontName`, `JourneyStopRenderer.group(point)`;
+  `MapOptions.bearingSettlingTime` and `bearingDeadband`.
 
 ### Fixed
 
@@ -132,8 +137,8 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.36 and later and Map 6.0.0-beta.32 and later are not used by ProximiioGADKit for
-Android 1.22.2. A host app that declares them gets them instead of the versions above.
+SDK 6.0.0-beta.37 and later and Map 6.0.0-beta.33 and later are not used by the next ProximiioGADKit
+for Android. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -155,7 +160,7 @@ Android 1.22.2. A host app that declares them gets them instead of the versions 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
   depend on `io.proximi.gadkit:proximiio-gadkit:1.22.2` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.35` and Map `6.0.0-beta.31` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.36` and Map `6.0.0-beta.32` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.
