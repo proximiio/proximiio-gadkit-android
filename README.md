@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.35` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.36` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -1010,7 +1010,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.68 and Map 6.0.0-beta.59 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.35 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.68 and Map 6.0.0-beta.59 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.36 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1114,9 +1114,9 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - Field log: `artwork geofence arrival: … · next stop at the exit` and `artwork left (<exit event |
   outside for n s | in another artwork>): … · next stop`.
 
-#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.35; iOS 1.25.0, 1.27.0)
+#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.36; iOS 1.25.0, 1.27.0)
 
-- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.35`
+- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.36`
   (was `6.0.0-beta.31`). A host app that declares them itself moves to the same versions. No source or
   binary change. The SDK's lists of the stored venue data are read-only: code that changes a returned
   list in place gets `UnsupportedOperationException` (MIGRATION.md section 1).
@@ -1128,6 +1128,9 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - The map asks the API host for up to 20 requests at once, not 5 (Map 6.0.0-beta.34 and later): a first open with
   an empty map cache gets its style, sprite, glyphs and floor-plan tiles sooner. Nothing is drawn
   differently. `adb shell setprop log.tag.ProximiioMapTiming DEBUG` turns on the map library's timing log.
+- The journey map is drawn sooner: the map encodes the venue's features in parallel (Map 6.0.0-beta.36).
+  On the Pixel 9 Pro the first map in the app process is drawn 2.0–2.4 s after it opens (was 3.0–3.4 s),
+  and a later one 1.0–1.1 s after it opens (was 1.4–1.5 s).
 
 #### Changed (iOS 1.23.0 to 1.24.1)
 
