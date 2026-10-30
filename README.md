@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.22.2")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.31.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.22.2
+git -C gadkit checkout 1.31.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1045,6 +1045,48 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
+No changes since 1.31.1.
+
+### [1.31.1] — 2026-10-30
+
+The behaviour of the iOS package 1.31.1, which includes 1.23.0 to 1.31.0, on SDK 6.0.0-beta.36 and Map
+6.0.0-beta.37. The changes:
+
+- the venue data in memory and `ProximiMapView.prepare`;
+- every gallery filled but the visitor's, and the start zoom;
+- stop groups and a slower heading-up map;
+- gallery names that give way, and every `in_search` amenity in the search;
+- the journey map screen as in Figma;
+- the host app's resume after "Add a stop", and the texts in the host app's language at runtime;
+- the next stop at the exit of the artwork's geofence, with the next leg shown while the visitor is at the artwork;
+- the walked part of the route only near the route;
+- a journey map drawn sooner: on the Pixel 9 Pro 1.5–2.0 s after a first open (was 3.0–3.4 s) and 0.7 s after a
+  later one.
+
+**BREAKING:** the SDK and Map versions; see the first "Changed" section. There is no Android 1.23.0 to 1.31.0. iOS
+1.30.0 changed only the iOS deployment target.
+
+#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.37; iOS 1.25.0, 1.27.0)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.37`
+  (was `6.0.0-beta.31`). A host app that declares them itself moves to the same versions. No source or
+  binary change. The SDK's lists of the stored venue data are read-only: code that changes a returned
+  list in place gets `UnsupportedOperationException` (MIGRATION.md section 1).
+- The SDK answers repeated reads of the stored venue data from memory until the data changes, and the
+  map reads the venue's features once per open, not twice. On the Pixel 9 Pro one `features()` call of
+  the GAD venue took about 0.5 s.
+- The map asks for no floor-plan tile outside the style's `proximiio:raster:bounds` (the GAD style has
+  it since 2026-10-30). Those tiles answered 403 and drew nothing; the first drawn frame waited for them.
+- The map asks the API host for up to 20 requests at once, not 5 (Map 6.0.0-beta.34 and later): a first open with
+  an empty map cache gets its style, sprite, glyphs and floor-plan tiles sooner. Nothing is drawn
+  differently. `adb shell setprop log.tag.ProximiioMapTiming DEBUG` turns on the map library's timing log.
+- The journey map is drawn sooner: the map encodes the venue's features in parallel (Map 6.0.0-beta.36).
+  On the Pixel 9 Pro the first map in the app process is drawn 2.0–2.4 s after it opens (was 3.0–3.4 s),
+  and a later one 1.0–1.1 s after it opens (was 1.4–1.5 s).
+- A map opened again draws sooner still: the map encodes the venue's features once per app process, as soon as
+  it has them (Map 6.0.0-beta.37); a few MB stay in memory after the map closes. On the Pixel 9 Pro the first
+  journey map in the process is drawn 1.5–2.0 s after it opens, a later one 0.7 s after it opens.
+
 #### Added (iOS 1.23.0, 1.24.0)
 
 - `ProximiMapView.prepare(context, sdk)`: installs the route network and reads the venue's features,
@@ -1067,6 +1109,71 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   turns more slowly and does not turn for a heading change under 5° (Nagarro: the rotation was too fast,
   2026-10-29). The map library's defaults are 0.9 s and 0°. The heading arrow of the position dot stays
   live.
+
+#### Added (iOS 1.29.0)
+
+- `GadSettings.advancesOnArtworkExit` (`true`). **Visible:** the journey moves to the next stop when the
+  visitor leaves the active artwork's geofence, not 2 s after they entered it (Nagarro call, 2026-10-30:
+  the next stop comes from the exit event). The audio guide can play while the visitor is at the
+  artwork. The visitor leaves on the SDK's `GeofenceEvent.Exited`, after `geofenceExitDelay` (5 s)
+  outside it without that event, or at once at a fix in another open artwork's geofence.
+  `ArtworkReached` and the stop's `VISITED` come at that moment. While the visitor is at the artwork, the
+  card and the route still show it as the next stop. `false` keeps the move `artworkAdvanceDelay` after
+  the enter.
+- Field log: `artwork geofence arrival: … · next stop at the exit` and `artwork left (<exit event |
+  outside for n s | in another artwork>): … · next stop`.
+
+#### Added (iOS 1.31.0)
+
+- `GadSettings.progressCorridorMeters` (3 m). **Visible:** the walked part of the route moves only while the
+  position is within this distance of the leg (`RouteFollowRules.progressCorridorMeters`). Before, a visitor a few
+  metres beside the path, or cutting a corner, marked the route walked ahead of them (PM, Monday "Route marked as
+  walked too far", 2026-10-30). `null` keeps the old behaviour.
+- Field log: `artwork reached: … · route to …` and `artwork left (the journey moved on): …`.
+
+#### Changed (iOS 1.23.0 to 1.24.1)
+
+- The screens read the venue's features, geofences and amenities once and keep them in memory; a kind
+  is read again only when `venueDataChanges()` names it. The SDK decodes every stored row on each
+  `features()` call, and the map library's own read waited behind the screens' reads. A change of the
+  amenity catalogue now updates the screens' icons and lists. Field log: `venue data: <n> features read
+  in <s>` (also geofences and amenities) and `hosted map: route network <n> paths in <s>`.
+- `ProximiMapView` and `ProximiExploreView` keep the route network and the venue data for the next view
+  on the same SDK; they no longer stop following `venueDataChanges()` when they close.
+- **Visible:** every gallery but the one the visitor is in has a fill on the journey map: the
+  destination and the visited galleries as before, every other gallery in the venue style's gallery
+  colour (`proximiio-gallery`, #E6E6E6) over its artworks and furniture. The artworks and the
+  furniture show only in the visitor's gallery, from zoom 19 (PM, Monday "Artwork + furniture
+  polygons", 2026-10-29).
+- **Visible:** a curated tour shows the galleries' pills and fills as a personalised journey does; the
+  destination is the gallery of the active artwork, unless the visitor is in it (PM, Monday "Gallery
+  numbers in gallery navigation", 2026-10-29). A curated tour still routes straight to the artwork.
+- **Visible:** a gallery is visited only once the visitor is out of it (PM, Monday "Visited gallery
+  visualization", 2026-10-29: "when user exits the gallery").
+- **Visible:** a long amenity list under the search button scrolls and fades out at the bottom, above
+  the map's buttons, on the journey map and the museum map (PM, Monday "Amenity search when list is
+  long", 2026-10-29). A list that fits does not scroll.
+
+#### Changed (iOS 1.25.0 to 1.26.1)
+
+- **Visible:** the galleries' names give way to each other and to the stop markers: of names that
+  would overlap, one shows, a visited gallery's first. The destination's name always shows. Zoomed out,
+  every name showed over the others (the PM's screenshot, 2026-10-29). The names are in two new layers,
+  `gad-gallery-names` and `gad-gallery-destination-name`, above `gad-level-changer`.
+- **Visible:** the maps' amenity search lists every amenity with `metadata.in_search` true that has a
+  place, also one that is none of the built-in kinds (Women's restroom, Men's restroom, Café, Help
+  Desk, Prayer Room, Stairs, Elevator, Museum Shop). Such an amenity shows with its title in the app
+  language and its icon from the venue data, in its `search_order`, and the shortcut leads to its
+  nearest place. Before, only the built-in kinds showed: "Learning & Engagement", "Single Artist
+  Gallery", "Performance Gallery" and "Artwork" did not (PM, 2026-10-29). Without an amenity flagged
+  true the shortcuts stay the built-in ones.
+- **Visible:** a chip's title stays on one line.
+- **Visible:** the journey map puts its camera at the SDK's last position (`Proximiio.lastPosition()`), at
+  the start zoom and without animation, and selects that position's floor, before the venue's features
+  are on the map. A position older than `GadSettings.trackingLostAfter` is not used. The start zoom's
+  move to the visitor has no animation either. Before, on the Pixel 9 Pro, the first fix moved the
+  camera from the world view to the visitor, animated, while the map still loaded the venue; the map
+  was drawn 2.6 to 2.9 s after that move. Field log: `camera at the last position before the venue`.
 
 #### Changed (iOS 1.27.1, 1.28.0)
 
@@ -1117,92 +1224,6 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   first fix after the exit (iOS 1.31.1).
 - **Visible:** the amenity list under the search button may reach under the Map / List control's column instead
   of sharing a row with it, so the widest chip no longer squeezes it on a narrow screen (iOS 1.30.1).
-
-#### Added (iOS 1.31.0)
-
-- `GadSettings.progressCorridorMeters` (3 m). **Visible:** the walked part of the route moves only while the
-  position is within this distance of the leg (`RouteFollowRules.progressCorridorMeters`). Before, a visitor a few
-  metres beside the path, or cutting a corner, marked the route walked ahead of them (PM, Monday "Route marked as
-  walked too far", 2026-10-30). `null` keeps the old behaviour.
-- Field log: `artwork reached: … · route to …` and `artwork left (the journey moved on): …`.
-
-#### Added (iOS 1.29.0)
-
-- `GadSettings.advancesOnArtworkExit` (`true`). **Visible:** the journey moves to the next stop when the
-  visitor leaves the active artwork's geofence, not 2 s after they entered it (Nagarro call, 2026-10-30:
-  the next stop comes from the exit event). The audio guide can play while the visitor is at the
-  artwork. The visitor leaves on the SDK's `GeofenceEvent.Exited`, after `geofenceExitDelay` (5 s)
-  outside it without that event, or at once at a fix in another open artwork's geofence.
-  `ArtworkReached` and the stop's `VISITED` come at that moment. While the visitor is at the artwork, the
-  card and the route still show it as the next stop. `false` keeps the move `artworkAdvanceDelay` after
-  the enter.
-- Field log: `artwork geofence arrival: … · next stop at the exit` and `artwork left (<exit event |
-  outside for n s | in another artwork>): … · next stop`.
-
-#### Changed (SDK 6.0.0-beta.36, Map 6.0.0-beta.37; iOS 1.25.0, 1.27.0)
-
-- **BREAKING:** the library depends on SDK `6.0.0-beta.36` (was `6.0.0-beta.35`) and Map `6.0.0-beta.37`
-  (was `6.0.0-beta.31`). A host app that declares them itself moves to the same versions. No source or
-  binary change. The SDK's lists of the stored venue data are read-only: code that changes a returned
-  list in place gets `UnsupportedOperationException` (MIGRATION.md section 1).
-- The SDK answers repeated reads of the stored venue data from memory until the data changes, and the
-  map reads the venue's features once per open, not twice. On the Pixel 9 Pro one `features()` call of
-  the GAD venue took about 0.5 s.
-- The map asks for no floor-plan tile outside the style's `proximiio:raster:bounds` (the GAD style has
-  it since 2026-10-30). Those tiles answered 403 and drew nothing; the first drawn frame waited for them.
-- The map asks the API host for up to 20 requests at once, not 5 (Map 6.0.0-beta.34 and later): a first open with
-  an empty map cache gets its style, sprite, glyphs and floor-plan tiles sooner. Nothing is drawn
-  differently. `adb shell setprop log.tag.ProximiioMapTiming DEBUG` turns on the map library's timing log.
-- The journey map is drawn sooner: the map encodes the venue's features in parallel (Map 6.0.0-beta.36).
-  On the Pixel 9 Pro the first map in the app process is drawn 2.0–2.4 s after it opens (was 3.0–3.4 s),
-  and a later one 1.0–1.1 s after it opens (was 1.4–1.5 s).
-- A map opened again draws sooner still: the map encodes the venue's features once per app process, as soon as
-  it has them (Map 6.0.0-beta.37); a few MB stay in memory after the map closes. On the Pixel 9 Pro the first
-  journey map in the process is drawn 1.5–2.0 s after it opens, a later one 0.7 s after it opens.
-
-#### Changed (iOS 1.23.0 to 1.24.1)
-
-- The screens read the venue's features, geofences and amenities once and keep them in memory; a kind
-  is read again only when `venueDataChanges()` names it. The SDK decodes every stored row on each
-  `features()` call, and the map library's own read waited behind the screens' reads. A change of the
-  amenity catalogue now updates the screens' icons and lists. Field log: `venue data: <n> features read
-  in <s>` (also geofences and amenities) and `hosted map: route network <n> paths in <s>`.
-- `ProximiMapView` and `ProximiExploreView` keep the route network and the venue data for the next view
-  on the same SDK; they no longer stop following `venueDataChanges()` when they close.
-- **Visible:** every gallery but the one the visitor is in has a fill on the journey map: the
-  destination and the visited galleries as before, every other gallery in the venue style's gallery
-  colour (`proximiio-gallery`, #E6E6E6) over its artworks and furniture. The artworks and the
-  furniture show only in the visitor's gallery, from zoom 19 (PM, Monday "Artwork + furniture
-  polygons", 2026-10-29).
-- **Visible:** a curated tour shows the galleries' pills and fills as a personalised journey does; the
-  destination is the gallery of the active artwork, unless the visitor is in it (PM, Monday "Gallery
-  numbers in gallery navigation", 2026-10-29). A curated tour still routes straight to the artwork.
-- **Visible:** a gallery is visited only once the visitor is out of it (PM, Monday "Visited gallery
-  visualization", 2026-10-29: "when user exits the gallery").
-- **Visible:** a long amenity list under the search button scrolls and fades out at the bottom, above
-  the map's buttons, on the journey map and the museum map (PM, Monday "Amenity search when list is
-  long", 2026-10-29). A list that fits does not scroll.
-
-#### Changed (iOS 1.25.0 to 1.26.1)
-
-- **Visible:** the galleries' names give way to each other and to the stop markers: of names that
-  would overlap, one shows, a visited gallery's first. The destination's name always shows. Zoomed out,
-  every name showed over the others (the PM's screenshot, 2026-10-29). The names are in two new layers,
-  `gad-gallery-names` and `gad-gallery-destination-name`, above `gad-level-changer`.
-- **Visible:** the maps' amenity search lists every amenity with `metadata.in_search` true that has a
-  place, also one that is none of the built-in kinds (Women's restroom, Men's restroom, Café, Help
-  Desk, Prayer Room, Stairs, Elevator, Museum Shop). Such an amenity shows with its title in the app
-  language and its icon from the venue data, in its `search_order`, and the shortcut leads to its
-  nearest place. Before, only the built-in kinds showed: "Learning & Engagement", "Single Artist
-  Gallery", "Performance Gallery" and "Artwork" did not (PM, 2026-10-29). Without an amenity flagged
-  true the shortcuts stay the built-in ones.
-- **Visible:** a chip's title stays on one line.
-- **Visible:** the journey map puts its camera at the SDK's last position (`Proximiio.lastPosition()`), at
-  the start zoom and without animation, and selects that position's floor, before the venue's features
-  are on the map. A position older than `GadSettings.trackingLostAfter` is not used. The start zoom's
-  move to the visitor has no animation either. Before, on the Pixel 9 Pro, the first fix moved the
-  camera from the world view to the visitor, animated, while the map still loaded the venue; the map
-  was drawn 2.6 to 2.9 s after that move. Field log: `camera at the last position before the venue`.
 
 #### Fixed (iOS 1.23.0)
 
