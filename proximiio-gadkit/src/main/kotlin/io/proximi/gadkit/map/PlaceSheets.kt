@@ -45,7 +45,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import io.proximi.gadkit.R
-import io.proximi.gadkit.map.AmenityKind
 import io.proximi.gadkit.map.GuidanceText
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.designsystem.GadTextStyle
@@ -75,10 +74,10 @@ import kotlin.math.roundToInt
 @Composable
 internal fun PlaceSearchSheet(
     places: List<VenuePlace>,
-    /** The amenity shortcuts ([AmenityListing.shortcuts]). */
-    shortcuts: List<AmenityKind>,
+    /** The amenity shortcuts, in order ([AmenityListing.searchShortcuts]). */
+    shortcuts: List<AmenityShortcut>,
     onPick: (VenuePlace) -> Unit,
-    onPickAmenity: (AmenityKind) -> Unit,
+    onPickAmenity: (AmenityShortcut) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -111,19 +110,19 @@ internal fun PlaceSearchSheet(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(amenities) { kind ->
+                            items(amenities, key = { it.id }) { shortcut ->
                                 Row(
                                     Modifier
                                         .heightIn(min = 36.dp)
                                         .border(1.dp, Palette.inputStroke, RoundedCornerShape(50))
                                         .clip(RoundedCornerShape(50))
-                                        .clickable { onPickAmenity(kind) }
+                                        .clickable { onPickAmenity(shortcut) }
                                         .padding(horizontal = 12.dp),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    MapIcon(kind.gadIcon.glyph, size = 16)
-                                    Text(kind.title(), style = GadTextStyle.BodySmallRegular.textStyle)
+                                    AmenityShortcutIcon(shortcut)
+                                    Text(shortcut.title(), style = GadTextStyle.BodySmallRegular.textStyle, maxLines = 1, softWrap = false)
                                 }
                             }
                         }

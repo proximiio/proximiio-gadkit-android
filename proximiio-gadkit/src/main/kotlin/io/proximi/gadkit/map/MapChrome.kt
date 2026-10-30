@@ -1,6 +1,7 @@
 package io.proximi.gadkit.map
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalDensity
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -179,7 +181,7 @@ internal fun MapIcon(icon: Int, modifier: Modifier = Modifier, size: Int = 24) {
  * long", 2026-10-29; iOS 1.24.1).
  */
 @Composable
-internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, modifier: Modifier = Modifier, onPick: (AmenityKind) -> Unit) {
+internal fun AmenityChipList(shortcuts: List<AmenityShortcut>, selected: AmenityShortcut?, modifier: Modifier = Modifier, onPick: (AmenityShortcut) -> Unit) {
     val scroll = rememberScrollState()
     val scrolls = AmenityChipListLayout.scrolls(contentHeight = scroll.maxValue + scroll.viewportSize, visibleHeight = scroll.viewportSize)
     Box(modifier) {
@@ -209,10 +211,10 @@ internal fun AmenityChipList(kinds: List<AmenityKind>, selected: AmenityKind?, m
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            kinds.forEach { kind ->
+            shortcuts.forEach { shortcut ->
                 // Frosted: on the clear glass the titles were hard to read over the map
                 // (PM 2026-10-15, "Search menu transparency").
-                AmenityChip(kind, selected = kind == selected, onClick = { onPick(kind) }, strength = GlassStrength.Frosted)
+                AmenityChip(shortcut, selected = shortcut == selected, onClick = { onPick(shortcut) }, strength = GlassStrength.Frosted)
             }
         }
     }
@@ -259,7 +261,7 @@ private fun Modifier.outset(amount: Dp): Modifier = layout { measurable, constra
 /** "Button Small" with the amenity icon before the title. */
 @Composable
 internal fun AmenityChip(
-    kind: AmenityKind,
+    shortcut: AmenityShortcut,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -278,8 +280,9 @@ internal fun AmenityChip(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MapIcon(kind.gadIcon.glyph, size = 16)
-        Text(kind.title(), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink)
+        AmenityShortcutIcon(shortcut)
+        // One line, as in the design; a long title widens the chip.
+        Text(shortcut.title(), style = GadTextStyle.BodySmallRegular.textStyle, color = Palette.ink, maxLines = 1, softWrap = false)
     }
 }
 
@@ -411,6 +414,22 @@ internal fun CardCloseButton(contentDescription: String, onClick: () -> Unit) {
 /** The visitor-facing name of an amenity kind. */
 @Composable
 internal fun AmenityKind.title(): String = UiText.Resource(titleKey).mapText()
+
+/** The design's title of a kind, else the amenity's title from the data. */
+@Composable
+internal fun AmenityShortcut.title(): String = when (this) {
+    is AmenityShortcut.Kind -> kind.title()
+    is AmenityShortcut.Amenity -> title
+}
+
+/** The design's icon of a kind, else the amenity's icon from the data; nothing without one. 16 dp. */
+@Composable
+internal fun AmenityShortcutIcon(shortcut: AmenityShortcut) {
+    when (shortcut) {
+        is AmenityShortcut.Kind -> MapIcon(shortcut.kind.gadIcon.glyph, size = 16)
+        is AmenityShortcut.Amenity -> shortcut.icon?.let { Image(it, contentDescription = null, Modifier.size(16.dp), contentScale = ContentScale.Fit) }
+    }
+}
 
 // The journey screen layout (iOS `MapGlassFrame`, `MapListToggle`, `BottomGlassBar`,
 // `RoundGlassButtonStyle`).

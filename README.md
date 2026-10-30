@@ -1074,6 +1074,27 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   the map's buttons, on the journey map and the museum map (PM, Monday "Amenity search when list is
   long", 2026-10-29). A list that fits does not scroll.
 
+#### Changed (iOS 1.25.0 to 1.26.1)
+
+- **Visible:** the galleries' names give way to each other and to the stop markers: of names that
+  would overlap, one shows, a visited gallery's first. The destination's name always shows. Zoomed out,
+  every name showed over the others (the PM's screenshot, 2026-10-29). The names are in two new layers,
+  `gad-gallery-names` and `gad-gallery-destination-name`, above `gad-level-changer`.
+- **Visible:** the maps' amenity search lists every amenity with `metadata.in_search` true that has a
+  place, also one that is none of the built-in kinds (Women's restroom, Men's restroom, Café, Help
+  Desk, Prayer Room, Stairs, Elevator, Museum Shop). Such an amenity shows with its title in the app
+  language and its icon from the venue data, in its `search_order`, and the shortcut leads to its
+  nearest place. Before, only the built-in kinds showed: "Learning & Engagement", "Single Artist
+  Gallery", "Performance Gallery" and "Artwork" did not (PM, 2026-10-29). Without an amenity flagged
+  true the shortcuts stay the built-in ones.
+- **Visible:** a chip's title stays on one line.
+- **Visible:** the journey map puts its camera at the SDK's last position (`Proximiio.lastPosition()`), at
+  the start zoom and without animation, and selects that position's floor, before the venue's features
+  are on the map. A position older than `GadSettings.trackingLostAfter` is not used. The start zoom's
+  move to the visitor has no animation either. Before, on the Pixel 9 Pro, the first fix moved the
+  camera from the world view to the visitor, animated, while the map still loaded the venue; the map
+  was drawn 2.6 to 2.9 s after that move. Field log: `camera at the last position before the venue`.
+
 #### Fixed (iOS 1.23.0)
 
 - Since 1.22.2 the map did not report the venue as drawn after a floor change: the cones of the other

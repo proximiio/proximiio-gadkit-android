@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Port of ProximiioGADKit `AmenityListingTests`: the amenity metadata that chooses and orders the
@@ -94,6 +95,41 @@ class AmenityListingTest {
 
         val stairs = AmenityListing.search(listOf(amenity("a-stairs", "Staircase", mapOf("in_search" to JsonValue.Bool(true), "search_order" to number(0.0)))))
         assertEquals(listOf(AmenityKind.STAIRS), stairs.shortcuts(places))
+    }
+
+    /**
+     * An amenity with the flag true that is none of the kinds is a shortcut too, with its own title, in
+     * the data's order among the kinds; one without a place is left out (PM, 2026-10-29: the galleries
+     * and Learning & Engagement did not show).
+     */
+    @Test
+    fun flaggedAmenitiesOutsideTheKindsAreShortcuts() {
+        val amenities = listOf(
+            amenity("a-women", "Women's Restroom", mapOf("in_search" to text("true"), "search_order" to number(1.0))),
+            amenity("a-learning", "Learning & Engagement", mapOf("in_search" to text("true"), "search_order" to number(6.0))),
+            amenity("a-shop", "Museum Shop", mapOf("in_search" to text("true"), "search_order" to number(5.0))),
+            amenity("a-gallery", "Single Artist Gallery", mapOf("in_search" to text("true"), "search_order" to number(7.0))),
+            amenity("a-empty", "Performance Gallery", mapOf("in_search" to text("true"), "search_order" to number(8.0))),
+        )
+        val learning = place("p-learning", "Studio", "a-learning")
+        val gallery = place("p-gallery", "G205 Pauliina", "a-gallery")
+        val all = places + learning + gallery
+        val shortcuts = AmenityListing.search(amenities).searchShortcuts(all, amenities, language = "en")
+        assertEquals(
+            listOf<AmenityShortcut>(
+                AmenityShortcut.Kind(AmenityKind.WOMENS_RESTROOM),
+                AmenityShortcut.Kind(AmenityKind.MUSEUM_SHOP),
+                AmenityShortcut.Amenity("a-learning", "Learning & Engagement", null),
+                AmenityShortcut.Amenity("a-gallery", "Single Artist Gallery", null),
+            ),
+            shortcuts,
+        )
+        assertTrue(shortcuts[2].matches(learning))
+        assertFalse(shortcuts[2].matches(gallery))
+        assertEquals(learning, shortcuts[2].nearest(all, Coordinate(24.54, 54.40), 1.0))
+        // Without a flag true the shortcuts are the kinds alone.
+        val unflagged = AmenityListing.ALL.searchShortcuts(all, amenities, language = "en")
+        assertEquals(AmenityKind.SHORTCUTS.map { AmenityShortcut.Kind(it) }, unflagged)
     }
 
     /**

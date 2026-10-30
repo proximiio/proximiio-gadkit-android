@@ -56,7 +56,9 @@ import org.maplibre.geojson.Polygon
  *   [PlaceFraming]).
  * - each gallery's title in a pill at its POI: red for the gallery a leg leads to, white with a red
  *   outline for a visited gallery, white with a black outline for the others ([updateGalleryMarkers];
- *   PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+ *   PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). Of names that would overlap one
+ *   shows, a visited gallery's first; they give way to the stop markers. The destination's name always
+ *   shows (iOS 1.25.0).
  * - the visited and the destination galleries over the venue's artworks, furniture and inner walls
  *   (`proximiio-inner_wall`), under labels, POI icons, the route and the stop markers.
  * - the building's cones on the shown floor, each an image of the design's metal gradient
@@ -203,7 +205,7 @@ internal class JourneyMapLayers {
         }
         if (style.getSource(LEVEL_CHANGER_SOURCE) == null) {
             style.addSource(GeoJsonSource(LEVEL_CHANGER_SOURCE))
-            val layer = SymbolLayer(LEVEL_CHANGER_LAYER, LEVEL_CHANGER_SOURCE).withProperties(
+            val layer = SymbolLayer(LEVEL_CHANGER_LAYER, LEVEL_CHANGER_SOURCE).withFilter(kindFilter(PointKind.CHANGER)).withProperties(
                 PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
                 PropertyFactory.iconAllowOverlap(true),
                 PropertyFactory.iconIgnorePlacement(true),
@@ -211,6 +213,20 @@ internal class JourneyMapLayers {
                 PropertyFactory.symbolSortKey(Expression.get(SORT_PROPERTY)),
             )
             canvas.addLayer(layer, MapCanvasLayerAnchor.Above(ProximiioMapLayer.ROUTE))
+            // MapLibre places the symbols of the upper layers first: the stop markers, then the
+            // destination's name, then the other names, each where nothing placed before it is.
+            val names = SymbolLayer(GALLERY_NAME_LAYER, LEVEL_CHANGER_SOURCE).withFilter(kindFilter(PointKind.GALLERY_NAME)).withProperties(
+                PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
+                PropertyFactory.iconAllowOverlap(false),
+                // The visited galleries' names before the others.
+                PropertyFactory.symbolSortKey(Expression.get(SORT_PROPERTY)),
+            )
+            canvas.addLayer(names, MapCanvasLayerAnchor.Above(LEVEL_CHANGER_LAYER))
+            val destination = SymbolLayer(DESTINATION_NAME_LAYER, LEVEL_CHANGER_SOURCE).withFilter(kindFilter(PointKind.DESTINATION_NAME)).withProperties(
+                PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
+                PropertyFactory.iconAllowOverlap(true),
+            )
+            canvas.addLayer(destination, MapCanvasLayerAnchor.Above(GALLERY_NAME_LAYER))
         }
         if (style.getSource(GALLERY_SOURCE) == null) {
             style.addSource(GeoJsonSource(GALLERY_SOURCE))
@@ -355,20 +371,24 @@ internal class JourneyMapLayers {
             if (style.getImage(name) == null && context != null) {
                 style.addImage(name, galleryMarkerImage(context, marker.name, marker.style))
             }
-            val sort = when (marker.style) {
-                GalleryMarker.Style.DESTINATION -> 3
-                GalleryMarker.Style.VISITED -> 1
-                GalleryMarker.Style.STANDARD -> 0
-            }
-            features += point(marker.coordinate, name, sort)
+            val kind = if (marker.style == GalleryMarker.Style.DESTINATION) PointKind.DESTINATION_NAME else PointKind.GALLERY_NAME
+            features += point(marker.coordinate, name, sort = if (marker.style == GalleryMarker.Style.VISITED) 0 else 1, kind = kind)
         }
         source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
-    private fun point(coordinate: Coordinate, image: String, sort: Int): Feature =
+    /** The layer a point of the level changer source goes to. */
+    private enum class PointKind(val value: String) {
+        CHANGER("changer"),
+        GALLERY_NAME("galleryName"),
+        DESTINATION_NAME("destinationName"),
+    }
+
+    private fun point(coordinate: Coordinate, image: String, sort: Int, kind: PointKind = PointKind.CHANGER): Feature =
         Feature.fromGeometry(Point.fromLngLat(coordinate.longitude, coordinate.latitude)).apply {
             addStringProperty(IMAGE_PROPERTY, image)
             addNumberProperty(SORT_PROPERTY, sort)
+            addStringProperty(KIND_PROPERTY, kind.value)
         }
 
     /** The design's icon of a level changer type. */
@@ -512,8 +532,21 @@ internal class JourneyMapLayers {
         const val LEVEL_CHANGER_SOURCE = "gad-level-changer"
         const val LEVEL_CHANGER_LAYER = "gad-level-changer"
         const val LEVEL_CHANGER_IMAGE = "gad-level-changer"
+
+        /**
+         * The standard and visited gallery names. They give way to each other, to the destination's
+         * name and to the stop markers (Monday, the PM's crowded map of 2026-10-29).
+         */
+        const val GALLERY_NAME_LAYER = "gad-gallery-names"
+
+        /** The destination gallery's name, always shown. */
+        const val DESTINATION_NAME_LAYER = "gad-gallery-destination-name"
         const val IMAGE_PROPERTY = "image"
         const val SORT_PROPERTY = "sort"
+        const val KIND_PROPERTY = "kind"
+
+        private fun kindFilter(kind: PointKind): Expression =
+            Expression.eq(Expression.get(KIND_PROPERTY), Expression.literal(kind.value))
         const val MARKER_DP = 30
         const val MARKER_COLOR = 0xFFED3731.toInt()
         const val INK_COLOR = 0xFF2B2B2B.toInt()

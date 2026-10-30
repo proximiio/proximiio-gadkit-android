@@ -42,6 +42,7 @@ import io.proximi.gadkit.map.PlaceFraming
 import io.proximi.gadkit.map.venueGeofences
 import io.proximi.sdk.VenueDataKind
 import io.proximi.sdk.enteredGeofenceIds
+import io.proximi.sdk.lastPosition
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import io.proximi.gadkit.map.galleries
@@ -55,6 +56,7 @@ import io.proximi.gadkit.ProximiDestination
 import io.proximi.gadkit.ProximiMapView
 import io.proximi.gadkit.hasPrompt
 import io.proximi.map.core.FloorKey
+import io.proximi.map.core.MapCoordinate
 import io.proximi.map.core.JourneyDeviationPolicy
 import io.proximi.sdk.computeRoute
 import io.proximi.sdk.wayfinding.WayfindingRoutingError
@@ -87,6 +89,7 @@ import io.proximi.map.live.AmenityIcon
 import io.proximi.gadkit.map.GalleryFill
 import io.proximi.gadkit.map.catalogue
 import io.proximi.gadkit.map.AmenityListing
+import io.proximi.gadkit.map.AmenityShortcut
 import io.proximi.gadkit.map.LevelChangerPlace
 import io.proximi.map.kit.MapCameraFollow
 import kotlinx.coroutines.flow.collectLatest
@@ -95,6 +98,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.toJavaDuration
 
 /**
@@ -245,7 +249,7 @@ internal class VisitViewModel(
         private set
 
     /** The search shortcuts, from the amenities' `in_search` and `search_order` ([AmenityListing]). */
-    var searchShortcuts by mutableStateOf(emptyList<AmenityKind>())
+    var searchShortcuts by mutableStateOf(emptyList<AmenityShortcut>())
         private set
 
     /**
@@ -436,6 +440,7 @@ internal class VisitViewModel(
             }
         }
         scope.launch {
+            placeCameraAtLastPosition()
             loadVenue()
             refreshMapLayers()
             // A journey without stops shows the map alone; the navigator would report it finished.
@@ -684,11 +689,11 @@ internal class VisitViewModel(
     private suspend fun loadVenue() {
         places = venue.places(language)
         val amenities = venue.catalogue()
-        searchShortcuts = AmenityListing.search(amenities).shortcuts(places)
         val icons = withContext(Dispatchers.Default) {
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
         }
         amenityIcons = icons.mapValues { it.value.asImageBitmap() }
+        searchShortcuts = AmenityListing.search(amenities).searchShortcuts(places, amenities, amenityIcons, language)
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }
         controller.artworkAreas = venue.artworkAreas()
         // The journey map shows artworks only as the numbered stop markers. Amenities, galleries
@@ -725,6 +730,26 @@ internal class VisitViewModel(
     }
 
     /**
+     * Before the venue's features are on the map: the camera at the SDK's last position, at the start
+     * zoom, without animation, and the floor of that position, as iOS 1.26.1. On the Pixel the first
+     * fix moved the camera from the world view to the visitor, animated, while the map still loaded
+     * the venue (UI tests, 2026-10-30). A position older than [GadSettings.trackingLostAfter] is not
+     * used.
+     */
+    private suspend fun placeCameraAtLastPosition() {
+        val last = venue.sdk.lastPosition() ?: return
+        val age = (System.currentTimeMillis() - last.timestamp).milliseconds
+        if (age >= settings.trackingLostAfter) return
+        val zoom = settings.startZoom ?: settings.followZoom
+        session.camera.setCenter(MapCoordinate(last.coordinate.latitude, last.coordinate.longitude), zoom, animated = false)
+        last.floor?.level?.let { session.select(FloorKey(it)) }
+        FieldLog.log(
+            "camera at the last position before the venue · L${last.floor?.level?.toInt() ?: "?"} · " +
+                "%.1f s old".format(Locale.ROOT, age.inWholeMilliseconds / 1000.0),
+        )
+    }
+
+    /**
      * Shows the visitor at [GadSettings.startZoom] for [GadSettings.startZoomDuration], then follows
      * them at the follow zoom: when the journey starts, on the first fix and when the position comes
      * back (PM, Monday "Zoom level at start + navigation", 2026-10-29). Without `startZoom` it follows
@@ -736,8 +761,9 @@ internal class VisitViewModel(
         if (zoom == null || position == null) return recentre(withHeading, reason)
         startZoomFollow?.cancel()
         FieldLog.log("start zoom ($reason) · zoom $zoom for ${settings.startZoomDuration.inWholeMilliseconds / 1000.0} s")
-        // The camera command lets go of the follow; `recentre` takes it again.
-        session.camera.setCenter(position.coordinate, zoom, animated = true)
+        // The camera command lets go of the follow; `recentre` takes it again. Without animation: an
+        // animated move delayed the first fully drawn frame.
+        session.camera.setCenter(position.coordinate, zoom, animated = false)
         startZoomFollow = scope.launch {
             delay(settings.startZoomDuration)
             startZoomFollow = null
@@ -1090,14 +1116,14 @@ internal class VisitViewModel(
     }
 
     /**
-     * Shows the nearest place of [kind] on a card. "Add a stop" adds it as a journey detour (PM review
-     * 2026-10-12).
+     * Shows the nearest place of [shortcut] on a card. "Add a stop" adds it as a journey detour (PM
+     * review 2026-10-12).
      */
-    fun detour(kind: AmenityKind) {
+    fun detour(shortcut: AmenityShortcut) {
         isShowingAmenities = false
         val here = session.position.value
         val from = here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) }
-        selectedAmenity = kind.nearest(places, from, here?.floor?.level)
+        selectedAmenity = shortcut.nearest(places, from, here?.floor?.level)
         selectedAmenity?.let { onEvent(VisitEvent.AmenitySelected(it)) }
     }
 

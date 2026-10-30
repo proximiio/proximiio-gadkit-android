@@ -76,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.proximi.gadkit.R
-import io.proximi.gadkit.map.AmenityKind
 import io.proximi.gadkit.map.GuidanceText
 import io.proximi.gadkit.visit.VisitCardState
 import io.proximi.gadkit.visit.VisitCardText
@@ -396,7 +395,7 @@ private fun CardOverlay(model: VisitViewModel) {
                     ) { MapIcon(R.drawable.icon_search) }
                     AnimatedVisibility(model.isShowingAmenities, enter = fadeIn(), exit = fadeOut()) {
                         AmenityChipList(
-                            kinds = model.searchShortcuts,
+                            shortcuts = model.searchShortcuts,
                             selected = null,
                             onPick = model::detour,
                         )

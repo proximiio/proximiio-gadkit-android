@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import androidx.compose.ui.graphics.ImageBitmap
 import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioAmenity
 
@@ -54,7 +55,35 @@ internal class AmenityListing private constructor(
      * else the kinds of [AmenityKind.SHORTCUTS] without those whose flag is false; by the data's
      * order, then in the order of [AmenityKind.entries]. Pure; covered by tests.
      */
-    fun shortcuts(places: List<VenuePlace>): List<AmenityKind> =
+    fun shortcuts(places: List<VenuePlace>): List<AmenityKind> = ordered(rankedKinds(places)).map { it.first }
+
+    /**
+     * The search's shortcuts: the kinds of [shortcuts], and, when an amenity has the flag true, each
+     * other amenity with the flag true and a place, with its title in [language] and its icon from
+     * [icons] (by amenity id). By the data's order, then kinds before the others. Pure; covered by
+     * tests.
+     */
+    fun searchShortcuts(
+        places: List<VenuePlace>,
+        amenities: List<ProximiioAmenity>,
+        icons: Map<String, ImageBitmap> = emptyMap(),
+        language: String,
+    ): List<AmenityShortcut> {
+        val ranked: MutableList<Pair<AmenityShortcut, Double>> = rankedKinds(places).mapTo(mutableListOf()) { (kind, rank) -> AmenityShortcut.Kind(kind) to rank }
+        if (isLimitedToIncluded) {
+            val kinds = AmenityKind.kinds(amenities)
+            val placed = places.mapNotNull { it.amenityId }.toSet()
+            for (amenity in amenities) {
+                if (amenity.id in kinds || amenity.id !in placed) continue
+                val rank = rank(amenity.id) ?: continue
+                val title = amenity.title(language) ?: amenity.title ?: amenity.id
+                ranked += AmenityShortcut.Amenity(amenity.id, title, icons[amenity.id]) to rank
+            }
+        }
+        return ordered(ranked).map { it.first }
+    }
+
+    private fun rankedKinds(places: List<VenuePlace>): List<Pair<AmenityKind, Double>> =
         AmenityKind.entries.mapNotNull { kind ->
             val matching = places.filter(kind::matches)
             if (matching.isEmpty()) return@mapNotNull null
@@ -62,9 +91,10 @@ internal class AmenityListing private constructor(
             if (kind !in AmenityKind.SHORTCUTS && !isFlagged) return@mapNotNull null
             matching.mapNotNull { rank(it.amenityId) }.minOrNull()?.let { kind to it }
         }
-            .withIndex()
-            .sortedWith(compareBy({ it.value.second }, { it.index }))
-            .map { it.value.first }
+
+    /** By rank, then in the given order. */
+    private fun <T> ordered(ranked: List<Pair<T, Double>>): List<Pair<T, Double>> =
+        ranked.withIndex().sortedWith(compareBy({ it.value.second }, { it.index })).map { it.value }
 
     override fun equals(other: Any?): Boolean =
         other is AmenityListing && order == other.order && excluded == other.excluded && included == other.included &&

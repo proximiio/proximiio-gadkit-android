@@ -63,14 +63,8 @@ internal enum class AmenityKind(
      * walking distance. The venue comes first because the GAD data has a café on level 1 of the DCT
      * office, 11 km away, and the Guggenheim café on level 0 (2026-10-15). Pure; covered by tests.
      */
-    internal fun nearest(places: List<VenuePlace>, from: Coordinate?, level: Double?): VenuePlace? {
-        val matching = places.filter(::matches)
-        if (from == null) return matching.firstOrNull()
-        val closest = VenuePlace.nearest(from, null, matching) ?: return null
-        val venue = matching.filter { it.placeId == closest.placeId }
-        val sameLevel = venue.filter { level != null && VenueLevel.same(it.level, level) }
-        return VenuePlace.nearest(from, null, sameLevel.ifEmpty { venue })
-    }
+    internal fun nearest(places: List<VenuePlace>, from: Coordinate?, level: Double?): VenuePlace? =
+        AmenityShortcut.nearestOf(places.filter(::matches), from, level)
 
     internal companion object {
         /** The kind of each amenity that has one, by amenity id. Pure; covered by tests. */

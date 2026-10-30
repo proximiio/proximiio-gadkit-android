@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -39,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.proximi.gadkit.R
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.AmenityKind
+import io.proximi.gadkit.map.AmenityShortcut
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.map.GalleryFill
 import io.proximi.gadkit.map.GuidanceSymbol
@@ -58,6 +60,7 @@ import io.proximi.gadkit.map.places
 import io.proximi.map.compose.ProximiioMap
 import io.proximi.map.compose.rememberProximiioMapSession
 import io.proximi.map.core.RouteFollowRules
+import io.proximi.map.live.AmenityIcon
 import io.proximi.map.live.ProximiioMapSession
 import io.proximi.sdk.computeRoute
 import io.proximi.sdk.core.model.ProximiioCoordinate
@@ -107,13 +110,13 @@ internal fun MuseumMapView(
 
     var places by remember { mutableStateOf(emptyList<VenuePlace>()) }
     // The search shortcuts, from the amenities' `in_search` and `search_order`.
-    var shortcuts by remember { mutableStateOf(emptyList<AmenityKind>()) }
+    var shortcuts by remember { mutableStateOf(emptyList<AmenityShortcut>()) }
     var selectedPlace by remember { mutableStateOf<VenuePlace?>(null) }
     var destination by remember { mutableStateOf<VenuePlace?>(null) }
     var routeError by remember { mutableStateOf<Int?>(null) }
     var isSearching by remember { mutableStateOf(false) }
     var isShowingAmenities by remember { mutableStateOf(false) }
-    var selectedAmenity by remember { mutableStateOf<AmenityKind?>(null) }
+    var selectedAmenity by remember { mutableStateOf<AmenityShortcut?>(null) }
     var detailPlace by remember { mutableStateOf<VenuePlace?>(null) }
 
     val isAccessibleRoutesOn by AccessibleRoutes.isOn(context).collectAsStateWithLifecycle()
@@ -175,11 +178,11 @@ internal fun MuseumMapView(
         session.clearRoute()
     }
 
-    /** Routes to the nearest place of [kind], preferring the visitor's floor, and shows it with the visitor ([PlaceFraming]). */
-    fun routeToNearest(kind: AmenityKind) {
+    /** Routes to the nearest place of [shortcut], preferring the visitor's floor, and shows it with the visitor ([PlaceFraming]). */
+    fun routeToNearest(shortcut: AmenityShortcut) {
         val here = session.position.value
         val from = here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) }
-        val place = kind.nearest(places, from, here?.floor?.level) ?: return
+        val place = shortcut.nearest(places, from, here?.floor?.level) ?: return
         selectedPlace = null
         scope.launch {
             route(place)
@@ -246,9 +249,18 @@ internal fun MuseumMapView(
         LaunchedEffect(selectedFloor) { layers.update(emptyList(), selectedFloor.level) }
     }
 
+    /** The search's shortcuts of [places], with the amenities' own icons. */
+    suspend fun searchShortcuts(): List<AmenityShortcut> {
+        val amenities = venue.catalogue()
+        val icons = withContext(Dispatchers.Default) {
+            amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it.asImageBitmap() } }.toMap()
+        }
+        return AmenityListing.search(amenities).searchShortcuts(places, amenities, icons, language)
+    }
+
     LaunchedEffect(language) {
         places = venue.places(language)
-        shortcuts = AmenityListing.search(venue.catalogue()).shortcuts(places)
+        shortcuts = searchShortcuts()
         // The picked places take their titles in the new language.
         destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
         selectedPlace = selectedPlace?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
@@ -260,7 +272,7 @@ internal fun MuseumMapView(
     LaunchedEffect(language) {
         venue.data.version.drop(1).collect {
             places = venue.places(language)
-            shortcuts = AmenityListing.search(venue.catalogue()).shortcuts(places)
+            shortcuts = searchShortcuts()
             destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
             selectedPlace = selectedPlace?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
         }
@@ -323,14 +335,14 @@ internal fun MuseumMapView(
                         AnimatedVisibility(isShowingAmenities, enter = fadeIn(), exit = fadeOut()) {
                             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 AmenityChipList(
-                                    kinds = shortcuts,
+                                    shortcuts = shortcuts,
                                     selected = selectedAmenity,
                                     // "Search the museum" keeps its place under a long list.
                                     modifier = Modifier.weight(1f, fill = false),
-                                ) { kind ->
-                                    selectedAmenity = kind
+                                ) { shortcut ->
+                                    selectedAmenity = shortcut
                                     isShowingAmenities = false
-                                    routeToNearest(kind)
+                                    routeToNearest(shortcut)
                                 }
                                 SmallButton(stringResource(R.string.search_the_museum), onClick = { isSearching = true })
                             }
@@ -423,9 +435,9 @@ internal fun MuseumMapView(
                 isSearching = false
                 selectedPlace = place
             },
-            onPickAmenity = { kind ->
+            onPickAmenity = { shortcut ->
                 isSearching = false
-                routeToNearest(kind)
+                routeToNearest(shortcut)
             },
             onDismiss = { isSearching = false },
         )
