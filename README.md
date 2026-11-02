@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.37` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.38` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -610,20 +610,26 @@ In a personalised journey, a leg to an artwork in a gallery the visitor is not i
 gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
 (`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. A gallery
 without a geofence uses its polygon feature (`type` `gallery`) with that id in `metadata.gallery_id`
-as the outline. The route ends at the POI. The map fills the geofence's outline with the floor's colour and marks the POI with a red
-label, the first word of its title ("G303"); the POI's own icon is hidden. The stop card names the
+as the outline. The route ends at the POI. The map fills the outline with the floor's colour and marks
+the POI with a red label, the first word of its title ("G303"); the POI's own icon is hidden. The stop card names the
 POI ("G303 Language") with a gallery icon and no stop number.
 
 The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
 leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
-whose gallery has no geofence polygon or no POI, is routed to directly. The GAD venue data on
-2026-10-19 has 14 such galleries.
+whose gallery has no outline or no POI, is routed to directly.
 
 An artwork on another floor than its gallery, or more than `GadSettings.galleryFirstMarginMeters`
 (50 m) outside the gallery's geofence, is routed to directly. In the GAD data of 2026-10-19, 34
 artworks lie 5–29 m outside their gallery's geofence. When the gallery has no route from the
 visitor, the leg ends at the artwork, and so do the later legs to that artwork. The field log names
 both cases ("gallery first:").
+
+The numbered marker of an artwork in a gallery shows only while the visitor is in that gallery, in
+every state: pending, active and done. This applies to personalised journeys and curated tours (PM,
+Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30). The markers of artworks
+outside every gallery and of detours stay. A hidden marker keeps its number: with stop 1 hidden, the
+next stop shows 2. The library sets the map's `JourneyStopMarkerStyle.hiddenStopIds` (Map
+6.0.0-beta.38) on each change of the journey and of the visitor's gallery.
 
 ### Venue data changes
 
@@ -1068,7 +1074,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.68 and Map 6.0.0-beta.60 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.37 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.68 and Map 6.0.0-beta.61 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.38 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1102,6 +1108,23 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
+#### Changed (Map 6.0.0-beta.38; iOS 1.33.0)
+
+- **BREAKING:** the library depends on Map `6.0.0-beta.38` (was `6.0.0-beta.37`); SDK `6.0.0-beta.36` is
+  unchanged. A host app that declares the Map itself moves to the same version. No source or binary change.
+  The app gets OkHttp 5.5.1 (was 5.5.0) and `androidx.annotation` 1.11.0 (was 1.10.0) through the Map.
+- A map that leaves the screen while the app is in front is paused and stopped before it is destroyed (Map
+  6.0.0-beta.38). Before, MapLibre could draw one more frame on a renderer that was already gone, and the
+  app ended with `SIGSEGV` in `MapRenderer::render` (Nagarro, 2026-11-02: a tester's app on a Pixel 7 with
+  Android 16, after 181 s). The host app does nothing.
+- **Visible:** the numbered marker of an artwork in a gallery shows only while the visitor is in that
+  gallery, in every state: pending, active and done, in personalised journeys and curated tours (PM,
+  Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30). Before, the markers of a
+  visited gallery stayed until the visitor reached the next gallery. The markers of artworks outside every
+  gallery and of detours stay, and a hidden marker keeps its number: with stop 1 hidden, the next stop
+  shows 2. The library sets the map's `JourneyStopMarkerStyle.hiddenStopIds` on each change of the
+  journey and of the visitor's gallery.
+
 #### Changed (iOS 1.32.0; PM, Monday, 2026-10-30 to 2026-11-02)
 
 - **Visible:** `GadSettings.startZoom` is 17 (was 18) and `followZoom` is 19.5 (was 18.8).
@@ -1129,11 +1152,6 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   selection stays inside the control after a tap and a slide. Android had this already; on iOS the
   selection left the control ("Arabic toggle functions to the wrong direction"). UI test
   `HostedMapUiTest.rightToLeftTheMapListSelectionStaysInsideTheControl` of the Proximi GAD app.
-
-#### Not yet (iOS 1.32.0 neither)
-
-- Artwork numbers only in the visitor's gallery ("Gallery numbers in gallery navigation"): it needs
-  `JourneyStopMarkerStyle.hiddenStopIDs` from the map libraries.
 
 ### [1.31.3] — 2026-11-02
 

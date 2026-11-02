@@ -273,4 +273,25 @@ class GalleryPolygonTest {
         assertNull(VisitViewModel.fillStyle("g104", destination = "g303", visited = visited, visitorGallery = "g104"))
         assertNull(VisitViewModel.fillStyle("g303", destination = "g303", visited = visited, visitorGallery = "g303"))
     }
+
+    /**
+     * The marker of an artwork in a gallery shows only while the visitor is in that gallery, in every
+     * state; artworks outside every gallery and detours stay (PM, Monday "Gallery numbers in gallery
+     * navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0).
+     */
+    @Test
+    fun artworkMarkersShowOnlyInTheVisitorsGallery() {
+        fun stop(id: String, gallery: String?, state: MapJourneyStop.State = MapJourneyStop.State.PENDING, kind: MapJourneyStop.Kind = MapJourneyStop.Kind.PLANNED) =
+            MapJourneyStop(id = id, title = id, coordinate = MapCoordinate(24.5, 54.4), poiId = id, group = gallery, kind = kind, state = state)
+        val stops = listOf(
+            stop("visited-g101", gallery = "g101", state = MapJourneyStop.State.DONE),
+            stop("outside", gallery = null, state = MapJourneyStop.State.DONE),
+            stop("active-g303", gallery = "g303", state = MapJourneyStop.State.ACTIVE),
+            stop("pending-g303", gallery = "g303"),
+            stop("cafe", gallery = "g101", kind = MapJourneyStop.Kind.DETOUR),
+        )
+        assertEquals(setOf("visited-g101", "active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = null))
+        assertEquals(setOf("visited-g101"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g303"))
+        assertEquals(setOf("active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g101"))
+    }
 }
