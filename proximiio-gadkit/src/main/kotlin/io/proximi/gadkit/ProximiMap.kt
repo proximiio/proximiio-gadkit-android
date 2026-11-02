@@ -311,20 +311,24 @@ public class ProximiMap(
         galleries = venue.galleries(language)
     }
 
-    /** The venue data changed on the backend. */
+    /**
+     * The venue data changed on the backend, or the app's language changed: the places and the
+     * stored journey's titles follow.
+     */
     private suspend fun venueDataChanged(venue: VenueService) {
         loadPlaces(venue)
         store?.let(::reconcileStoredJourney)
     }
 
     /**
-     * Updates the stored journey with the current places ([VisitPlan.reconciled]). While the journey
-     * screen is open, the screen updates its journey and stores it.
+     * Updates the stored journey with the current places ([VisitPlan.reconciled]) and their titles in
+     * the app's language ([VisitPlan.retitled]; iOS 1.31.3). While the journey screen is open, the
+     * screen updates its journey and stores it.
      */
     private fun reconcileStoredJourney(store: VisitStore) {
         if (presenter.screen.value == Screen.JOURNEY) return
         val stored = store.load() ?: return
-        val journey = VisitPlan.reconciled(stored, places.value, galleries)
+        val journey = VisitPlan.retitled(VisitPlan.reconciled(stored, places.value, galleries), places.value)
         if (journey == stored) return
         FieldLog.log("map: stored journey updated · ${stored.stops.size} → ${journey.stops.size} stops")
         store.save(journey)
@@ -338,12 +342,15 @@ public class ProximiMap(
         refreshJourney()
     }
 
-    /** The app's language, from [ProximiMapHost]: the places and the stop picker follow it. */
+    /**
+     * The app's language, from [ProximiMapHost]: the places, the stop picker and the stored journey's
+     * titles follow it.
+     */
     internal fun setLanguage(tag: String?) {
         if (tag == language) return
         language = tag
         val venue = venue ?: return
-        mainScope.launch { loadPlaces(venue) }
+        mainScope.launch { venueDataChanged(venue) }
     }
 
     /**

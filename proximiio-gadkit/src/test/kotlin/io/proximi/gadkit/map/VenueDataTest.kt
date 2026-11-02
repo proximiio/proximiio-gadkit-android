@@ -11,6 +11,7 @@ import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioFeature
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Port of ProximiioGADKit `VenueDataTests`. */
@@ -68,6 +69,56 @@ class VenueDataTest {
         )
         val stored = Journey(journey().stops + cafe)
         assertEquals("cafe", VisitPlan.reconciled(stored, places).stops.last().id)
+    }
+
+    /**
+     * Nagarro, 2026-11-02: the language changed wrongly while the app ran. The stops kept the POI
+     * titles of the language the app launched in (iOS 1.31.3).
+     */
+    @Test
+    fun everyStopTakesItsPlacesTitleInTheAppsLanguage() {
+        val cafe = JourneyStop(
+            id = "cafe", title = "Café", coordinate = Coordinate(24.5, 54.4), level = null, poiId = "cafe",
+            state = StopState.ACTIVE, kind = StopKind.DETOUR,
+        )
+        val stored = Journey(journey(mapOf("a" to StopState.DONE, "b" to StopState.ACTIVE)).stops + cafe)
+        fun arabic(id: String, title: String, english: String) =
+            VenuePlace(id = id, title = title, titles = setOf(english, title), coordinate = Coordinate(24.5, 54.4), level = 1.0)
+        val arabicPlaces = listOf(
+            arabic("a", "العمل أ", "Artwork A"),
+            arabic("b", "العمل ب", "Artwork B"),
+            arabic("c", "العمل ج", "Artwork C"),
+            arabic("cafe", "المقهى", "Café"),
+        )
+        val retitled = VisitPlan.retitled(stored, arabicPlaces)
+        assertEquals(listOf("العمل أ", "العمل ب", "العمل ج", "المقهى"), retitled.stops.map { it.title })
+        assertEquals(stored.stops.map { it.state }, retitled.stops.map { it.state })
+        assertEquals(stored.stops.map { it.coordinate }, retitled.stops.map { it.coordinate })
+        assertEquals(retitled, VisitPlan.retitled(retitled, arabicPlaces))
+    }
+
+    /** A done stop keeps the title the visitor saw after the POI was renamed ([VisitPlan.reconciled]). */
+    @Test
+    fun aStopWithATitleThePlaceNoLongerHasKeepsIt() {
+        val stored = journey(mapOf("a" to StopState.DONE))
+        val renamed = VenuePlace(id = "a", title = "Artwork A (new)", titles = setOf("Artwork A (new)"), coordinate = Coordinate(24.5, 54.4), level = 1.0)
+        assertEquals(stored, VisitPlan.retitled(stored, listOf(renamed)))
+    }
+
+    @Test
+    fun aPlaceHasTheTitlesOfEveryLanguage() {
+        val i18n = mapOf("en" to "Artwork A", "ar" to "العمل أ", "fr" to "")
+        val feature = VenueFeature(
+            id = "a",
+            type = "poi",
+            geometry = Geometry("Point", listOf(54.4, 24.5)),
+            properties = mapOf("title" to "Artwork A", "title_i18n" to i18n),
+            level = 1.0,
+        )
+        val arabic = assertNotNull(VenuePlace.from(feature, language = "ar"))
+        assertEquals(setOf("Artwork A", "العمل أ"), arabic.titles)
+        assertEquals("العمل أ", arabic.title)
+        assertEquals("Artwork A", assertNotNull(VenuePlace.from(feature, language = "en")).title)
     }
 
     @Test

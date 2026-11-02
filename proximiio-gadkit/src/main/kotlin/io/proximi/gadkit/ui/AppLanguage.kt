@@ -6,12 +6,14 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.LayoutDirection
+import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.map.MapLanguage
 import java.util.Locale
 
@@ -23,6 +25,16 @@ import java.util.Locale
  * ([MapLanguage]). The map labels follow the same language.
  */
 internal object AppLanguage {
+    /** The language the library's views took last, for the field log. */
+    private var taken: String? = null
+
+    /** Writes `app language <ar|en> (host locale <tag>)` to the field log when [language] is new (iOS). */
+    fun take(language: String, hostLocale: String?) {
+        if (language == taken) return
+        taken = language
+        FieldLog.log("app language $language (host locale ${hostLocale ?: "-"})")
+    }
+
     /** [context]'s resources in [language] ("ar" or "en"), or [context]'s own when they are in it already. */
     fun resources(context: Context, language: String): Resources {
         val own = context.resources
@@ -45,7 +57,9 @@ internal object AppLanguage {
 @Composable
 internal fun HostLanguage(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val language = MapLanguage.forAppLanguage(LocalConfiguration.current.locales[0]?.language)
+    val locale = LocalConfiguration.current.locales[0]
+    val language = MapLanguage.forAppLanguage(locale?.language)
+    SideEffect { AppLanguage.take(language, locale?.toLanguageTag()) }
     val localized = remember(context, language) {
         val resources = AppLanguage.resources(context, language)
         if (resources === context.resources) context else LocalizedContext(context, resources)

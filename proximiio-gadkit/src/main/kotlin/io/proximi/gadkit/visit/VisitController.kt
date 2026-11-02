@@ -873,6 +873,25 @@ internal class VisitController(
     }
 
     /**
+     * Gives the stops the titles of [places], read in the app's language ([VisitPlan.retitled]; iOS
+     * 1.31.3), after the journey changes started before it ([serially]). A new title alone routes
+     * nothing. [language] names the language in the field log.
+     */
+    suspend fun retitle(places: List<VenuePlace>, language: String) {
+        serially {
+            val current = journey.stops.associateBy { it.id }
+            var count = 0
+            for (stop in VisitPlan.retitled(journey, places).stops) {
+                if (current[stop.id] == stop) continue
+                if (navigator.replace(stop.toMap())) count += 1
+            }
+            if (count == 0) return@serially
+            FieldLog.log("journey: $count stop titles in $language")
+            save()
+        }
+    }
+
+    /**
      * Takes the host app's journey on the open screen (`ProximiMapView`): stops added, removed,
      * visited, skipped, reopened and moved. The navigator, its route cache, its event flow and the
      * camera stay. Calls run one after another; a call during another keeps only the latest journey,

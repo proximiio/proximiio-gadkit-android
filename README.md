@@ -129,6 +129,30 @@ The library ships English and Arabic strings. Declare both languages in the host
 support right-to-left layouts. `ProximiMapException.message` and `WristbandStatus.NotConnected.notice`
 are in the app's language at the time they are created.
 
+The library's views show Arabic when the language is Arabic, else English. The language is the first
+locale of the composition's `LocalConfiguration`:
+
+- the one the host app gives `ProximiMapView`, `ProximiExploreView` or `ProximiMapHost`;
+- else the activity's, which is the app language (`LocaleManager`).
+
+A change applies at once, also to an open map: the library's texts, the texts of the venue data
+(`title_i18n`, `description_i18n`, `metadata.artist_name`: POI titles, gallery names, journey stops,
+search results), the layout direction of its views (right to left in Arabic) and the map labels. The
+host app needs no restart, and the open map keeps its journey.
+
+A host app that switches its language another way, such as its own string tables, changes neither the
+composition's `LocalConfiguration` nor the app language, and the library's views keep their language. The
+field log shows each language the views take: `app language <ar|en> (host locale <tag>)`.
+
+```kotlin
+// A host app that switches its language in its composition:
+val language by viewModel.language.collectAsState()   // "ar" or "en"
+val configuration = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag(language)) }
+CompositionLocalProvider(LocalConfiguration provides configuration) {
+    ProximiMapView(sdk = sdk, journey = journey, onJourneyChange = { journey = it })
+}
+```
+
 ### Fonts
 
 Guggenheim Sans Display is a font resource of the library. Nothing needs registering.
@@ -422,6 +446,37 @@ The view's navigator differs from a navigator with the map library's default rul
 | Off the route | Without `OFF_ROUTE_PROMPT` the route follows the visitor (`JourneyDeviationPolicy.AUTOMATIC`); with it the navigator routes nothing by itself (`ASK_APP`) and the view shows its warning first. While the journey is paused the view passes on no `LeftRoute`, `FarFromRoute`, `OffRouteTooLong` or `ReturnedToRoute`. |
 | `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `APPROACHING_DESTINATION` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
+
+#### Any change of the journey
+
+With `PROGRESS`, `ProximiMapEvent.StopOrderChanged(journey)` reports each new order the view gives the
+stops: from the visitor's first position, after `ArtworkVisitedOutOfOrder` and after a detour. It carries
+the journey in your ids, as `onJourneyChange` gets it. A change of the states alone sends no
+`StopOrderChanged`.
+
+The navigator's `journey` (a `StateFlow<Journey>`) reports every change of the stops, with or without
+`PROGRESS`:
+
+- The map library sets it when the stops change: a stop is added, removed, replaced, moved or changes
+  state, or a detour starts or ends. A position fix does not change it.
+- A collector gets the current journey first. A collector that falls behind gets the latest journey.
+- Collect it in each `onNavigator` call: a new navigator replaces the previous one.
+
+```kotlin
+var journeyJob: Job? = null
+
+ProximiMapView(sdk = sdk, journey = journey, onJourneyChange = { journey = it }, onNavigator = { navigator ->
+    journeyJob?.cancel()
+    journeyJob = viewModelScope.launch {
+        navigator.journey.collect { journey -> println("stops ${journey.stops.map { it.id }}") }
+    }
+})
+```
+
+With `PROGRESS` the view also calls `onJourneyChange`: the order of the stops and the visited and
+skipped stops, also the new order of a personalised journey. That journey has no detour stops, and an
+active or reached stop is pending in it. Without `PROGRESS` the view does not reorder the journey and
+does not call `onJourneyChange`.
 
 ### Routing to a place
 
@@ -1045,7 +1100,27 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.31.1.
+#### Fixed (iOS 1.31.3)
+
+- **Visible:** the journey stops follow a change of the app's language at once, the done stops and the
+  detours too (Nagarro, 2026-11-02: the language switching does not work correctly). The places, gallery
+  names and search results followed it already; the stops kept the titles of the language the journey
+  started in. A new title routes nothing. A done stop whose POI was renamed in the venue data keeps the
+  title the visitor saw. The host app does nothing.
+- **Visible:** `ProximiMap` gives the stored journey the titles in the app's language, also after a change
+  of the language while no journey screen is open.
+- Field log: `journey: <n> stop titles in <ar|en>`, and `app language <ar|en> (host locale <tag>)` for each
+  language the library's views take.
+- README "Languages": the language rule, what follows a change, and an example.
+- README "The navigator" → "Any change of the journey": `StopOrderChanged` and the navigator's `journey`, as
+  in the events and UI document for Nagarro of 1.7.0.
+
+#### Checked (iOS 1.31.2)
+
+- The open amenity list leaves the stop card's height, on the journey map and on the museum map: the
+  list takes the height that is left above the buttons and the card, and scrolls. Android had this
+  already. UI test `AddStopUiTest.theAmenityListLeavesTheStopCardsHeight` of the Proximi GAD app, on a
+  360 × 640 dp screen.
 
 ### [1.31.1] — 2026-10-30
 

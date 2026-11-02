@@ -9,12 +9,18 @@ import java.util.Locale
 
 /**
  * A point of interest the visitor can open and route to. Built from the SDK's cached
- * features. Same rules as proximiio-blueiot-minimal-ios `VenuePOI`. Title and description are
- * read from `title_i18n` and `description_i18n` for the app's language when the feature has them.
+ * features. Same rules as proximiio-blueiot-minimal-ios `VenuePOI`. Title, description and artist
+ * are read from `title_i18n`, `description_i18n` and `metadata.artist_name` for the app's language
+ * when the feature has them. A change of the app's language needs the places read again.
  */
 internal data class VenuePlace(
     val id: String,
     val title: String,
+    /**
+     * Every title of the POI: the values of `title_i18n`, `title` and `name`. A journey stop with one
+     * of them takes [title] ([io.proximi.gadkit.visit.VisitPlan.retitled]; iOS 1.31.3).
+     */
+    val titles: Set<String> = emptySet(),
     /** Feature `description`, if set in Proximi.io Portal. */
     val details: String? = null,
     val coordinate: Coordinate,
@@ -98,6 +104,7 @@ internal data class VenuePlace(
                     ?: text(properties?.get("title"))
                     ?: text(properties?.get("name"))
                     ?: feature.id,
+                titles = titles(listOf(properties?.get("title_i18n"), properties?.get("title"), properties?.get("name"))),
                 details = localized(properties?.get("description_i18n"), language) ?: text(properties?.get("description")),
                 coordinate = Coordinate(latitude, longitude),
                 level = feature.level ?: 0.0,
@@ -152,6 +159,12 @@ internal data class VenuePlace(
             val folded = fold(needle)
             return places.filter { fold(it.title).contains(folded) }
         }
+
+        /** The non-empty strings among [values]: strings, and the values of i18n objects. Pure; covered by tests. */
+        internal fun titles(values: List<Any?>): Set<String> =
+            values.flatMapTo(LinkedHashSet()) { value ->
+                if (value is Map<*, *>) value.values.mapNotNull(::text) else listOfNotNull(text(value))
+            }
 
         /**
          * The value for [language] from an i18n object such as `{"en": "Café", "ar": "المقهى"}`,

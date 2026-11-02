@@ -51,6 +51,23 @@ internal object VisitPlan {
         )
     }
 
+    /**
+     * [journey] in the app's language (iOS 1.31.3). A stop whose title is one of its place's
+     * [VenuePlace.titles] takes the place's title, whatever its state and kind. A stop with another
+     * title keeps it: a done stop keeps the title the visitor saw after the POI was renamed
+     * ([reconciled]). Pure; covered by tests.
+     */
+    fun retitled(journey: Journey, places: List<VenuePlace>): Journey {
+        val byId = LinkedHashMap<String, VenuePlace>()
+        for (place in places) byId.putIfAbsent(place.id, place)
+        return Journey(
+            journey.stops.map { stop ->
+                val place = stop.poiId?.let(byId::get)
+                if (place == null || stop.title == place.title || stop.title !in place.titles) stop else stop.copy(title = place.title)
+            },
+        )
+    }
+
     /** The pending, active and skipped planned stops whose POI is no longer a place. Pure; covered by tests. */
     fun stopsWithoutPlace(journey: Journey, places: List<VenuePlace>): List<JourneyStop> {
         val ids = places.mapTo(HashSet()) { it.id }

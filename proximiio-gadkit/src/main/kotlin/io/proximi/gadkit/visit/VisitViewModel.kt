@@ -464,6 +464,8 @@ internal class VisitViewModel(
             if (hasStops) {
                 if (isPausedAtStart) controller.pause()
                 controller.start()
+                // A journey stored or matched in another language (iOS 1.31.3).
+                controller.retitle(places, language)
                 // A visitor who opens the journey inside the first artwork's geofence.
                 checkArrival()
             }
@@ -708,6 +710,8 @@ internal class VisitViewModel(
         scope.launch {
             loadVenue()
             refreshMapLayers()
+            // The open journey's stops take the titles in the new language (iOS 1.31.3).
+            if (isReady && hasStops) controller.retitle(places, language)
         }
     }
 
