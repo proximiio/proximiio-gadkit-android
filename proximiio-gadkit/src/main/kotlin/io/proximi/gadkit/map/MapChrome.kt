@@ -151,8 +151,9 @@ internal fun GlassSquareButton(
 }
 
 /**
- * The accessible routes button, 50 × 50 glass: the icon in ink, with a 1 dp ink outline while it is on
- * or pressed (RPR, Monday "Accessible routing", 2026-10-28: no blue fill).
+ * The accessible routes button, 50 × 50 glass: the design's ISA wheelchair, 19 × 20 dp in ink, with a
+ * 1 dp ink outline while it is on or pressed (RPR, Monday "Accessible routing", 2026-10-28: no blue
+ * fill; PM, Monday "Accessible route icon", 2026-11-02).
  */
 @Composable
 internal fun AccessibleRoutesButton(isOn: Boolean, onToggle: (Boolean) -> Unit) {
@@ -178,7 +179,7 @@ internal fun AccessibleRoutesButton(isOn: Boolean, onToggle: (Boolean) -> Unit) 
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(R.drawable.ic_accessible), contentDescription = null, Modifier.size(22.dp), tint = Palette.ink)
+        Icon(painterResource(R.drawable.ic_wheelchair), contentDescription = null, Modifier.size(width = 19.dp, height = 20.dp), tint = Palette.ink)
     }
 }
 
@@ -190,8 +191,8 @@ internal fun MapIcon(icon: Int, modifier: Modifier = Modifier, size: Int = 24) {
 
 /**
  * Amenity shortcuts as a trailing-aligned stack of small chips (Figma search state). A list taller
- * than the space it gets scrolls and fades out at the bottom (PM, Monday "Amenity search when list is
- * long", 2026-10-29; iOS 1.24.1).
+ * than the space it gets scrolls, ends at its top edge and fades out at the bottom (PM, Monday "Amenity
+ * search when list is long", 2026-10-29 and 2026-10-30; iOS 1.24.1 and 1.32.0).
  */
 @Composable
 internal fun AmenityChipList(shortcuts: List<AmenityShortcut>, selected: AmenityShortcut?, modifier: Modifier = Modifier, onPick: (AmenityShortcut) -> Unit) {
@@ -209,6 +210,9 @@ internal fun AmenityChipList(shortcuts: List<AmenityShortcut>, selected: Amenity
                 .drawWithContent {
                     drawContent()
                     if (scroll.maxValue > 0) {
+                        // A list that scrolls ends at its top edge, so no chip scrolls up over the search
+                        // button (PM, Monday "Amenity search when list is long", 2026-10-30).
+                        drawRect(Color.Black, size = Size(size.width, AmenityChipListLayout.SHADOW_ROOM.toPx()), blendMode = BlendMode.Clear)
                         val fade = AmenityChipListLayout.FADE_HEIGHT.toPx()
                         drawRect(
                             Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
@@ -659,14 +663,17 @@ internal fun MapListToggle(showsList: Boolean, onChange: (Boolean) -> Unit, modi
                 )
             },
     ) {
-        // `offset` follows the layout direction: toward List on both.
+        // `offset` follows the layout direction: toward List on both. Right to left, Map is the right part
+        // and the selection stays inside the control (before iOS 1.32.0 it left the control on iOS; PM,
+        // Monday "Arabic toggle functions to the wrong direction", 2026-10-30).
         Box(
             Modifier
                 .offset { IntOffset(selection.roundToInt(), 0) }
                 .width(MapListSelection.PART_WIDTH)
                 .fillMaxHeight()
                 .background(Palette.white.copy(alpha = 0.6f), shape)
-                .border(1.5.dp, Palette.ink, shape),
+                .border(1.5.dp, Palette.ink, shape)
+                .testTag("mapListSelection"),
         )
         Row(Modifier.fillMaxSize().selectableGroup()) {
             ToggleSegment(stringResource(R.string.map), isSelected = !showsList) { onChange(false) }

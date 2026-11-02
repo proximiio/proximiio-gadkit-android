@@ -13,8 +13,9 @@ import kotlin.math.roundToLong
  * The lists of the Explore Museum map (Figma "Explore Museum", node 12129:102006; PM screens
  * 2026-10-23), each grouped by level, as iOS `ExploreCatalog`:
  *
- * - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline; the
- *   POI with the same `remote_id` gives the name, the level, the category (its amenity, such as
+ * - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, else the
+ *   gallery's polygon feature with the id in `metadata.gallery_id`; the POI with the same `remote_id`
+ *   gives the name, the level, the category (its amenity, such as
  *   "Thematic Gallery") and the description (`Gallery.destinations`).
  * - Highlights: the artworks that list the highlight amenity in `included_amenities`.
  * - Amenities: the POIs of an `AmenityKind` other than stairs and lifts.

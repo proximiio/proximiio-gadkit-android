@@ -106,21 +106,23 @@ public data class GadSettings(
     // Map
 
     /**
-     * Zoom of "Centre on me", of the first position and of the follow (PM, Monday "Curated tours:
-     * zoom level", 2026-10-27; RPR, "Need to determine correct zoom levels on-site", 2026-10-28).
+     * Zoom of "Centre on me", of the first position and of the follow, in personalised and curated
+     * journeys. The follow eases to it from [startZoom] (PM, Monday "Zoom level at start +
+     * navigation", 2026-10-30).
      */
-    val followZoom: Double = 18.8,
+    val followZoom: Double = 19.5,
     /**
      * Zoom of the follow while the visitor is in a gallery during a personalised journey, or `null`
-     * for [followZoom] (PM, Monday "Navigation to a gallery", 2026-10-27).
+     * for [followZoom] (PM, Monday "Navigation to a gallery", 2026-10-27). `null` since the PM asked
+     * for one zoom in every situation (Monday "Zoom level at start + navigation", 2026-10-30).
      */
-    val galleryFollowZoom: Double? = 20.0,
+    val galleryFollowZoom: Double? = null,
     /**
      * The journey map shows the visitor at this zoom for [startZoomDuration] before it follows them:
      * when the journey starts, on the first fix and when the position comes back. `null` follows at
-     * once (PM, Monday "Zoom level at start + navigation", 2026-10-29). iOS `startZoom`.
+     * once (PM, Monday "Zoom level at start + navigation", 2026-10-29 and 2026-10-30). iOS `startZoom`.
      */
-    val startZoom: Double? = 18.0,
+    val startZoom: Double? = 17.0,
     /** How long the journey map stays at [startZoom]. iOS `startZoomSeconds`. */
     val startZoomDuration: Duration = 2.seconds,
     /**

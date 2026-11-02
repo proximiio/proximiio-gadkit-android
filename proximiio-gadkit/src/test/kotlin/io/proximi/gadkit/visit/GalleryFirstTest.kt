@@ -222,6 +222,29 @@ class GalleryPolygonTest {
         assertEquals(none.gallery, none.shown)
     }
 
+    /**
+     * PM, Monday "Explore Museum view: gallery highlighting", 2026-10-30: gallery "205" has a polygon
+     * with its `gallery_id` and a POI, and no geofence (iOS 1.32.0).
+     */
+    @Test
+    fun aGalleryWithoutAGeofenceUsesItsPolygon() {
+        val poi = VenuePlace(id = "poi-205", title = "205", coordinate = Coordinate(24.05, 54.05), level = 2.0, remoteId = "placeholder3")
+        val destinations = Gallery.destinations(
+            geofences = emptyList(),
+            places = listOf(poi),
+            features = listOf(polygon("room-205", 2.0, galleryId = "placeholder3"), polygon("no-poi", 2.0, galleryId = "placeholder99"), polygon("untagged", 2.0)),
+        )
+        assertEquals(listOf("placeholder3"), destinations.keys.sorted())
+        val g205 = destinations.getValue("placeholder3")
+        assertEquals("placeholder3", g205.gallery.id)
+        assertEquals("205", g205.gallery.name)
+        assertEquals(2.0, g205.gallery.level)
+        assertTrue(g205.gallery.contains(poi.coordinate, 2.0))
+        assertEquals(poi.coordinate, g205.entry)
+        assertEquals("poi-205", g205.placeId)
+        assertEquals("room-205", g205.shown.id)
+    }
+
     /** A gallery is visited when its artworks of the journey are all visited or skipped, at least one visited (the customer, Monday "Visited gallery visualization", 2026-10-28). */
     @Test
     fun aGalleryIsVisitedWhenAllItsArtworksAreDoneOrSkipped() {

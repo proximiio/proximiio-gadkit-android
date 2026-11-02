@@ -37,6 +37,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -64,6 +65,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -277,11 +279,14 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                 verticalArrangement = Arrangement.spacedBy(11.5.dp),
             ) {
                 MapGlassFrame(Modifier.weight(1f)) {
+                    // List mode shows the host app's background through the card, not the map (PM, Monday
+                    // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
+                    val mapAlpha by animateFloatAsState(if (model.showsList) 0f else 1f, label = "mapAlpha")
                     ProximiioMap(
                         session = model.session,
                         // The map fades out under the controls at the top (110 dp) and over the card at the
                         // bottom (170 dp; RPR, Monday "Map fade at top & bottom", 2026-10-28).
-                        modifier = Modifier.fillMaxSize().glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp).verticalFades(top = 110.dp, bottom = 170.dp),
+                        modifier = Modifier.fillMaxSize().alpha(mapAlpha).glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp).verticalFades(top = 110.dp, bottom = 170.dp),
                         configure = { canvas ->
                             model.layers.attach(canvas)
                         },
@@ -289,7 +294,7 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                     // The top 44 dp do not pan the map; with the bottom bar and `onClose` a drag down there
                     // is Back (PM, Monday "More space for the pull down functionality", 2026-10-26).
                     MapHandleArea(onPullDown = if (ProximiMapView.Option.BOTTOM_BAR in model.options && hasBack) model::requestClose else null)
-                    // The list covers the map with white: its rows have nothing to blur.
+                    // The list lies on the host app's background with white over it: its rows have nothing to blur.
                     ProvideGlassBackdrop(null) { ListOverlay(model) }
                     // "Rerouting you…" fades the map (PM, Monday "Rerouting calculation view", 2026-10-26).
                     // The scope-free overload: inside the frame's Box the Column scope of the screen is also in reach.
@@ -365,13 +370,20 @@ private fun RideOverlay(model: VisitViewModel) {
     }
 }
 
-/** List mode: the stop list over the map, faded in. */
+/**
+ * List mode: the stop list in place of the map, faded in. White at [LIST_BACKGROUND_ALPHA] over the host
+ * app's background: the Figma list frame is white in the middle and shows the background's colours at
+ * the edges.
+ */
 @Composable
 private fun ListOverlay(model: VisitViewModel) {
     AnimatedVisibility(model.showsList, enter = fadeIn(), exit = fadeOut()) {
-        VisitStopList(model, Modifier.fillMaxSize().background(Palette.white.copy(alpha = 0.92f)))
+        VisitStopList(model, Modifier.fillMaxSize().background(Palette.white.copy(alpha = LIST_BACKGROUND_ALPHA)))
     }
 }
+
+/** The white over the host app's background behind the list (iOS `VisitView.listBackgroundOpacity`). */
+internal const val LIST_BACKGROUND_ALPHA = 0.6f
 
 /**
  * Controls inside the map card: the toggle and search at the top, compass and floor at the

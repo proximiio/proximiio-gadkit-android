@@ -152,12 +152,14 @@ internal data class Gallery(
 
         /**
          * The galleries a personalised journey leads to first, by `gallery_id` ([GalleryDestination]).
-         * A gallery without a polygon geofence or a POI is left out. Geofence polygons are GeoJSON
-         * `[longitude, latitude]` pairs. Pure; covered by tests.
+         * A gallery without a POI is left out. Geofence polygons are GeoJSON `[longitude, latitude]`
+         * pairs. Pure; covered by tests.
          *
          * Each destination gets the polygon feature (`type` starting with `gallery`) whose
          * `metadata.gallery_id` is the gallery's id, else the one on the POI's floor that contains the
-         * POI ([features]).
+         * POI ([features]). A gallery without a polygon geofence uses its polygon feature with that
+         * `gallery_id` as the outline too: the GAD data has 13 such galleries, such as "205" (PM, Monday
+         * "Explore Museum view: gallery highlighting", 2026-10-30; iOS 1.32.0).
          */
         internal fun destinations(geofences: List<VenueGeofence>, places: List<VenuePlace>, features: List<VenueFeature> = emptyList()): Map<String, GalleryDestination> {
             val pois = LinkedHashMap<String, VenuePlace>()
@@ -178,6 +180,11 @@ internal data class Gallery(
                 destinations[id] = GalleryDestination(Gallery(id, poi.title, poi.level, ring), poi.coordinate, poi.id)
             }
             val polygons = polygonOutlines(features)
+            for ((outline, id) in polygons) {
+                if (id == null || id in destinations) continue
+                val poi = pois[id] ?: continue
+                destinations[id] = GalleryDestination(Gallery(id, poi.title, outline.level, outline.ring), poi.coordinate, poi.id)
+            }
             for ((id, destination) in destinations.toList()) {
                 val polygon = polygons.firstOrNull { it.second == id }?.first
                     ?: polygons.firstOrNull { it.second == null && it.first.contains(destination.entry, destination.gallery.level) }?.first

@@ -30,8 +30,8 @@ class GadSettingsTest {
         assertEquals(20.0, GadSettings.STANDARD.rideFloorHoldMeters)
         // The next stop at the exit of the artwork's geofence (Nagarro call, 2026-10-30).
         assertTrue(GadSettings.STANDARD.advancesOnArtworkExit)
-        // Zoom 18 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-29).
-        assertEquals(18.0, GadSettings.STANDARD.startZoom)
+        // Zoom 17 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-30).
+        assertEquals(17.0, GadSettings.STANDARD.startZoom)
         assertEquals(2.seconds, GadSettings.STANDARD.startZoomDuration)
         assertEquals(5.0, GadSettings.STANDARD.levelChangerReachedMeters)
         assertEquals(1800.seconds, GadSettings.STANDARD.floorWithoutPositioningMaximum)
@@ -88,15 +88,20 @@ class GadSettingsTest {
         assertTrue(StopNearbyDetector.isNearby(eightMetresNorth, 1.0, stop, 1.0, routeMeters = 9.0, nearbyMeters = 10.0))
     }
 
-    /** RPR, Monday "Need to determine correct zoom levels on-site", 2026-10-28. */
+    /**
+     * One zoom in every situation and both journey kinds (PM, Monday "Zoom level at start + navigation",
+     * 2026-10-30). A host's `galleryFollowZoom` still applies in a gallery of a personalised journey.
+     */
     @Test
-    fun theFollowZoomIs18Point8And20InAGalleryOfAPersonalisedJourney() {
+    fun theFollowZoomIs19Point5Everywhere() {
         val settings = GadSettings.STANDARD
-        assertEquals(18.8, VisitViewModel.followZoom(inGallery = false, kind = JourneyKind.PERSONALISED, settings = settings))
-        assertEquals(20.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = settings))
-        assertEquals(18.8, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = settings))
-        val withoutGalleryZoom = settings.copy(galleryFollowZoom = null)
-        assertEquals(18.8, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = withoutGalleryZoom))
+        assertEquals(null, settings.galleryFollowZoom)
+        assertEquals(19.5, VisitViewModel.followZoom(inGallery = false, kind = JourneyKind.PERSONALISED, settings = settings))
+        assertEquals(19.5, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = settings))
+        assertEquals(19.5, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = settings))
+        val withGalleryZoom = settings.copy(galleryFollowZoom = 20.0)
+        assertEquals(20.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = withGalleryZoom))
+        assertEquals(19.5, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = withGalleryZoom))
     }
 
     /** The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map 6.0.0-beta.32). */
