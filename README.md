@@ -1108,7 +1108,10 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.33.0.
+#### Tooling
+
+- The workflow `.github/workflows/release.yml` publishes a pushed tag `X.Y.Z` to
+  `maven.eu.proximi.fi`, after the unit tests. Nothing changes for the host app.
 
 ### [1.33.0] — 2026-11-02
 

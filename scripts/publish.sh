@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Publishes the version in gradle.properties to https://maven.eu.proximi.fi/releases/ as
-# io.proximi.gadkit:proximiio-gadkit, from this computer. Run it from a clean checkout of a commit
-# that is on origin. The repository does not accept a version twice, so a version is published once.
+# io.proximi.gadkit:proximiio-gadkit, from this computer, when .github/workflows/release.yml cannot.
+# Run it from a clean checkout of a commit that is on origin. The repository does not accept a version
+# twice, so a version is published once.
 #
 # MAVEN_USERNAME and MAVEN_PASSWORD (a token with write access) come from the shell, else from the
 # login Keychain, else the script asks for them. Store them in the Keychain once; `security` asks for
