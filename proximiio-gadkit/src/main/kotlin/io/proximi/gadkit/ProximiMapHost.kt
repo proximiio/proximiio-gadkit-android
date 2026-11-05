@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -54,6 +55,7 @@ import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.explore.MuseumMapScreen
 import io.proximi.gadkit.map.LocalRouteAccessibility
 import io.proximi.gadkit.ui.AskNotificationPermission
+import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.JourneyReadyScreen
 import io.proximi.gadkit.visit.ManageJourneySheet
 import io.proximi.gadkit.visit.VisitPlanPicker
@@ -217,6 +219,9 @@ private fun HostedExploreCheck(map: ProximiMap, venue: VenueService) {
  * give the view a locale of its own (`LocalConfiguration`), as a host app that switches its language
  * in its composition; "App ar" and "App en" set the app language (`LocaleManager`, Android 13 and
  * later), which recreates the activity (iOS "Locale ar/en" and "Apple ar/en", GADKit 1.28.0).
+ * "Other kind" gives the open view the journey of the other kind, which starts its screen again.
+ * "Reopen" takes the view away for a frame and opens a new one with the journey of the other kind,
+ * in the same activity, as a host app that opens one journey after another.
  */
 @Composable
 private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
@@ -251,8 +256,18 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
     fun set(id: String, state: ProximiJourney.State) {
         map.hostedJourney.value = journey.copy(stops = journey.stops.map { if (it.id == id) it.copy(state = state) else it })
     }
+    /** The journey of the other kind: the open view starts its screen again. */
+    fun otherKind() = journey.copy(kind = if (journey.kind == JourneyKind.CURATED) JourneyKind.PERSONALISED else JourneyKind.CURATED)
+    /** `false` for one frame after "Reopen": the view leaves, and a new one opens with the other kind. */
+    var isViewShown by remember { mutableStateOf(true) }
+    LaunchedEffect(isViewShown) {
+        if (isViewShown) return@LaunchedEffect
+        withFrameNanos {}
+        map.hostedJourney.value = otherKind()
+        isViewShown = true
+    }
     Box(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(LocalConfiguration provides viewConfiguration) {
+        if (isViewShown) CompositionLocalProvider(LocalConfiguration provides viewConfiguration) {
             ProximiMapView(
                 sdk = sdk,
                 journey = journey,
@@ -332,6 +347,8 @@ private fun HostedMapCheck(map: ProximiMap, sdk: io.proximi.sdk.Proximiio) {
                     }) { Text("App $language", style = MaterialTheme.typography.labelSmall) }
                 }
             }
+            TextButton(onClick = { map.hostedJourney.value = otherKind() }) { Text("Other kind", style = MaterialTheme.typography.labelSmall) }
+            TextButton(onClick = { isViewShown = false }) { Text("Reopen", style = MaterialTheme.typography.labelSmall) }
         }
     }
 }

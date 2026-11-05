@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -226,7 +227,13 @@ public fun ProximiMapView(
         model.onJourneyChange = onJourneyChange
         model.onNavigator = onNavigator
     }
-    LaunchedEffect(model) { model.start(context.applicationContext, sdk, settings, options, journey, language) }
+    // Until this view has started, `model.loaded` can still be the screen of a view that left (the
+    // activity's view model outlives it): a new view would build that journey's screen once more.
+    var isStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(model) {
+        model.start(context.applicationContext, sdk, settings, options, journey, language)
+        isStarted = true
+    }
     LaunchedEffect(model, journey) { model.journeyChanged(journey) }
     LaunchedEffect(model, language) { model.setLanguage(language) }
     DisposableEffect(model) {
@@ -237,7 +244,7 @@ public fun ProximiMapView(
     HostLanguage {
         Box(modifier) {
             val loaded = model.loaded
-            if (loaded != null) {
+            if (loaded != null && isStarted) {
                 CompositionLocalProvider(LocalRouteAccessibility provides routeAccessibility) {
                     VisitScreen(
                         loaded.venue,

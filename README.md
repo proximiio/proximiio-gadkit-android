@@ -1108,8 +1108,25 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
+#### Fixed (Android only; Nagarro, 2026-11-05)
+
+- **Visible:** `ProximiMapView` shows a live map after a change of journey. Two cases left a still map on
+  screen, which no longer moved or drew the route:
+  - a `journey` that starts the screen again in the open view: a new `kind`, a journey without a stop on
+    the map, or the first journey on a map without one;
+  - a new `ProximiMapView` in the same activity, after the view of another journey left. The new view
+    also built the screen of the journey before for a moment, and `onNavigator` got that journey's
+    navigator first.
+
+  Each new screen now gets a map view of its own. A new view shows its spinner until it has started
+  and then only its own journey; `onNavigator` gets one navigator per screen. The host app changes
+  nothing.
+
 #### Tooling
 
+- The debug host of `gad.hostedMap` has "Other kind" (the open view gets the journey of the other kind)
+  and "Reopen" (a new view opens the journey of the other kind in the same activity), for the UI tests
+  of the fix above. Debuggable builds only; nothing changes for the host app.
 - The workflow `.github/workflows/release.yml` publishes a pushed tag `X.Y.Z` to
   `maven.eu.proximi.fi`, after the unit tests. Nothing changes for the host app.
 

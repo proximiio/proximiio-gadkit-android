@@ -60,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -198,7 +199,10 @@ internal fun VisitScreen(
     LaunchedEffect(model, incoming) { incoming?.let(model::apply) }
     LaunchedEffect(model, destination) { model.destinationChanged(destination) }
     LaunchedEffect(model, isPaused) { model.pausedChanged(isPaused) }
-    VisitContent(model, hasBack = onClose != null)
+    // A new visit gets a screen of its own: its map view on its map session, and none of the state
+    // the screen before remembered. The map view of the visit before is taken apart with its session,
+    // and a map view kept for the new session would stay still on screen (Nagarro, 2026-11-05).
+    key(model) { VisitContent(model, hasBack = onClose != null) }
 }
 
 /**
