@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.33.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.33.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.33.0
+git -C gadkit checkout 1.33.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1107,6 +1107,16 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+No changes since 1.33.1.
+
+### [1.33.1] — 2026-11-05
+
+The behaviour of the iOS package 1.33.0, on SDK 6.0.0-beta.36 and Map 6.0.0-beta.38, as in 1.33.0, with a
+fix for Android only: the map no longer stays still after a change of journey. There is no iOS 1.33.1. The
+zoom range of iOS 1.34.0 is not in this release.
+
+No breaking change: the host app changes no code.
 
 #### Fixed (Android only; Nagarro, 2026-11-05)
 
