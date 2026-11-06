@@ -266,7 +266,7 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
     val position by model.session.position.collectAsStateWithLifecycle()
     val isCameraReady by model.session.isCameraReady.collectAsStateWithLifecycle()
     val hasPosition = position != null
-    LaunchedEffect(hasPosition, isCameraReady) { if (hasPosition && isCameraReady) model.showVisitorThenFollow(reason = "first position") }
+    LaunchedEffect(hasPosition, isCameraReady) { if (hasPosition && isCameraReady) model.firstPosition() }
 
     val backdrop = rememberGlassBackdrop()
     val mapBackdrop = rememberGlassBackdrop()

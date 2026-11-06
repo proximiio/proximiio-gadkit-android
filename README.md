@@ -681,7 +681,23 @@ scope.launch {
 - Positions arrive only while `wristband` is `Connected`. A session stored by the SDK is confirmed
   with the relay-api after `start()`.
 - The library shows no wristband alerts. `ProximiMapEvent.WristbandChanged` and `TrackingChanged`
-  let the host app show its own.
+  let the host app show its own. The `overlay` of `ProximiMapHost` draws the host app's UI over the
+  museum map, Journey ready and the journey, above the screen and below Manage journey:
+
+  ```kotlin
+  ProximiMapHost(map, overlay = {
+      // The host app's UI, for example a notice while `map.wristband` is `NotConnected(notice)`
+      // on `map.screen == ProximiMap.Screen.JOURNEY`.
+      WristbandNotice(map)
+  }) {
+      HostScreens()
+  }
+  ```
+
+- Without a live position the journey map shows the active stop on its floor at `startZoom`, also
+  after "Centre on me". It does not show the SDK's last position when that position is older than
+  `trackingLostAfter` and positioning has not been available in the journey, or when the wristband
+  has been silent for `trackingLostAfter`. A live position moves the camera back to the visitor.
 
 ## Privacy zones
 
@@ -1108,7 +1124,29 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.33.1.
+#### Added (iOS 1.35.0)
+
+- `ProximiMapHost` has `overlay`: the host app's UI over the museum map, Journey ready and the
+  journey, for example a notice after the wristband session ended. The overlay is above the screen
+  and below Manage journey. A new parameter with a default: the host app changes nothing.
+
+#### Changed (iOS 1.35.0; field tests at the Guggenheim, 2026-11-06)
+
+- **Visible:** without a live position the journey map shows the active stop (or the detour, or the
+  first stop not visited) on its floor at `startZoom`: when the journey starts and after "Centre on
+  me". Before, the journey map waited for a position and then showed it, also the SDK's last
+  position at any age (44 min old in the field test). A position counts as live while positioning is
+  available or was within `trackingLostAfter`, or in a privacy zone. Before positioning was
+  available in the journey, only a position younger than `trackingLostAfter` counts. When the
+  position is live again, the map shows the visitor at `startZoom` and follows them. The host app
+  changes nothing.
+
+#### Not taken from iOS
+
+- iOS 1.34.0: `GadSettings.minimumZoom` 15 and `maximumZoom` 21 as defaults. On Android both stay
+  `null` (the map library's limits); the host app sets them (the user, 2026-11-05).
+- iOS 1.35.0, Live Activity of killed runs: the journey notification has one id, so the journey of a
+  new run replaces the notification a killed run left. No change.
 
 ### [1.33.1] — 2026-11-05
 

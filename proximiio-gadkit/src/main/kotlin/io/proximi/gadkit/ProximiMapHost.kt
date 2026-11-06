@@ -82,9 +82,20 @@ import java.util.Locale
  * In an app with Fragments, compose it in a `ComposeView` that fills the activity's window above the
  * fragment container, without [content]. It draws nothing and passes touches through while no
  * screen of the library is shown.
+ *
+ * [overlay] draws the host app's UI over the museum map, Journey ready and the journey, above the
+ * screen and below Manage journey, as iOS `.proximiMap(_:overlay:)` (1.35.0). [ProximiMap.screen]
+ * names the screen. The library shows no wristband alerts: the host app can show its own notice
+ * there, for example after the wristband session ended ([WristbandStatus.NotConnected] with a
+ * notice). The overlay fills the screen; it gets the touches it takes.
  */
 @Composable
-public fun ProximiMapHost(map: ProximiMap, modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {
+public fun ProximiMapHost(
+    map: ProximiMap,
+    modifier: Modifier = Modifier,
+    overlay: @Composable () -> Unit = {},
+    content: @Composable () -> Unit = {},
+) {
     val activity = LocalActivity.current
     LaunchedEffect(map) { map.launchOptionsRead(DebugLaunch.read(activity)) }
     val language = LocalConfiguration.current.locales[0]?.toLanguageTag()
@@ -121,7 +132,12 @@ public fun ProximiMapHost(map: ProximiMap, modifier: Modifier = Modifier, conten
         ) { shown ->
             if (shown != null) {
                 // The texts follow the host app's locale while the cover shows (iOS 1.28.0).
-                HostLanguage { Cover(map, shown) }
+                HostLanguage {
+                    Box(Modifier.fillMaxSize()) {
+                        Cover(map, shown)
+                        if (shown.screen in OVERLAID_SCREENS) Box(Modifier.fillMaxSize()) { overlay() }
+                    }
+                }
                 // The cover has gone once its exit animation ends; a recreated activity shows it again.
                 DisposableEffect(shown.key) {
                     onDispose { if (activity?.isChangingConfigurations != true) map.presenter.dismissed(shown.key) }
@@ -147,6 +163,9 @@ public fun ProximiMapHost(map: ProximiMap, modifier: Modifier = Modifier, conten
         }
     }
 }
+
+/** The screens the host app's overlay of [ProximiMapHost] covers, as iOS. */
+private val OVERLAID_SCREENS = setOf(ProximiMap.Screen.MUSEUM_MAP, ProximiMap.Screen.JOURNEY_READY, ProximiMap.Screen.JOURNEY)
 
 /** A full-screen presentation. It takes every touch, so the host app's screens below get none. */
 @Composable

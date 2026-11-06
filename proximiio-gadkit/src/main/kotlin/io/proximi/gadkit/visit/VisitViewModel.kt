@@ -69,6 +69,7 @@ import io.proximi.map.core.RouteGuidance
 import io.proximi.sdk.wayfinding.NoRouteReason
 import io.proximi.map.core.VenuePosition
 import io.proximi.map.core.JourneyEvent
+import io.proximi.map.core.Journey as MapJourney
 import io.proximi.map.core.JourneyStop as MapJourneyStop
 import io.proximi.map.live.JourneyNavigator
 import io.proximi.map.live.ProximiioMapSession
@@ -98,6 +99,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.toJavaDuration
 
@@ -319,6 +321,9 @@ internal class VisitViewModel(
     /** The follow that starts after [GadSettings.startZoomDuration] at [GadSettings.startZoom]. */
     private var startZoomFollow: Job? = null
 
+    /** The camera shows the next stop because the position is not live ([showStopWithoutPosition]). */
+    private var showsStopWithoutPosition = false
+
     /** Galleries the visitor has been in during this visit. */
     /** The amenity icons of the venue data, by amenity id: the gallery icon of the stop card. */
     var amenityIcons by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
@@ -441,6 +446,17 @@ internal class VisitViewModel(
         scope.launch { monitor.health.drop(1).collect { onEvent(VisitEvent.TrackingChanged(it)) } }
         // No dot while a privacy zone holds it (`MapStyle.hidingPosition`).
         scope.launch { monitor.health.collect(::applyPositionStyle) }
+        // The position is live again after an old one or a silent wristband (iOS 1.35.0). A first
+        // position is the "first position" of `VisitContent`.
+        scope.launch {
+            // Live at the previous value; `null` without a position.
+            var previous: Boolean? = null
+            combine(monitor.health, session.position) { health, position -> position?.let { isLive(health, ageOf(it), settings) } }
+                .collect { live ->
+                    if (live == true && previous == false) positionBecameLive()
+                    previous = live
+                }
+        }
         scope.launch { MapDiagnostics.follow(session, "journey", scope) }
         scope.launch { floorGuide.phase.drop(1).collect(::floorGuidePhaseChanged) }
         scope.launch { snapshotFlow { visitorGallery?.id }.distinctUntilChanged().collect { applyFollowZoom() } }
@@ -472,13 +488,17 @@ internal class VisitViewModel(
             isReady = true
             destinationChanged(requestedDestination)
             if (!hasStops) return@launch
-            // Starts the heading-up follow at `MapOptions.recentreZoom` once the journey is drawn,
-            // the visitor has a position and the camera takes commands (PM review 2026-10-12: the
-            // map did not turn until "Centre on me"; PM item 13273799998: the map stayed at world
-            // scale). A recentre before the camera is ready is lost.
-            combine(session.position, session.isCameraReady) { position, ready -> position != null && ready }
-                .first { it }
-            showVisitorThenFollow(withHeading = true, reason = "journey started")
+            // Starts the heading-up follow at `MapOptions.recentreZoom` once the journey is drawn and
+            // the camera takes commands (PM review 2026-10-12: the map did not turn until "Centre on
+            // me"; PM item 13273799998: the map stayed at world scale). A recentre before the camera
+            // is ready is lost. Without a live position the camera shows the next stop (iOS 1.35.0);
+            // the first live position shows the visitor.
+            session.isCameraReady.first { it }
+            if (hasLivePosition) {
+                showVisitorThenFollow(withHeading = true, reason = "journey started")
+            } else {
+                showStopWithoutPosition(reason = "journey started")
+            }
         }
         scope.launch {
             val navigator = controller.navigator
@@ -800,6 +820,62 @@ internal class VisitViewModel(
         }
     }
 
+    private fun ageOf(position: VenuePosition): Duration = (System.currentTimeMillis() - position.timestampMillis).milliseconds
+
+    /** The session's position shows where the visitor is now ([isLive]). */
+    private val hasLivePosition: Boolean
+        get() = isLive(monitor.health.value, session.position.value?.let(::ageOf), settings)
+
+    /**
+     * The first position, once the map shows: the camera shows the visitor, then follows. An old
+     * position does not count ([isLive]).
+     */
+    fun firstPosition() {
+        if (!hasLivePosition) return
+        endStopWithoutPosition()
+        showVisitorThenFollow(reason = "first position")
+    }
+
+    /**
+     * Without a live position the camera shows the stop of [stopWithoutPosition] on its floor at the
+     * start zoom, without animation. It does not show an old position, and it does not keep the
+     * style's camera (level 0, zoom 15), which looks like a map outside the museum (field tests at the
+     * Guggenheim, 2026-11-06, iOS 1.35.0). A live position moves the camera back to the visitor
+     * ([positionBecameLive]).
+     */
+    private fun showStopWithoutPosition(reason: String) {
+        startZoomFollow?.cancel()
+        startZoomFollow = null
+        val navigator = controller.navigator
+        val stop = stopWithoutPosition(navigator.detourStop, navigator.activeStop, navigator.journey.value) ?: return
+        // The camera command lets go of the follow.
+        session.camera.setCenter(stop.coordinate, settings.startZoom ?: settings.followZoom, animated = false)
+        stop.floor?.let(session::select)
+        showsStopWithoutPosition = true
+        val age = session.position.value?.let { "%.0f s old".format(Locale.ROOT, ageOf(it).inWholeMilliseconds / 1000.0) } ?: "none"
+        FieldLog.log(
+            "camera at the stop without a live position ($reason) · ${stop.title} L${stop.floor?.level?.roundToInt() ?: "-"} · " +
+                "health ${monitor.health.value} · position $age",
+        )
+    }
+
+    /**
+     * The position is live again after none, an old one or a silent wristband: the camera shows the
+     * visitor at the start zoom, then follows. After [showStopWithoutPosition] the map follows the
+     * visitor's floor again.
+     */
+    private fun positionBecameLive() {
+        if (!isReady || !hasStops || !session.isCameraReady.value) return
+        endStopWithoutPosition()
+        showVisitorThenFollow(withHeading = true, reason = "position live again")
+    }
+
+    /** After [showStopWithoutPosition] the map follows the visitor's floor again. */
+    private fun endStopWithoutPosition() {
+        if (showsStopWithoutPosition && !floorGuide.isActive) session.followMyFloor()
+        showsStopWithoutPosition = false
+    }
+
     /** Field log: the route guidance once per second and the navigator's events, as iOS `VisitView`. */
     private fun logGuidance() {
         // Camera diagnostics for the map library: why the heading-up follow does not start on a
@@ -1112,13 +1188,21 @@ internal class VisitViewModel(
 
     // Card and list actions
 
-    /** "Centre on me": the map follows the visitor's floor again, also after a floor without positioning. */
+    /**
+     * "Centre on me": the map follows the visitor's floor again, also after a floor without
+     * positioning. Without a live position the camera shows the next stop again (iOS 1.35.0).
+     */
     fun centreOnMe() {
         floorGuide.leave()
         rideFloor = null
-        session.followMyFloor()
         onEvent(VisitEvent.Recentred)
-        recentre(reason = "Centre on me")
+        if (hasLivePosition || !hasStops) {
+            showsStopWithoutPosition = false
+            session.followMyFloor()
+            recentre(reason = "Centre on me")
+        } else {
+            showStopWithoutPosition(reason = "Centre on me")
+        }
     }
 
     /** The floor button: the map follows the visitor's floor again, also after a floor without positioning. */
@@ -1518,6 +1602,30 @@ internal class VisitViewModel(
 
         /** The states of a stop still to visit: a destination at such a stop makes it the next stop. */
         private val OPEN_STATES = setOf(MapJourneyStop.State.PENDING, MapJourneyStop.State.ACTIVE, MapJourneyStop.State.REACHED)
+
+        /**
+         * `true` for a position that shows where the visitor is: positioning is available, or was
+         * within [GadSettings.trackingLostAfter], or a privacy zone holds the dot. Before positioning is
+         * available in the visit ([TrackingHealth.WAITING]), only a position younger than
+         * `trackingLostAfter` counts: a new map gets the SDK's last position at any age. In the field
+         * test of 2026-11-06 it was 44 min old, from a wristband that another phone had taken over
+         * (iOS 1.35.0). Pure; covered by tests.
+         */
+        internal fun isLive(health: TrackingHealth, positionAge: Duration?, settings: GadSettings): Boolean {
+            if (positionAge == null) return false
+            return when (health) {
+                TrackingHealth.TRACKING, TrackingHealth.PRIVACY_ZONE -> true
+                TrackingHealth.LOST_PLACE, TrackingHealth.STOPPED_RESPONDING -> false
+                TrackingHealth.WAITING -> positionAge < settings.trackingLostAfter
+            }
+        }
+
+        /**
+         * The stop the camera shows without a live position: the detour, else the active stop, else
+         * the first stop that is not done or skipped. Pure; covered by tests.
+         */
+        internal fun stopWithoutPosition(detour: MapJourneyStop?, active: MapJourneyStop?, journey: MapJourney): MapJourneyStop? =
+            detour ?: active ?: journey.stops.firstOrNull { it.state in OPEN_STATES }
 
         /** The navigator's off-route events, not reported while the journey is paused. Pure; covered by tests. */
         internal fun isRouteDeviation(event: JourneyEvent): Boolean =
