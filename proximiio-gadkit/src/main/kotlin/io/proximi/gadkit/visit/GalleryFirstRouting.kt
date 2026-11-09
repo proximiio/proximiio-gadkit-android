@@ -2,9 +2,12 @@ package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.FieldLog
+import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.map.GalleryDestination
+import io.proximi.gadkit.map.RouteToStop
 import io.proximi.gadkit.map.VenueLevel
 import io.proximi.gadkit.map.VenuePlace
+import io.proximi.sdk.core.model.ProximiioCoordinate
 import io.proximi.sdk.wayfinding.ComputedRoute
 import io.proximi.map.core.FloorKey
 import io.proximi.map.core.MapCoordinate
@@ -26,10 +29,16 @@ import kotlin.math.roundToLong
  * ([io.proximi.gadkit.GadSettings.galleryFirstMarginMeters]) has no gallery (field test 2026-10-19:
  * test copies of artworks named galleries in another building).
  *
- * The navigator's legs come from this router (`JourneyRouting`). The walking times that order the
- * journey come from the SDK's router unchanged. Thread-safe: the navigator routes off the main thread.
+ * The navigator's legs come from this router (`JourneyRouting`). A leg that ends at its stop goes on
+ * from the path to the stop ([routeToStopMaximumMeters], [RouteToStop]); a leg to a gallery ends on the
+ * path. The walking times that order the journey come from the SDK's router unchanged. Thread-safe: the
+ * navigator routes off the main thread.
  */
-internal class GalleryFirstRouting(private val inner: JourneyRouting) : JourneyRouting {
+internal class GalleryFirstRouting(
+    private val inner: JourneyRouting,
+    /** [GadSettings.routeToStopMaximumMeters]. */
+    private val routeToStopMaximumMeters: Double = GadSettings.STANDARD.routeToStopMaximumMeters,
+) : JourneyRouting {
     data class State(
         val isEnabled: Boolean = false,
         /** The gallery of each artwork, by the artwork's coordinate. */
@@ -67,7 +76,7 @@ internal class GalleryFirstRouting(private val inner: JourneyRouting) : JourneyR
     }
 
     override suspend fun route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey): ComputedRoute? =
-        inner.route(origin, originFloor, destination, destinationFloor)
+        inner.route(origin, originFloor, destination, destinationFloor)?.let { toStop(it, destination) }
 
     override suspend fun route(
         origin: MapCoordinate,
@@ -89,8 +98,13 @@ internal class GalleryFirstRouting(private val inner: JourneyRouting) : JourneyR
             synchronized(lock) { state = state.copy(withoutRoute = state.withoutRoute + Key(destination)) }
             FieldLog.log("gallery first: no route to ${gallery.gallery.name} (${result.reason}) · route ends at the artwork")
         }
-        return inner.route(origin, originFloor, destination, destinationFloor, options)
+        val result = inner.route(origin, originFloor, destination, destinationFloor, options)
+        return if (result is RouteResult.Route) RouteResult.Route(toStop(result.route, destination)) else result
     }
+
+    /** [route] up to the stop at [destination] ([RouteToStop.extended]). */
+    private fun toStop(route: ComputedRoute, destination: MapCoordinate): ComputedRoute =
+        RouteToStop.extended(route, ProximiioCoordinate(destination.latitude, destination.longitude), routeToStopMaximumMeters)
 
     override suspend fun durations(origins: List<JourneyRoutePoint>, destinations: List<JourneyRoutePoint>): List<List<Double?>> =
         inner.durations(origins, destinations)

@@ -865,6 +865,7 @@ val configuration = GadConfiguration(
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.StopNearby`. |
 | `offRouteMeters`, `offRouteAfter` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, also where a later leg passes, or off the route this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
+| `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
 | `followZoom`, `galleryFollowZoom` | 19.5, `null` | Zoom of "Centre on me" and of the follow, in personalised and curated journeys; in a gallery of a personalised journey, `galleryFollowZoom` (`null` for `followZoom`). |
 | `startZoom`, `startZoomDuration` | 17, 2 s | When the journey starts, on the first fix and when the position comes back, the journey map shows the visitor at `startZoom` for `startZoomDuration`, then follows them. `null` follows at once. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
@@ -1129,6 +1130,21 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - `ProximiMapHost` has `overlay`: the host app's UI over the museum map, Journey ready and the
   journey, for example a notice after the wristband session ended. The overlay is above the screen
   and below Manage journey. A new parameter with a default: the host app changes nothing.
+
+#### Added (iOS 1.36.0)
+
+- `GadSettings.routeToStopMaximumMeters` (15 m). A new setting with a default: the host app changes
+  nothing.
+
+#### Changed (iOS 1.36.0; the user, 2026-11-09)
+
+- **Visible:** the route goes on from the end of the path to the stop. The SDK's route ends where the
+  stop projects onto the path network, so the line ended short of an artwork beside the path. The
+  journey legs to an artwork or an amenity and the "Go here" routes of the museum map and the journey
+  map now end at the stop, with a straight segment from the path. The remaining distance, the walking
+  time and the arrive instruction include the segment. The arrival radius of an amenity counts from
+  the amenity, not from the end of the path. A leg to a gallery's POI (gallery first) ends on the
+  path. The host app changes nothing.
 
 #### Changed (iOS 1.35.0; field tests at the Guggenheim, 2026-11-06)
 

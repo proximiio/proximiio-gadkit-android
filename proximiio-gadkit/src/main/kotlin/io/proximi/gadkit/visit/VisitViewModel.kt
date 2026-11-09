@@ -17,6 +17,7 @@ import io.proximi.gadkit.map.GuidanceText
 import io.proximi.gadkit.map.JourneyMapContent
 import io.proximi.gadkit.map.MapLanguage
 import io.proximi.gadkit.map.VenuePlace
+import io.proximi.gadkit.map.RouteToStop
 import io.proximi.gadkit.wristband.TrackingHealth
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyStop
@@ -1298,7 +1299,7 @@ internal class VisitViewModel(
                 )
             }
             if (routedAmenity?.id != place.id) return
-            session.setRoute(route)
+            session.setRoute(RouteToStop.extended(route, ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude), settings.routeToStopMaximumMeters))
             amenityRouteError = null
         } catch (error: CancellationException) {
             throw error

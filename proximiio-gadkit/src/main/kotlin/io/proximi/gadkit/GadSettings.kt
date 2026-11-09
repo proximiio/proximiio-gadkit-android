@@ -102,6 +102,15 @@ public data class GadSettings(
      * `progressCorridorMeters`.
      */
     val progressCorridorMeters: Double? = 3.0,
+    /**
+     * A route ends where its stop projects onto the path network. The line goes on in a straight line
+     * to the stop when the stop is at most this many metres from that point. The remaining distance
+     * and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the
+     * path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path
+     * (`WayfindingRouter.DEFAULT_SNAP_THRESHOLD_METERS`), so 15 extends every route (user, 2026-11-09). iOS
+     * `routeToStopMaximumMeters`.
+     */
+    val routeToStopMaximumMeters: Double = 15.0,
 
     // Map
 

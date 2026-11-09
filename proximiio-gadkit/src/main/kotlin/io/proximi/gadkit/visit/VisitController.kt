@@ -184,7 +184,7 @@ internal class VisitController(
     )
 
     /** The navigator's legs (gallery first). */
-    private val galleryRouting = GalleryFirstRouting(ProximiioJourneyRouting(checkNotNull(session.sdk)))
+    private val galleryRouting = GalleryFirstRouting(ProximiioJourneyRouting(checkNotNull(session.sdk)), settings.routeToStopMaximumMeters)
 
     /** Guidance on a leg to an artwork ([artworkGuidanceRules]). */
     private val artworkGuidanceRules = artworkGuidanceRules(settings)

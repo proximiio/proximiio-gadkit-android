@@ -153,7 +153,7 @@ internal fun MuseumMapView(
                     toLevel = place.level,
                     options = currentAccessibility.routeOptions,
                 )
-            }
+            }.let { RouteToStop.extended(it, ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude), settings.routeToStopMaximumMeters) }
             session.setRoute(route)
             routeError = null
             if (debug != null) {
