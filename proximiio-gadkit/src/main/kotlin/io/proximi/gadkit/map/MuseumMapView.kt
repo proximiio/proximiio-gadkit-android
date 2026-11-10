@@ -374,7 +374,7 @@ internal fun MuseumMapView(
                     // the card says that the position is not shown.
                     val instruction = routeError?.let { stringResource(it) }
                         ?: if (isOnFloorWithoutPositioning) {
-                            stringResource(R.string.your_position_is_not_shown_on_this)
+                            stringResource(R.string.hey_it_looks_like_you_re_on)
                         } else {
                             coreGuidance?.let { GuidanceText.instruction(it, markers).mapText() }
                         }

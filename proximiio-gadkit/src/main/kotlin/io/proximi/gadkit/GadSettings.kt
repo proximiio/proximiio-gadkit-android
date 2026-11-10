@@ -1,5 +1,7 @@
 package io.proximi.gadkit
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -68,6 +70,12 @@ public data class GadSettings(
      * straight line without a route.
      */
     val stopNearbyMeters: Double = 5.0,
+    /**
+     * [ProximiMapEvent.GalleryNearby]: the POI of the active stop's gallery is less than this many
+     * metres away in a straight line, on the visitor's level. A visitor inside the gallery's outline
+     * is nearby at any distance. iOS `galleryNearbyMeters`.
+     */
+    val galleryNearbyMeters: Double = 5.0,
 
     // Route
 
@@ -134,6 +142,14 @@ public data class GadSettings(
     val startZoom: Double? = 17.0,
     /** How long the journey map stays at [startZoom]. iOS `startZoomSeconds`. */
     val startZoomDuration: Duration = 2.seconds,
+    /**
+     * The height over which the journey map fades out at the top of its card, under the Map / List
+     * control. The faded part shows what the host app draws behind [ProximiMapView]. 0: no fade. iOS
+     * `mapTopFadeHeight` (points).
+     */
+    val mapTopFadeHeight: Dp = 110.dp,
+    /** The height over which the journey map fades out at the bottom of its card, under the stop card. 0: no fade. iOS `mapBottomFadeHeight`. */
+    val mapBottomFadeHeight: Dp = 170.dp,
     /**
      * The farthest the visitor can zoom out, or `null` for the map library's limit. MapLibre zoom
      * levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).

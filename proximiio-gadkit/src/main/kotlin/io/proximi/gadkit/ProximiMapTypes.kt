@@ -60,12 +60,36 @@ public sealed interface WristbandStatus {
  * @property id the Proximi.io POI id.
  * @property artworkId the artwork's collection id (`remote_id`), or `null` for an amenity.
  * @property level the floor, or `null` when the POI has none.
+ * @property gallery the artwork's gallery: the POI whose `remote_id` is the artwork's
+ *   `metadata.gallery_id`. `null` for an amenity, and for an artwork without a gallery or whose
+ *   gallery has no POI.
  */
 public data class ProximiStop(
     public val id: String,
     public val title: String,
     public val artworkId: String? = null,
     public val level: Int? = null,
+    public val gallery: ProximiGallery? = null,
+)
+
+/**
+ * The gallery of an artwork, in [ProximiStop.gallery] and [ProximiMapEvent.GalleryNearby]. iOS
+ * `ProximiGallery`.
+ *
+ * @property id the Proximi.io POI id of the gallery's POI.
+ * @property galleryId the gallery's id (`remote_id` of the gallery's POI), which its artworks name
+ *   in `metadata.gallery_id`.
+ * @property level the floor of the gallery's POI.
+ * @property latitude the position of the gallery's POI.
+ * @property longitude the position of the gallery's POI.
+ */
+public data class ProximiGallery(
+    public val id: String,
+    public val galleryId: String,
+    public val title: String,
+    public val level: Int,
+    public val latitude: Double,
+    public val longitude: Double,
 )
 
 /**
@@ -168,6 +192,14 @@ public sealed interface ProximiMapEvent {
     public data class StopNearby(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
+     * The gallery of the active stop is nearby: its POI is less than [GadSettings.galleryNearbyMeters]
+     * away in a straight line on the visitor's level, or the visitor is inside the gallery's outline.
+     * Sent once while the gallery stays the gallery of the active stop, also for a journey opened
+     * there. Not sent while the journey is paused or during a detour; sent again when it resumes.
+     */
+    public data class GalleryNearby(public val gallery: ProximiGallery, public val stop: ProximiStop) : ProximiMapEvent
+
+    /**
      * The position is uncertain near the active stop: the accuracy is worse than
      * [GadSettings.uncertainAccuracyMeters] and the stop is within it. Sent by [ProximiMapView]
      * without [ProximiMapView.Option.UNCERTAIN_POSITION_PROMPT], which otherwise asks "Probably at …".
@@ -206,7 +238,7 @@ public sealed interface ProximiMapEvent {
 
     /**
      * The visitor swiped a stop in the list. With [ProximiMapView.Option.SKIP_PROMPT] a dialog asks
-     * "Skip artwork?"; without it the host app decides.
+     * "Skip it?"; without it the host app decides.
      */
     public data class SkipRequested(public val stop: ProximiStop) : ProximiMapEvent
 

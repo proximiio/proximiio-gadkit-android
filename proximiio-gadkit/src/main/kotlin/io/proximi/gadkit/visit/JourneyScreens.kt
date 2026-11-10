@@ -177,15 +177,15 @@ internal fun JourneyCompleteScreen(venue: VenueService, onClose: () -> Unit) {
     }
 }
 
-/** "Skip this artwork?" bottom sheet. */
+/** "Leave this artwork out?" bottom sheet. */
 @Composable
 internal fun SkipConfirmation(stop: String, onSkip: () -> Unit, onKeep: () -> Unit) {
     // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
     OverlaySheet(onDismiss = onKeep, bottomPadding = 12.dp) {
-        SheetTitle(stringResource(R.string.skip_this_artwork))
+        SheetTitle(stringResource(R.string.leave_this_artwork_out))
         Text(stop, style = GadTextStyle.LargeBodyRegular.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
-        SheetBody(stringResource(R.string.it_will_be_removed_from_your_route), Modifier.padding(bottom = 20.dp))
-        PrimaryButton(stringResource(R.string.skip_artwork), onSkip)
+        SheetBody(stringResource(R.string.i_ll_remove_it_from_your_route), Modifier.padding(bottom = 20.dp))
+        PrimaryButton(stringResource(R.string.skip_it), onSkip)
         TextActionButton(stringResource(R.string.keep_it), onKeep)
     }
 }

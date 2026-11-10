@@ -16,11 +16,11 @@ internal sealed interface VisitEvent {
     /** The presentation changed: the Map / List toggle. */
     data class ModeChanged(val mode: VisitMode) : VisitEvent
 
-    /** The visitor swiped a stop in the list, or used its "Skip" accessibility action. `VisitScreen` asks "Skip artwork?". */
+    /** The visitor swiped a stop in the list, or used its "Skip" accessibility action. `VisitScreen` asks "Skip it?". */
     data class SkipRequested(val stop: JourneyStop) : VisitEvent
 
     /**
-     * The visitor confirmed "Skip artwork". With [io.proximi.gadkit.ProximiMapView.Option.PROGRESS]
+     * The visitor confirmed "Skip it". With [io.proximi.gadkit.ProximiMapView.Option.PROGRESS]
      * the stop is skipped; without it the host app skips it.
      */
     data class StopSkipped(val stop: JourneyStop) : VisitEvent
@@ -66,6 +66,13 @@ internal sealed interface VisitEvent {
      * visitor's level. Once per stop for the whole visit ([StopNearbyDetector]).
      */
     data class StopNearby(val stop: JourneyStop) : VisitEvent
+
+    /**
+     * The gallery of the active stop is nearby: its POI is less than
+     * [io.proximi.gadkit.GadSettings.galleryNearbyMeters] away, or the visitor is inside its outline
+     * ([GalleryNearbyDetector]). Not sent while the journey is paused; sent again after a resume.
+     */
+    data class GalleryNearby(val stop: JourneyStop) : VisitEvent
 
     /**
      * The POI of a stop was deleted on the backend while the screen is open. Once per stop. With

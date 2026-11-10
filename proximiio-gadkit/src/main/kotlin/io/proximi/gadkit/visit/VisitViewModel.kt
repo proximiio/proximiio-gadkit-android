@@ -212,6 +212,9 @@ internal class VisitViewModel(
     /** The active stop less than [GadSettings.stopNearbyMeters] away, once per stop in this visit. */
     private val stopNearby = StopNearbyDetector(settings.stopNearbyMeters)
 
+    /** The gallery of the active stop within [GadSettings.galleryNearbyMeters] or around the visitor. */
+    private val galleryNearby = GalleryNearbyDetector(settings.galleryNearbyMeters)
+
     /** Whether the journey has a stop. Without one the screen shows the map alone. */
     val hasStops: Boolean = journey.stops.isNotEmpty()
 
@@ -330,7 +333,7 @@ internal class VisitViewModel(
     var amenityIcons by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
         private set
 
-    /** The stop of "Skip artwork?". */
+    /** The stop of "Skip it?". */
     var stopToSkip by mutableStateOf<JourneyStop?>(null)
         private set
     var isConfirmingExit by mutableStateOf(false)
@@ -527,6 +530,15 @@ internal class VisitViewModel(
                 controller.checkLegDeviation(guidance, floorGuide.isActive)
             }
         }
+        // A resumed journey reports the gallery ahead again (PM, Monday "Sending entered geofences &
+        // approaching gallery at start", 2026-11-10).
+        scope.launch {
+            controller.isPaused.drop(1).collect { paused ->
+                if (paused) return@collect
+                galleryNearby.reset()
+                reportGalleryNearby(session.position.value)
+            }
+        }
         scope.launch {
             session.position.collect { position ->
                 if (position == null) return@collect
@@ -628,6 +640,17 @@ internal class VisitViewModel(
     private fun reportStopNearby(position: VenuePosition?, stop: MapJourneyStop?, guidance: RouteGuidance?) {
         val legGuidance = guidance.takeUnless { controller.navigator.hasArrived }
         stopNearby.update(position, stop, legGuidance)?.let { onEvent(VisitEvent.StopNearby(it.toCore())) }
+        reportGalleryNearby(position)
+    }
+
+    /**
+     * Reports `GalleryNearby` for the gallery of the active stop. A paused journey and a detour report
+     * none; the resume reports the gallery again ([GalleryNearbyDetector.reset]).
+     */
+    private fun reportGalleryNearby(position: VenuePosition?) {
+        if (controller.isPaused.value || controller.navigator.detourStop != null) return
+        galleryNearby.update(position, controller.navigator.activeStop, places, galleryDestinations)
+            ?.let { onEvent(VisitEvent.GalleryNearby(it.toCore())) }
     }
 
     /** The host app's journey after a change, applied to the open screen ([VisitController.apply]). */
@@ -1216,7 +1239,7 @@ internal class VisitViewModel(
     fun dismissOffRoute() = controller.dismissOffRoute()
 
     /**
-     * A swipe on [stop] in the list, or its "Skip" accessibility action: "Skip artwork?" with
+     * A swipe on [stop] in the list, or its "Skip" accessibility action: "Skip it?" with
      * [ProximiMapView.Option.SKIP_PROMPT], else only the event.
      */
     fun requestSkip(stop: JourneyStop) {

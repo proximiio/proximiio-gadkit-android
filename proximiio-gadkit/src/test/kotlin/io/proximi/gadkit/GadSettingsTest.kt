@@ -1,5 +1,6 @@
 package io.proximi.gadkit
 
+import androidx.compose.ui.unit.dp
 import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.VisitController
 import io.proximi.gadkit.visit.VisitViewModel
@@ -25,6 +26,9 @@ class GadSettingsTest {
         assertEquals(GadSettings.STANDARD, configuration.settings)
         assertEquals(110.seconds, GadSettings.STANDARD.trackingLostAfter)
         assertEquals(5.0, GadSettings.STANDARD.stopNearbyMeters)
+        assertEquals(5.0, GadSettings.STANDARD.galleryNearbyMeters)
+        assertEquals(110.dp, GadSettings.STANDARD.mapTopFadeHeight)
+        assertEquals(170.dp, GadSettings.STANDARD.mapBottomFadeHeight)
         assertEquals(setOf(0), GadSettings.STANDARD.levelsWithoutPositioning)
         assertEquals(5.seconds, GadSettings.STANDARD.levelChangeViewDuration)
         assertEquals(20.0, GadSettings.STANDARD.rideFloorHoldMeters)

@@ -290,7 +290,7 @@ private fun VisitContent(model: VisitViewModel, hasBack: Boolean) {
                         session = model.session,
                         // The map fades out under the controls at the top (110 dp) and over the card at the
                         // bottom (170 dp; RPR, Monday "Map fade at top & bottom", 2026-10-28).
-                        modifier = Modifier.fillMaxSize().alpha(mapAlpha).glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp).verticalFades(top = 110.dp, bottom = 170.dp),
+                        modifier = Modifier.fillMaxSize().alpha(mapAlpha).glassBackdrop(mapBackdrop).softEdges(cornerRadius = 50.dp).verticalFades(top = model.settings.mapTopFadeHeight, bottom = model.settings.mapBottomFadeHeight),
                         configure = { canvas ->
                             model.layers.attach(canvas)
                         },
@@ -556,7 +556,7 @@ private fun VisitCard(model: VisitViewModel) {
     val instruction = if (returningToLevel != null) {
         stringResource(R.string.head_to_level_n_by_lift_or, returningToLevel)
     } else if (isOnFloorWithoutPositioning) {
-        stringResource(R.string.your_position_is_not_shown_on_this)
+        stringResource(R.string.hey_it_looks_like_you_re_on)
     } else if (model.hasNoAccessibleRoute) {
         // The navigator keeps a stop that no route with the visitor's accessibility needs
         // reaches, with no route line. In a personalised journey the visitor can skip it.

@@ -15,6 +15,7 @@ import io.proximi.gadkit.map.isArtwork
 import io.proximi.gadkit.map.places
 import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.ui.resolve
+import io.proximi.gadkit.visit.GalleryNearbyDetector
 import io.proximi.gadkit.visit.Journey
 import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.JourneyStop
@@ -731,6 +732,11 @@ public class ProximiMap(
          * Pure; covered by tests.
          */
         fun event(event: VisitEvent, places: List<VenuePlace>): ProximiMapEvent? {
+            fun gallery(placeId: String): ProximiGallery? {
+                val poi = GalleryNearbyDetector.gallery(placeId, places) ?: return null
+                val galleryId = poi.remoteId ?: return null
+                return ProximiGallery(poi.id, galleryId, poi.title, poi.level.roundedInt(), poi.coordinate.latitude, poi.coordinate.longitude)
+            }
             fun stop(stop: JourneyStop): ProximiStop {
                 val id = stop.poiId ?: stop.id
                 return ProximiStop(
@@ -738,6 +744,7 @@ public class ProximiMap(
                     title = stop.title,
                     artworkId = places.firstOrNull { it.id == id }?.remoteId,
                     level = stop.level?.roundedInt(),
+                    gallery = gallery(id),
                 )
             }
             fun place(place: VenuePlace) = ProximiStop(
@@ -745,6 +752,7 @@ public class ProximiMap(
                 title = place.title,
                 artworkId = if (place.isArtwork) place.remoteId else null,
                 level = place.level.roundedInt(),
+                gallery = if (place.isArtwork) gallery(place.id) else null,
             )
             return when (event) {
                 is VisitEvent.ModeChanged -> ProximiMapEvent.ModeChanged(event.mode)
@@ -762,6 +770,7 @@ public class ProximiMap(
                 VisitEvent.ExitConfirmed -> ProximiMapEvent.ExitConfirmed
                 VisitEvent.ExitCancelled -> ProximiMapEvent.ExitCancelled
                 is VisitEvent.StopNearby -> ProximiMapEvent.StopNearby(stop(event.stop))
+                is VisitEvent.GalleryNearby -> stop(event.stop).let { mapped -> mapped.gallery?.let { ProximiMapEvent.GalleryNearby(it, mapped) } }
                 is VisitEvent.PositionUncertain -> ProximiMapEvent.PositionUncertain(stop(event.stop))
                 is VisitEvent.StopPlaceDeleted -> ProximiMapEvent.StopPlaceDeleted(stop(event.stop))
                 is VisitEvent.ArtworkReached -> ProximiMapEvent.ArtworkReached(stop(event.stop))

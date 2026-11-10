@@ -340,7 +340,7 @@ internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap:
             )
             if (showsNoPositionNote) {
                 Text(
-                    stringResource(R.string.your_position_is_not_shown_on_this),
+                    stringResource(R.string.hey_it_looks_like_you_re_on),
                     style = GadTextStyle.BodySmallRegular.textStyle,
                     color = Palette.ink,
                     textAlign = TextAlign.Center,

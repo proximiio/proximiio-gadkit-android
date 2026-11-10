@@ -88,7 +88,7 @@ public object ProximiMapView {
          */
         PROMPTS,
 
-        /** "Skip this artwork?" after a swipe in the list. Without it the view reports [ProximiMapEvent.SkipRequested] only. */
+        /** "Leave this artwork out?" after a swipe in the list. Without it the view reports [ProximiMapEvent.SkipRequested] only. */
         SKIP_PROMPT,
 
         /**

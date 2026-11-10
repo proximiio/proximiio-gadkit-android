@@ -52,12 +52,13 @@
     <string name="head_straight_for_n_m">Head straight for %d m</string>
     <string name="head_to_level_n_by_lift_or">Head to Level %d by lift or stairs</string>
     <string name="help_desk">Help Desk</string>
+    <string name="hey_it_looks_like_you_re_on">Hey, it looks like you’re on a level where I can’t locate you.</string>
     <string name="highlights">Highlights</string>
     <string name="hold_the_qr_code_on_the_back">Hold the QR code on the back of your wristband inside the frame</string>
     <string name="hold_your_current_wristband_next_to_the">Hold your current wristband next to the new one and scan again.</string>
     <string name="i_couldn_t_get_things_started_check">I couldn’t get things started. Check your connection and let’s try again.</string>
+    <string name="i_ll_remove_it_from_your_route">I’ll remove it from your route.</string>
     <string name="it_will_be_ready_when_you_arrive">It will be ready when you arrive at GAD</string>
-    <string name="it_will_be_removed_from_your_route">It will be removed from your route. Artworks you have visited stay saved.</string>
     <string name="journey_complete">JOURNEY COMPLETE</string>
     <string name="journey_complete_2">Journey complete</string>
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
@@ -68,6 +69,7 @@
     <string name="last_stop">LAST STOP</string>
     <string name="leave_the_tour">Leave the tour</string>
     <string name="leave_the_tour_here">Leave the tour here</string>
+    <string name="leave_this_artwork_out">Leave this artwork out?</string>
     <string name="level_n">Level %d</string>
     <string name="lift">lift</string>
     <string name="list">List</string>
@@ -135,9 +137,8 @@
     <string name="search">Search</string>
     <string name="search_the_museum">Search the museum</string>
     <string name="skip">Skip</string>
-    <string name="skip_artwork">Skip artwork</string>
     <string name="skip_for_now">Skip for now</string>
-    <string name="skip_this_artwork">Skip this artwork?</string>
+    <string name="skip_it">Skip it</string>
     <string name="spaces">Spaces</string>
     <string name="stairs">Stairs</string>
     <string name="stairs_2">stairs</string>
@@ -194,7 +195,6 @@
     <string name="your_location_could_not_be_determined_in">Your location could not be determined in time. Try again, or ask at the reception desk.</string>
     <string name="your_next_stop_is_x">Your next stop is %s.</string>
     <string name="your_personalised_journey">YOUR PERSONALISED JOURNEY</string>
-    <string name="your_position_is_not_shown_on_this">Your position is not shown on this level.</string>
     <string name="your_position_is_uncertain_here">Your position is uncertain here.</string>
     <string name="your_visit_has_ended">Your visit has ended.</string>
     <string name="your_visit_time_is_over">Your visit time is over.</string>
