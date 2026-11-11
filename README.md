@@ -820,7 +820,7 @@ lists:
 | `ArrivedAtMuseum` | `isAtMuseum` became `true`. Once per `ProximiMap`. |
 | `WristbandChanged(status)` | The wristband session changed. |
 | `TrackingChanged(health)` | During a journey: the wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`), came back (`TRACKING`), or the visitor is in a privacy zone (`PRIVACY_ZONE`, never lost there). |
-| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. The exit comes `geofenceExitDelay` (5 s) after the visitor leaves. |
+| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. The exit comes `geofenceExitDelay` (5 s) after the visitor leaves. When the journey opens and when a paused journey resumes, `GeofenceEntered` comes again for every geofence the visitor is in, with its notification (Android only). |
 | `JourneyChanged(journey)` | A new, planned, edited or deleted (`null`) journey, and the progress after the journey screen closed. |
 | `NextStop(stop)` | The route leads to this stop now. |
 | `StopNearby(stop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The library posts no notification for it. |
@@ -1192,6 +1192,14 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   distance. `false` keeps the order of before. The time of a proposal on the GAD venue is not measured.
 - Map 6.0.0-beta.39: `ProximiioMap(session)` given a new session shows the new session's map. The
   library already makes a new map for a new session, so nothing changes in it.
+
+#### Changed (Android only; the user, 2026-11-11)
+
+- **Visible**, `ProximiMap` only: when the journey opens and when a paused journey resumes, `ProximiMap`
+  follows the geofence events again with `geofenceEvents(replayingEntered = true)`. A visitor who is
+  already in a geofence gets `ProximiMapEvent.GeofenceEntered` and the geofence notification for it.
+  Before, both came only at the next enter. `ProximiMapView` is unchanged: its host app opens the
+  replayed flow itself. The host app changes nothing.
 
 #### Changed (iOS 1.37.0; PM, Monday "Translations / copy changes", 2026-11-10)
 

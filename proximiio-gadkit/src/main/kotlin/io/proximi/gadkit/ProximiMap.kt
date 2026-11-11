@@ -188,6 +188,9 @@ public class ProximiMap(
 
     /** The work that follows the started SDK. A refused token ends it ([tokenRefused]). */
     private val venueJobs = mutableListOf<Job>()
+
+    /** The SDK's geofence events for the host events and the notifications ([followGeofences]). */
+    private var geofenceJob: Job? = null
     private var isSessionRunning = false
     private var lastWristband: WristbandStatus? = null
 
@@ -263,10 +266,7 @@ public class ProximiMap(
                 // One position from the wristband or playback means the visitor is inside.
                 if (venue.sdk.positions().firstOrNull() != null) arrival.positionReceived()
             }
-            venueJobs += mainScope.launch { venue.sdk.geofenceEvents().collect { event -> event(event)?.let(::emit) } }
-            if (configuration.settings.postsGeofenceNotifications && configuration.settings.notifiesGeofenceEvents) {
-                venueJobs += mainScope.launch { GeofenceNotifier(context).run(venue.sdk) }
-            }
+            followGeofences(venue, replayingEntered = false)
             venueJobs += mainScope.launch {
                 venue.sdk.syncEvents().first(::isTokenRefusal)
                 tokenRefused(venue)
@@ -293,8 +293,9 @@ public class ProximiMap(
      */
     private fun tokenRefused(venue: VenueService) {
         FieldLog.log("map: the API refused the token; the SDK stopped and deleted the venue data")
-        val jobs = venueJobs.toList()
+        val jobs = venueJobs.toList() + listOfNotNull(geofenceJob)
         venueJobs.clear()
+        geofenceJob = null
         venue.data.onChange = null
         close()
         mutablePlaces.value = emptyList()
@@ -304,6 +305,28 @@ public class ProximiMap(
         mutableStatus.value = Status.Failed(failure)
         // Last: the caller is one of these jobs.
         jobs.forEach { it.cancel() }
+    }
+
+    /**
+     * Follows the SDK's geofence events: the host events `GeofenceEntered` and `GeofenceExited`, and
+     * the notifications while `postsGeofenceNotifications` and `notifiesGeofenceEvents` are on. One
+     * flow serves both. With [replayingEntered] a new flow replaces the earlier one and starts with an
+     * enter event for every geofence the visitor is in (SDK 6.0.0-beta.37): when the journey opens and
+     * when a paused journey resumes ([replaysEnteredGeofences]), so a visitor who is already inside
+     * gets the event and the notification (the user, 2026-11-11). Android only; `ProximiMapView` keeps
+     * the host app's flows.
+     */
+    private fun followGeofences(venue: VenueService, replayingEntered: Boolean) {
+        geofenceJob?.cancel()
+        val settings = configuration.settings
+        val notifier = if (settings.postsGeofenceNotifications && settings.notifiesGeofenceEvents) GeofenceNotifier(context) else null
+        if (replayingEntered) FieldLog.log("geofences: replaying the entered geofences")
+        geofenceJob = mainScope.launch {
+            venue.sdk.geofenceEvents(replayingEntered).collect { event ->
+                event(event)?.let(::emit)
+                notifier?.post(event)
+            }
+        }
     }
 
     private suspend fun loadPlaces(venue: VenueService) {
@@ -602,6 +625,7 @@ public class ProximiMap(
 
     private fun emit(event: ProximiMapEvent) {
         mutableEvents.tryEmit(event)
+        if (replaysEnteredGeofences(event) && mutableStatus.value == Status.Ready) venue?.let { followGeofences(it, replayingEntered = true) }
     }
 
     // Debug launch
@@ -710,6 +734,13 @@ public class ProximiMap(
             is BindingState.Ended -> WristbandStatus.NotConnected(notice = text(WristbandCopy.notice(state.reason)))
             BindingState.Unbound -> WristbandStatus.NotConnected(notice = null)
         }
+
+        /**
+         * `true` for the events after which the geofence events start again with the geofences the
+         * visitor is in: the journey opened, or a paused journey resumed. Pure; covered by tests.
+         */
+        fun replaysEnteredGeofences(event: ProximiMapEvent): Boolean =
+            event == ProximiMapEvent.Opened(Screen.JOURNEY) || event == ProximiMapEvent.JourneyResumed
 
         /** The host event for a geofence enter or exit of the SDK, or `null` for another event. Pure; covered by tests. */
         fun event(event: GeofenceEvent): ProximiMapEvent? {

@@ -3,8 +3,6 @@ package io.proximi.gadkit.map
 import android.content.Context
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.UiText
-import io.proximi.sdk.Proximiio
-import io.proximi.sdk.geofenceEvents
 import io.proximi.sdk.geofencing.GeofenceEvent
 
 /**
@@ -24,15 +22,13 @@ internal class GeofenceNotifier(context: Context) {
     private val context = context.applicationContext
 
     /**
-     * Posts a notification for every geofence enter and exit event of [sdk]. Returns when the
-     * stream finishes; cancel the calling coroutine to stop it.
+     * Posts the notification of a geofence enter or exit event. `ProximiMap` passes every event of
+     * its geofence flow, also the replayed enters at the journey start and after a resume.
      */
-    internal suspend fun run(sdk: Proximiio) {
-        sdk.geofenceEvents().collect { event ->
-            val notice = notice(event) ?: return@collect
-            FieldLog.log("notification: ${notice.tag} ${notice.title}")
-            LocalNotices.post(context, notice, NOTIFICATION_ID)
-        }
+    internal fun post(event: GeofenceEvent) {
+        val notice = notice(event) ?: return
+        FieldLog.log("notification: ${notice.tag} ${notice.title}")
+        LocalNotices.post(context, notice, NOTIFICATION_ID)
     }
 
     internal companion object {

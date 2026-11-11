@@ -108,6 +108,19 @@ class ProximiMapTest {
         assertEquals(ProximiMapEvent.TrackingChanged(TrackingHealth.LOST_PLACE), ProximiMap.event(VisitEvent.TrackingChanged(TrackingHealth.LOST_PLACE), places))
     }
 
+    /**
+     * The geofence events start again with the geofences the visitor is in when the journey opens and
+     * when a paused journey resumes (the user, 2026-11-11; SDK 6.0.0-beta.37). Android only.
+     */
+    @Test
+    fun theJourneyStartAndAResumeReplayTheEnteredGeofences() {
+        assertTrue(ProximiMap.replaysEnteredGeofences(ProximiMapEvent.Opened(ProximiMap.Screen.JOURNEY)))
+        assertTrue(ProximiMap.replaysEnteredGeofences(ProximiMapEvent.JourneyResumed))
+        assertFalse(ProximiMap.replaysEnteredGeofences(ProximiMapEvent.Opened(ProximiMap.Screen.JOURNEY_READY)))
+        assertFalse(ProximiMap.replaysEnteredGeofences(ProximiMapEvent.Opened(ProximiMap.Screen.MUSEUM_MAP)))
+        assertFalse(ProximiMap.replaysEnteredGeofences(ProximiMapEvent.JourneyPaused))
+    }
+
     @Test
     fun geofenceEventsNameTheArtwork() {
         val artwork = ProximiioGeofence(
