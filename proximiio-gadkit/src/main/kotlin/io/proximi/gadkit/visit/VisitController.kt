@@ -84,8 +84,9 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * - After a reached detour, the journey continues only after "Resume your Journey" ([rules]).
  *
  * A new personalised journey is ordered floor by floor and gallery by gallery
- * (`JourneyOrderStrategy.FLOOR_THEN_GALLERY`): the stop nearest the visitor first, then the rest of
- * its gallery, then the rest of its floor. Without a fix the first stop stays first, and the first
+ * (`JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED`, or `FLOOR_THEN_GALLERY` when
+ * [GadSettings.ordersGalleriesByWalkingTime] is `false`): the stop nearest the visitor first, then the
+ * rest of its gallery, then the rest of its floor. Without a fix the first stop stays first, and the first
  * fix within 60 s orders the journey again while no stop is reached. A restored journey keeps its
  * order. After a detour the stops still ahead are ordered again from the visitor. A curated tour
  * keeps the curators' order ([keepsOrder]).
@@ -169,6 +170,9 @@ internal class VisitController(
     private val settings: GadSettings = GadSettings.STANDARD,
 ) {
     private val keepsOrder = keepsOrder || !managesProgress
+
+    /** The rule for the order of the stops ([GadSettings.ordersGalleriesByWalkingTime]). */
+    private val orderStrategy = VisitController.orderStrategy(settings)
 
     /**
      * A reached detour waits for "Resume your Journey" (PM review 2026-10-12). Artworks are never
@@ -367,19 +371,19 @@ internal class VisitController(
         waitForFix(settings.lateOrderWindow.inWholeMilliseconds)
         if (session.position.value == null || navigator.hasArrived) return
         if (!navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING || it.state == JourneyStop.State.ACTIVE }) return
-        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY) ?: return
+        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return
         if (proposal.isImprovement) apply(proposal)
     }
 
     /** The floor-then-gallery order from the visitor's fix, or from the first stop without a fix. */
     private suspend fun proposedOrder(): JourneyOrderProposal? =
-        navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY)
-            ?: navigator.proposeOrder(JourneyOrderOrigin.ACTIVE_STOP, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY)
+        navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy)
+            ?: navigator.proposeOrder(JourneyOrderOrigin.ACTIVE_STOP, strategy = orderStrategy)
 
     /** Orders the stops still ahead from the visitor, floor by floor and gallery by gallery. */
     private suspend fun orderRemaining() {
         if (keepsOrder) return
-        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY) ?: return
+        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return
         if (proposal.isImprovement) apply(proposal)
     }
 
@@ -467,7 +471,7 @@ internal class VisitController(
         doneJobs += scope.launch {
             serially {
                 if (!isOffRouteEpisode || navigator.activeStop?.id != active.id) return@serially
-                val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY) ?: return@serially
+                val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return@serially
                 val first = proposal.order.firstOrNull()
                 if (!proposal.isImprovement || first == null || first == active.id) return@serially
                 FieldLog.log("off route: $first is nearer than ${active.title} · journey ordered again")
@@ -510,7 +514,7 @@ internal class VisitController(
             serially {
                 rerouting {
                     if (reorders) {
-                        navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = JourneyOrderStrategy.FLOOR_THEN_GALLERY)
+                        navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy)
                             ?.takeIf { it.isImprovement }
                             ?.let { apply(it) }
                     }
@@ -1049,6 +1053,10 @@ internal class VisitController(
     }
 
     companion object {
+        /** The order strategy for [settings]. Pure; covered by tests. */
+        internal fun orderStrategy(settings: GadSettings): JourneyOrderStrategy =
+            if (settings.ordersGalleriesByWalkingTime) JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED else JourneyOrderStrategy.FLOOR_THEN_GALLERY
+
         /**
          * Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance off;
          * the artwork geofence is the only arrival. Off the leg beyond [GadSettings.offRouteMeters]. The

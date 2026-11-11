@@ -158,6 +158,22 @@ public data class GadSettings(
     /** The farthest the visitor can zoom in, or `null` for the map library's limit. */
     val maximumZoom: Double? = null,
     /**
+     * The box the screen stays inside, or `null` for no limit. It holds for gestures and for every
+     * camera move the map makes, on the journey map and the Explore Museum map
+     * (`MapOptions.cameraBounds`, map 6.0.0-beta.39). The map stops zooming out where the box
+     * covers the view, so a [minimumZoom] below that zoom is not reached. The default is the PM's
+     * box around the museum (Monday "Zoom out limit", 2026-11-10). iOS `cameraBounds`.
+     */
+    val cameraBounds: GadCameraBounds? = GadCameraBounds.GUGGENHEIM_ABU_DHABI,
+    /**
+     * `true` picks the first gallery on a floor and the gallery after a finished one by routed
+     * walking time (`JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED`, map 6.0.0-beta.39). `false`
+     * picks them by straight-line distance, as before. A stop without a route uses the straight
+     * line in both (PM, Monday "First stop over birds flight vs along the route"). iOS
+     * `ordersGalleriesByWalkingTime`.
+     */
+    val ordersGalleriesByWalkingTime: Boolean = true,
+    /**
      * `false` draws the position dot on each fix. `true` slides it toward each fix (the map
      * library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
      * 2026-10-23).
@@ -285,5 +301,20 @@ public data class GadSettings(
     public companion object {
         /** The defaults. */
         public val STANDARD: GadSettings = GadSettings()
+    }
+}
+
+/** A box in degrees that limits the map camera ([GadSettings.cameraBounds]). iOS `GADCameraBounds`. */
+public data class GadCameraBounds(
+    val south: Double,
+    val west: Double,
+    val north: Double,
+    val east: Double,
+) {
+    public companion object {
+        /** The PM's box around the Guggenheim Abu Dhabi (Monday "Zoom out limit", 2026-11-10). */
+        public val GUGGENHEIM_ABU_DHABI: GadCameraBounds = GadCameraBounds(
+            south = 24.53557985, west = 54.39348543, north = 24.54644005, east = 54.40758853,
+        )
     }
 }

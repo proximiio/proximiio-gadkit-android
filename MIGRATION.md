@@ -77,6 +77,9 @@ built again: both have a new trailing parameter.
 | Map 6.0.0-beta.35 | The timing log also counts the feature pushes and shows the main thread's longest hold. Nothing runs with the log off. | | Info |
 | Map 6.0.0-beta.36 | A feature push encodes its changed features in parallel from 64 on, with the same result; a push overtaken before its encode is skipped. The first map open draws sooner. Nothing is drawn differently. | | Info |
 | Map 6.0.0-beta.37 | The venue's features are encoded once per app process, as soon as the session has them, so a map opened again draws sooner; a few MB stay in memory after the map closes. New and off by default: `JourneyNavigator.markReached(stopId)`, `upcomingStop`, `drawsNextLegWhileReached`, `RouteFollowRules.progressCorridorMeters`. | | Info |
+| SDK 6.0.0-beta.37 | New overload `geofenceEvents(replayingEntered: Boolean)`. `geofenceEvents()` is unchanged. `sdk::geofenceEvents` as a function reference without an expected function type is ambiguous. | Call the function: `sdk.geofenceEvents()`. | **Required** with a bare reference |
+| Map 6.0.0-beta.39 | New constant `JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED`. | A `when` over `JourneyOrderStrategy` used as an expression without `else` does not compile. Add the branch. | **Required** with such a `when` |
+| Map 6.0.0-beta.39 | `MapOptions.cameraBounds` (default `null`) keeps the screen inside a box. ProximiioGADKit for Android 1.37.0 sets it from `GadSettings.cameraBounds`. `ProximiioMap(session)` given a new session shows the new session's map. | | Info |
 
 ### Added
 
@@ -289,8 +292,10 @@ app matches the one its journey uses.
 
 ### Step 8: SDK streams (Info)
 
-`sdk.geofenceEvents()` and `sdk.positions()` stay as they are. The view collects its own flows and
-takes no events from the app's. The view reports no geofence event. It follows
+`sdk.geofenceEvents()` and `sdk.positions()` stay as they are.
+`sdk.geofenceEvents(replayingEntered = true)` (SDK 6.0.0-beta.37) first sends an enter event for every
+geofence and privacy zone the visitor is in. Open it when the journey starts and again when a paused
+journey resumes. The view collects its own flows and takes no events from the app's. The view reports no geofence event. It follows
 `sdk.venueDataChanges()` itself: the open map draws changed venue data, and the journey routes again
 after a change of features.
 

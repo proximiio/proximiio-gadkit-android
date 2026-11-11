@@ -7,6 +7,7 @@ import io.proximi.gadkit.visit.VisitViewModel
 import io.proximi.gadkit.map.MapLoading
 import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.visit.StopNearbyDetector
+import io.proximi.map.core.JourneyOrderStrategy
 import io.proximi.map.core.PositionSmoothing
 import io.proximi.gadkit.wristband.TrackingHealth
 import java.time.Instant
@@ -44,6 +45,8 @@ class GadSettingsTest {
         assertFalse(GadSettings.STANDARD.smoothsPosition)
         assertEquals(null, GadSettings.STANDARD.minimumZoom)
         assertEquals(null, GadSettings.STANDARD.maximumZoom)
+        assertEquals(GadCameraBounds.GUGGENHEIM_ABU_DHABI, GadSettings.STANDARD.cameraBounds)
+        assertTrue(GadSettings.STANDARD.ordersGalleriesByWalkingTime)
     }
 
     @Test
@@ -106,6 +109,27 @@ class GadSettingsTest {
         val withGalleryZoom = settings.copy(galleryFollowZoom = 20.0)
         assertEquals(20.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = withGalleryZoom))
         assertEquals(19.5, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = withGalleryZoom))
+    }
+
+    /**
+     * The camera stays in the PM's box, and the galleries are ordered by walking time (PM, Monday
+     * "Zoom out limit" and "First stop over birds flight vs along the route", 2026-11-10; map
+     * 6.0.0-beta.39).
+     */
+    @Test
+    fun theCameraIsBoundedAndTheGalleriesAreOrderedByWalkingTime() {
+        val settings = GadSettings.STANDARD
+        val box = MapStyle.options("en", settings = settings).cameraBounds
+        assertEquals(24.53557985, box?.southWest?.latitude)
+        assertEquals(54.39348543, box?.southWest?.longitude)
+        assertEquals(24.54644005, box?.northEast?.latitude)
+        assertEquals(54.40758853, box?.northEast?.longitude)
+        assertEquals(true, box?.canBoundCamera)
+        assertEquals(box, MapStyle.exploreOptions("en", settings).cameraBounds)
+        assertEquals(JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED, VisitController.orderStrategy(settings))
+        val off = settings.copy(cameraBounds = null, ordersGalleriesByWalkingTime = false)
+        assertNull(MapStyle.options("en", settings = off).cameraBounds)
+        assertEquals(JourneyOrderStrategy.FLOOR_THEN_GALLERY, VisitController.orderStrategy(off))
     }
 
     /** The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map 6.0.0-beta.32). */

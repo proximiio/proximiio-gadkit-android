@@ -396,6 +396,13 @@ visitor's first position, after `ArtworkVisitedOutOfOrder` and after a detour. A
 alone sends none. Without `PROGRESS` the view keeps the host app's order and never sends it. Screen, wristband, arrival, geofence and `JourneyChanged` events come only from
 `ProximiMap`; geofence enter and exit events are on the host app's SDK (`geofenceEvents()`).
 
+`sdk.geofenceEvents()` reports changes only: a visitor who is inside a geofence when the flow opens
+gets no enter event for it. `sdk.geofenceEvents(replayingEntered = true)` (SDK 6.0.0-beta.37) first
+sends an enter event for every geofence and privacy zone the visitor is in, then the changes. A host
+app whose flow starts on an enter event opens this flow when the journey starts and opens a new one
+when a paused journey resumes. `sdk::geofenceEvents` as a function reference without an expected
+function type is ambiguous since SDK 6.0.0-beta.37; call the function.
+
 ### The navigator
 
 `onNavigator` gives the host app the map library's `JourneyNavigator` that draws the journey. The
@@ -882,6 +889,8 @@ val configuration = GadConfiguration(
 | `followZoom`, `galleryFollowZoom` | 19.5, `null` | Zoom of "Centre on me" and of the follow, in personalised and curated journeys; in a gallery of a personalised journey, `galleryFollowZoom` (`null` for `followZoom`). |
 | `startZoom`, `startZoomDuration` | 17, 2 s | When the journey starts, on the first fix and when the position comes back, the journey map shows the visitor at `startZoom` for `startZoomDuration`, then follows them. `null` follows at once. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
+| `cameraBounds` | `GadCameraBounds.GUGGENHEIM_ABU_DHABI` | The box the screen stays inside on every map of the library, for gestures and for every camera move; `null` for no limit (`MapOptions.cameraBounds`, map 6.0.0-beta.39). The default is south-west 24.53557985, 54.39348543 and north-east 24.54644005, 54.40758853 (latitude, longitude). The map stops zooming out where the box covers the view; a `minimumZoom` below that zoom is not reached. During a pinch the edge is one frame behind and the camera is put right when it comes to rest. With the heading-up map a corner of the view can show past the box. |
+| `ordersGalleriesByWalkingTime` | `true` | `true` picks the first gallery on a floor and the gallery after a finished one by routed walking time (`JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED`, map 6.0.0-beta.39). `false` picks them by straight-line distance. Which floor comes next and the order inside a gallery use straight-line distance in both. A stop without a route uses the straight line. The first proposal asks the SDK for the walking time between every pair of stops; the time on the GAD venue is not measured. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker with a badge holding the number of the others (PM, Monday "Clustering", 2026-10-29). |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
@@ -1163,6 +1172,27 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   faded map and the List mode show what the host app draws behind `ProximiMapView`; a host app keeps
   only its background there.
 
+#### Added (SDK 6.0.0-beta.37, Map 6.0.0-beta.39; iOS 1.37.0; PM, Monday "Sending entered geofences & approaching gallery at start", "Zoom out limit" and "First stop over birds flight vs along the route", 2026-11-10)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.37` (was `6.0.0-beta.36`) and Map
+  `6.0.0-beta.39` (was `6.0.0-beta.38`). A host app that declares them itself moves to the same
+  versions. No binary change. Two source edges: a `when` over `JourneyOrderStrategy` used as an
+  expression without `else` adds `FLOOR_THEN_GALLERY_ROUTED`, and `sdk::geofenceEvents` as a
+  function reference without an expected function type is ambiguous (call the function).
+- `sdk.geofenceEvents(replayingEntered = true)` on the host app's SDK sends an enter event for every
+  geofence the visitor is in when the flow opens. See "Events of ProximiMapView". The library's own
+  flows stay on `geofenceEvents()`.
+- **Visible:** `GadSettings.cameraBounds` (`GadCameraBounds`, default the PM's box around the museum):
+  the screen stays inside the box on the journey map, the museum map and the Explore Museum map. The
+  map stops zooming out where the box covers the view. `null` keeps the map unlimited, as before.
+  Android only: during a pinch the edge is one frame behind, and the camera is put right when it comes
+  to rest (MapLibre on Android limits only the centre; the map library computes the limit itself).
+- **Visible:** `GadSettings.ordersGalleriesByWalkingTime` (default `true`): the first gallery on a
+  floor and the gallery after a finished one are picked by routed walking time, not by straight-line
+  distance. `false` keeps the order of before. The time of a proposal on the GAD venue is not measured.
+- Map 6.0.0-beta.39: `ProximiioMap(session)` given a new session shows the new session's map. The
+  library already makes a new map for a new session, so nothing changes in it.
+
 #### Changed (iOS 1.37.0; PM, Monday "Translations / copy changes", 2026-11-10)
 
 - **Visible:** the skip panel reads "Leave this artwork out?", "I’ll remove it from your route.",
@@ -1203,12 +1233,6 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   `null` (the map library's limits); the host app sets them (the user, 2026-11-05).
 - iOS 1.35.0, Live Activity of killed runs: the journey notification has one id, so the journey of a
   new run replaces the notification a killed run left. No change.
-- iOS 1.37.0, on SDK 6.0.0-beta.70 and map 6.0.0-beta.62: `GADSettings.cameraBounds` (the PM's box
-  around the museum), `ordersGalleriesByWalkingTime` (`JourneyOrderStrategy.floorThenGalleryRouted`)
-  and the advice to open `geofenceEvents(replayingEntered: true)`. The Android map library
-  (6.0.0-beta.38) has no camera bounds and no routed gallery order yet, and the Android SDK
-  (6.0.0-beta.36) has no replayed geofence stream. They come in a later release once the Android map
-  and SDK have them.
 
 ### [1.33.1] — 2026-11-05
 

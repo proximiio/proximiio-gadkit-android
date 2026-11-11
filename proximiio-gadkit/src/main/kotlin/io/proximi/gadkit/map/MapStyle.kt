@@ -13,7 +13,9 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.content.Context
 import io.proximi.map.core.JourneyStopMarkerStyle
+import io.proximi.map.core.MapBoundingBox
 import io.proximi.map.core.MapColor
+import io.proximi.map.core.MapCoordinate
 import io.proximi.map.core.PositionAccuracyStyle
 import io.proximi.map.core.PositionFreshnessRules
 import io.proximi.map.core.PositionHeadingStyle
@@ -206,6 +208,10 @@ internal object MapStyle {
             // rotation is too fast; map 6.0.0-beta.32).
             bearingSettlingTime = settings.bearingSettlingTime.inWholeMilliseconds / 1000.0,
             bearingDeadband = settings.bearingDeadband,
+            // The screen stays inside the box (map 6.0.0-beta.39).
+            cameraBounds = settings.cameraBounds?.let {
+                MapBoundingBox(southWest = MapCoordinate(it.south, it.west), northEast = MapCoordinate(it.north, it.east))
+            },
         )
     }
 
