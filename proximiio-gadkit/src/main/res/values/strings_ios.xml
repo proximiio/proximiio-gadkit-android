@@ -146,6 +146,7 @@
     <string name="start_the_journey">Start the Journey</string>
     <string name="stop_n_of_n">Stop %1$d of %2$d</string>
     <string name="swipe_left_to_skip_an_artwork">Swipe left to skip an artwork</string>
+    <string name="swipe_right_to_skip_an_artwork">Swipe right to skip an artwork</string>
     <string name="take_the_x_to_level_n">Take the %1$s to level %2$d</string>
     <string name="take_your_time_leaving_here_s_what">Take your time leaving - here\'s what\'s next</string>
     <string name="thank_you_for_visiting_guggenheim_abu_dhabi">Thank you for visiting Guggenheim Abu Dhabi.</string>

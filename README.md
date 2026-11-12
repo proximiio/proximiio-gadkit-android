@@ -1193,6 +1193,16 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 - Map 6.0.0-beta.39: `ProximiioMap(session)` given a new session shows the new session's map. The
   library already makes a new map for a new session, so nothing changes in it.
 
+#### Fixed (iOS 1.37.1; PM, Monday "Skipping in Arabic goes the wrong way" and "When all artworks skipped, remove 'skip artwork' text", 2026-11-11)
+
+- **Visible:** in a right-to-left layout a quick swipe to the right reveals the skip action. Before,
+  the velocity of the swipe counted in the wrong direction, so a quick swipe closed the panel; a slow
+  drag worked. The row already slid right with the action at the left.
+- **Visible:** the hint under the journey list reads "Swipe right to skip an artwork" in a
+  right-to-left layout, in Arabic "إسحب لليمين لتخطي العمل الفني" (the PM's text), new string resource
+  `swipe_right_to_skip_an_artwork`. The hint shows only while the list has a stop that can be skipped:
+  with every artwork skipped or visited it is hidden.
+
 #### Changed (Android only; the user, 2026-11-11)
 
 - **Visible**, `ProximiMap` only: when the journey opens and when a paused journey resumes, `ProximiMap`

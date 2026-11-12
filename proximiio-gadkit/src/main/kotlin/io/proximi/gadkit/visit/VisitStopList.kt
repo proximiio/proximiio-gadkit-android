@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.animation.core.Animatable
@@ -116,7 +117,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                     SwipeToSkipRow(
                         isRevealed = revealedStopId == stop.id,
                         onRevealChange = { revealedStopId = if (it) stop.id else null },
-                        isEnabled = allowsSkip && (stop.state == StopState.PENDING || stop.state == StopState.ACTIVE),
+                        isEnabled = allowsSkip && SkipSwipe.canSkip(stop),
                         onSkip = {
                             revealedStopId = null
                             model.requestSkip(stop)
@@ -127,10 +128,12 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                 }
             }
         }
-        if (allowsSkip) {
+        // No hint without a stop to skip: every artwork skipped or visited (PM, Monday "When all
+        // artworks skipped, remove 'skip artwork' text"; iOS 1.37.1).
+        if (allowsSkip && VisitPlan.artworks(journey).any(SkipSwipe::canSkip)) {
             item(key = "hint") {
                 Text(
-                    stringResource(R.string.swipe_left_to_skip_an_artwork),
+                    stringResource(SkipSwipe.hint(isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl)),
                     Modifier.padding(top = 10.dp),
                     style = GadTextStyle.BodyExtraSmall.textStyle,
                     color = Palette.ink,
@@ -261,7 +264,8 @@ private fun SwipeToSkipRow(
         }
         Box(
             Modifier
-                .offset { IntOffset(rubberBand(offset.value, revealWidth).roundToInt(), 0) }
+                // `offset {}` follows the layout direction: a negative x is towards the start edge.
+                .offset { IntOffset(SkipSwipe.rubberBand(offset.value, revealWidth).roundToInt(), 0) }
                 .then(
                     if (isEnabled) {
                         Modifier.draggable(
@@ -269,9 +273,11 @@ private fun SwipeToSkipRow(
                             orientation = Orientation.Horizontal,
                             reverseDirection = isRtl,
                             onDragStopped = { velocity ->
-                                val logicalVelocity = if (isRtl) -velocity else velocity
-                                val projected = offset.value + logicalVelocity * 0.1f
-                                val reveal = projected < -revealWidth / 2
+                                // `draggable` reverses the velocity with `reverseDirection` too: it is
+                                // already logical. Reversing it again made a quick swipe to the right
+                                // close the panel in Arabic (PM, Monday "Skipping in Arabic goes the
+                                // wrong way").
+                                val reveal = SkipSwipe.reveals(offset.value, velocity, revealWidth)
                                 if (reveal == isRevealed) offset.animateTo(if (reveal) -revealWidth else 0f, tween(250))
                                 onRevealChange(reveal)
                             },
@@ -285,11 +291,28 @@ private fun SwipeToSkipRow(
     }
 }
 
-/** Damped drag past the open position and past the closed position. */
-private fun rubberBand(raw: Float, revealWidth: Float): Float = when {
-    raw > 0 -> raw * 0.2f
-    raw < -revealWidth -> -revealWidth + (raw + revealWidth) * 0.3f
-    else -> raw
+/**
+ * The swipe that reveals the skip action of a row, as iOS `SkipSwipe`. Offsets and velocities are
+ * logical: negative is towards the start edge, which is left in a left-to-right layout and right in a
+ * right-to-left one. Pure; covered by tests.
+ */
+internal object SkipSwipe {
+    /** Only a stop still ahead can be skipped. */
+    fun canSkip(stop: JourneyStop): Boolean = stop.state == StopState.PENDING || stop.state == StopState.ACTIVE
+
+    /** The hint under the list: the row slides towards the start edge, right in a right-to-left layout. */
+    @StringRes
+    fun hint(isRtl: Boolean): Int = if (isRtl) R.string.swipe_right_to_skip_an_artwork else R.string.swipe_left_to_skip_an_artwork
+
+    /** True when a drag that stops at [offset] with [velocity] (px/s) leaves the skip panel revealed. */
+    fun reveals(offset: Float, velocity: Float, revealWidth: Float): Boolean = offset + velocity * 0.1f < -revealWidth / 2
+
+    /** Damped drag past the open position and past the closed position. */
+    fun rubberBand(raw: Float, revealWidth: Float): Float = when {
+        raw > 0 -> raw * 0.2f
+        raw < -revealWidth -> -revealWidth + (raw + revealWidth) * 0.3f
+        else -> raw
+    }
 }
 
 private val REVEAL_WIDTH = 72.dp
