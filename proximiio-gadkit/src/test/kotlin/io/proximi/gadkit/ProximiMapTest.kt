@@ -110,7 +110,7 @@ class ProximiMapTest {
 
     /**
      * The geofence events start again with the geofences the visitor is in when the journey opens and
-     * when a paused journey resumes (the user, 2026-11-11; SDK 6.0.0-beta.37). Android only.
+     * when a paused journey resumes (the user, 2026-11-11; SDK 6.0.0-beta.37; iOS 1.38.0).
      */
     @Test
     fun theJourneyStartAndAResumeReplayTheEnteredGeofences() {

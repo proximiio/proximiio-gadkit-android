@@ -313,7 +313,7 @@ public class ProximiMap(
      * flow serves both. With [replayingEntered] a new flow replaces the earlier one and starts with an
      * enter event for every geofence the visitor is in (SDK 6.0.0-beta.37): when the journey opens and
      * when a paused journey resumes ([replaysEnteredGeofences]), so a visitor who is already inside
-     * gets the event and the notification (the user, 2026-11-11). Android only; `ProximiMapView` keeps
+     * gets the event and the notification (the user, 2026-11-11; iOS 1.38.0). `ProximiMapView` keeps
      * the host app's flows.
      */
     private fun followGeofences(venue: VenueService, replayingEntered: Boolean) {

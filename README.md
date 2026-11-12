@@ -820,7 +820,7 @@ lists:
 | `ArrivedAtMuseum` | `isAtMuseum` became `true`. Once per `ProximiMap`. |
 | `WristbandChanged(status)` | The wristband session changed. |
 | `TrackingChanged(health)` | During a journey: the wristband's positions stopped (`LOST_PLACE` after `trackingLostAfter`, `STOPPED_RESPONDING` after `trackingStoppedAfter`), came back (`TRACKING`), or the visitor is in a privacy zone (`PRIVACY_ZONE`, never lost there). |
-| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. The exit comes `geofenceExitDelay` (5 s) after the visitor leaves. When the journey opens and when a paused journey resumes, `GeofenceEntered` comes again for every geofence the visitor is in, with its notification (Android only). |
+| `GeofenceEntered(geofence)`, `GeofenceExited(geofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkId`. The exit comes `geofenceExitDelay` (5 s) after the visitor leaves. When the journey opens and when a paused journey resumes, `GeofenceEntered` comes again for every geofence the visitor is in, with its notification (iOS 1.38.0). |
 | `JourneyChanged(journey)` | A new, planned, edited or deleted (`null`) journey, and the progress after the journey screen closed. |
 | `NextStop(stop)` | The route leads to this stop now. |
 | `StopNearby(stop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The library posts no notification for it. |
@@ -1203,7 +1203,7 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   `swipe_right_to_skip_an_artwork`. The hint shows only while the list has a stop that can be skipped:
   with every artwork skipped or visited it is hidden.
 
-#### Changed (Android only; the user, 2026-11-11)
+#### Changed (iOS 1.38.0, without its SDK and Map; the user, 2026-11-11)
 
 - **Visible**, `ProximiMap` only: when the journey opens and when a paused journey resumes, `ProximiMap`
   follows the geofence events again with `geofenceEvents(replayingEntered = true)`. A visitor who is
@@ -1251,6 +1251,9 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   `null` (the map library's limits); the host app sets them (the user, 2026-11-05).
 - iOS 1.35.0, Live Activity of killed runs: the journey notification has one id, so the journey of a
   new run replaces the notification a killed run left. No change.
+- iOS 1.38.0, SDK 6.0.0-beta.71 and Map 6.0.0-beta.63: position barriers (a position that jumps through
+  a wall stops at the wall). The Android SDK has no barriers yet; they come with the Android SDK release
+  that has them. The GAD venue had no barrier features on 2026-11-11.
 
 ### [1.33.1] — 2026-11-05
 
