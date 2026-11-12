@@ -9,6 +9,7 @@ import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.visit.StopNearbyDetector
 import io.proximi.map.core.JourneyOrderStrategy
 import io.proximi.map.core.PositionSmoothing
+import io.proximi.sdk.core.model.BarrierConfiguration
 import io.proximi.gadkit.wristband.TrackingHealth
 import java.time.Instant
 import kotlin.test.Test
@@ -47,6 +48,21 @@ class GadSettingsTest {
         assertEquals(null, GadSettings.STANDARD.maximumZoom)
         assertEquals(GadCameraBounds.GUGGENHEIM_ABU_DHABI, GadSettings.STANDARD.cameraBounds)
         assertTrue(GadSettings.STANDARD.ordersGalleriesByWalkingTime)
+        // The position about 1 s after a privacy zone (PM, Monday "Takes quite a long time to get position after a privacy zone").
+        assertEquals(1.seconds, GadSettings.STANDARD.privacyZoneExitDelay)
+    }
+
+    /** Port of iOS `GADSettingsTests` (1.39.0): the SDK's barrier defaults. */
+    @Test
+    fun thePositionBarriersAreTheSDKDefaults() {
+        val barriers = GadSettings.STANDARD.positionBarriers
+        assertEquals(BarrierConfiguration(), barriers)
+        assertTrue(barriers.isEnabled)
+        assertEquals(10, barriers.armingPositions)
+        assertEquals(2.0, barriers.maxWalkingSpeed)
+        assertEquals(0.4, barriers.wallMargin)
+        assertEquals(10, barriers.releasePositions)
+        assertEquals(5.0, barriers.releaseMinimumDuration)
     }
 
     @Test

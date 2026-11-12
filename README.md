@@ -312,8 +312,8 @@ The host app:
 - creates and starts the SDK and attaches the wristband's position provider. The view does not
   start, stop or configure the SDK and does not change the wristband session;
 - uses the SDK and Map versions this library depends on (see "Adding the library");
-- turns on the SDK's privacy-zone option and passes the wristband's privacy signal to the SDK (see
-  "Privacy zones");
+- turns on the SDK's privacy-zone option, sets its privacy zone exit delay and passes the wristband's
+  privacy signal to the SDK (see "Privacy zones");
 - lays the view out and closes it; draws the background and the bottom bar (for example the audio
   guide's controls);
 - stores the journey and moves it on. The view stores nothing but the accessible routes button.
@@ -724,13 +724,18 @@ prayer room. These rooms have no positioning anchors, so the wristband falls sil
   off-route, re-route or arrival.
 - The journey screen reports `TrackingChanged(PRIVACY_ZONE)` and no `LOST_PLACE` or
   `STOPPED_RESPONDING` while private.
+- The SDK reports the exit of a privacy zone `ProximiioConfiguration.privacyZoneExitDelay` after the
+  visitor left it (SDK 6.0.0-beta.38), and the first position after the zone comes then. Without it
+  the zone waits for `geofenceExitDelay`, 5 s in `ProximiMap`. `ProximiMap` sets it from
+  `GadSettings.privacyZoneExitDelay`, 1 s.
 
-`ProximiMap` turns the option on and passes the binding's signal to its SDK. A host app with
-`ProximiMapView` does both on its own SDK:
+`ProximiMap` turns the option on, sets the exit delay and passes the binding's signal to its SDK. A
+host app with `ProximiMapView` does the same on its own SDK:
 
 ```kotlin
 val configuration = ProximiioConfiguration.relayOnly(token = token).copy(
     withholdsPositionsInPrivacyZones = true,
+    privacyZoneExitDelay = 1.0,
 )
 
 // In a coroutine that follows the wristband binding's states:
@@ -879,7 +884,9 @@ val configuration = GadConfiguration(
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `null`: at any distance. The remaining distance and the instructions follow every position. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
-| `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence or privacy zone before the SDK reports the exit. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
+| `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence before the SDK reports the exit; a privacy zone uses `privacyZoneExitDelay` when it is set. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
+| `privacyZoneExitDelay` | 1 s | Time the position stays outside an entered privacy zone before the SDK reports its exit. The first position after the zone comes then. `null`: `geofenceExitDelay`. `ProximiMap` sets it; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.privacyZoneExitDelay` (SDK default `null`). |
+| `positionBarriers` | the SDK's `BarrierConfiguration()` | How walls drawn as barrier features stop a position that jumps through them: on, 10 positions on a floor before any is stopped, 2 m/s walking speed, 0.4 m from the wall, the newest position accepted again after 10 stopped positions over 5 s. No effect in a venue without barriers. `ProximiMap` sets it; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.positioning.barriers` (the same defaults). |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.StopNearby`. |
 | `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.GalleryNearby`, from the gallery's POI. |
 | `mapTopFadeHeight`, `mapBottomFadeHeight` | 110 dp, 170 dp | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
@@ -1147,7 +1154,36 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.37.1.
+#### Changed (SDK 6.0.0-beta.38; iOS 1.38.0)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.38` (was `6.0.0-beta.37`). A host app that
+  declares it itself moves to the same version. No source or binary change: the SDK's API only gains
+  members. Map stays `6.0.0-beta.39`.
+- **Visible:** in a venue with barrier features (a line or a polygon with `metadata.type` `"barrier"`
+  on a level), a position that jumps through a wall stops 0.4 m short of the wall, on the visitor's
+  side. The dot, the follow, the arrival and the geofence events use the stopped point, so a geofence
+  behind a wall is entered later, or not at all. After 10 stopped positions over at least 5 s the next
+  position is accepted, so a door missing from the map holds the visitor for about 5 s. A venue without
+  barriers behaves as before; the GAD venue had none on 2026-11-11. The SDK reads the barriers with the
+  route network, which both `ProximiMap` and `ProximiMapView` install. The SDK turns the barriers on by
+  default, so this holds for the host app's SDK under `ProximiMapView` too. To turn them off there:
+  `positioning = ProximiioConfiguration.defaultPositioning.copy(barriers = BarrierConfiguration(isEnabled = false))`.
+
+#### Added (iOS 1.39.0)
+
+- `GadSettings.positionBarriers` (`BarrierConfiguration`, the SDK's defaults): how barrier features
+  stop a position that jumps through a wall. `ProximiMap` passes it to
+  `ProximiioConfiguration.positioning.barriers`. `ProximiMapView` uses the host app's SDK
+  configuration. A new setting with a default: the host app changes nothing.
+
+#### Added (SDK 6.0.0-beta.38; PM, Monday "Takes quite a long time to get position after a privacy zone", 2026-11-11; not in iOS yet)
+
+- **Visible:** `GadSettings.privacyZoneExitDelay` (1 s). `ProximiMap` passes it to
+  `ProximiioConfiguration.privacyZoneExitDelay`: the position comes back about 1 s after the visitor
+  leaves a privacy zone. Before, it took 5 s (`geofenceExitDelay`). Artwork geofences still exit after
+  5 s. `null` keeps the 5 s. `ProximiMapView` uses the host app's SDK configuration: a host app that
+  wants the same sets `privacyZoneExitDelay = 1.0` (see "Privacy zones"). The iOS package takes the
+  same setting with iOS SDK 6.0.0-beta.72.
 
 ### [1.37.1] — 2026-11-12
 

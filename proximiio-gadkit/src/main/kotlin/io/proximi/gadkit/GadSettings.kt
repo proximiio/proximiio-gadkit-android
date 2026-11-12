@@ -2,6 +2,7 @@ package io.proximi.gadkit
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.proximi.sdk.core.model.BarrierConfiguration
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -62,6 +63,27 @@ public data class GadSettings(
      * has its own value. 0 reports the exit at the first position outside.
      */
     val geofenceExitDelay: Duration = 5.seconds,
+    /**
+     * Time the position stays outside an entered privacy zone before the SDK reports its exit
+     * (`ProximiioConfiguration.privacyZoneExitDelay`, SDK 6.0.0-beta.38). The first position after the
+     * zone comes this long after the visitor leaves it. Other geofences keep [geofenceExitDelay].
+     * `null`: privacy zones wait for [geofenceExitDelay] too. [ProximiMap] sets it when it starts the
+     * SDK; [ProximiMapView] runs on the host app's SDK (PM, Monday "Takes quite a long time to get
+     * position after a privacy zone", 2026-11-11).
+     */
+    val privacyZoneExitDelay: Duration? = 1.seconds,
+
+    // Position barriers
+
+    /**
+     * How walls drawn as barrier features stop a position that jumps through them
+     * (`ProximiioConfiguration.positioning.barriers`, SDK 6.0.0-beta.38). The default is the SDK's:
+     * on, 10 positions on a floor before any is stopped, 2 m/s walking speed, 0.4 m from the wall, and
+     * the newest position accepted again after 10 stopped positions over 5 s. No effect in a venue
+     * without barrier features. [ProximiMap] sets it when it starts the SDK; [ProximiMapView] runs on
+     * the host app's SDK. iOS `positionBarriers`.
+     */
+    val positionBarriers: BarrierConfiguration = BarrierConfiguration(),
 
     // Notifications
 

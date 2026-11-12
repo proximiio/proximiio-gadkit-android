@@ -209,8 +209,10 @@ internal class VenueService private constructor(
             )
 
         /** [configuration] with the foreground service's [serviceOptions]. Pure; covered by tests. */
-        internal fun configuration(configuration: GadConfiguration, serviceOptions: ProximiioServiceOptions): ProximiioConfiguration =
-            ProximiioConfiguration.relayOnly(token = configuration.applicationToken, serviceOptions = serviceOptions).copy(
+        internal fun configuration(configuration: GadConfiguration, serviceOptions: ProximiioServiceOptions): ProximiioConfiguration {
+            val relayOnly = ProximiioConfiguration.relayOnly(token = configuration.applicationToken, serviceOptions = serviceOptions)
+            val settings = configuration.settings
+            return relayOnly.copy(
                 apiBaseURL = URI(configuration.apiBaseUrl),
                 // No fallback hosts: a production build must not fall back to *.proximi.fi.
                 fallbackAPIBaseURLs = emptyList(),
@@ -222,12 +224,16 @@ internal class VenueService private constructor(
                 // on in every build. It is the SDK default since 6.0.0-beta.24; it is set here so a
                 // later default does not turn it off.
                 visitorReportingEnabled = true,
-                geofenceExitDelay = configuration.settings.geofenceExitDelay.toDouble(DurationUnit.SECONDS),
+                // The relay-only positioning with the settings' position barriers (SDK 6.0.0-beta.38).
+                positioning = relayOnly.positioning.copy(barriers = settings.positionBarriers),
+                geofenceExitDelay = settings.geofenceExitDelay.toDouble(DurationUnit.SECONDS),
                 // In a privacy zone `positions()` emits no fix and positioning counts as available, so
                 // the map holds a grey dot at the last fix before the zone (SDK 6.0.0-beta.31). The
                 // relay's `private` reaches the SDK through `WristbandSession.forwardPrivacy`.
                 withholdsPositionsInPrivacyZones = true,
+                privacyZoneExitDelay = settings.privacyZoneExitDelay?.toDouble(DurationUnit.SECONDS),
             )
+        }
 
         /**
          * Authenticates, starts positioning and installs the route network. Before the API has

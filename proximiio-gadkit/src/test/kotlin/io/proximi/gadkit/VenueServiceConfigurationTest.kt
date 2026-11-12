@@ -1,10 +1,12 @@
 package io.proximi.gadkit
 
+import io.proximi.sdk.core.model.BarrierConfiguration
 import io.proximi.sdk.service.ProximiioServiceOptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
@@ -37,6 +39,26 @@ class VenueServiceConfigurationTest {
     @Test
     fun theSDKWithholdsPositionsInAPrivacyZone() {
         assertTrue(VenueService.configuration(backend, ProximiioServiceOptions()).withholdsPositionsInPrivacyZones)
+    }
+
+    @Test
+    fun aPrivacyZoneExitComesAfterItsOwnDelay() {
+        assertEquals(1.0, VenueService.configuration(backend, ProximiioServiceOptions()).privacyZoneExitDelay)
+        val geofenceDelay = backend.copy(settings = GadSettings(privacyZoneExitDelay = null))
+        assertNull(VenueService.configuration(geofenceDelay, ProximiioServiceOptions()).privacyZoneExitDelay)
+    }
+
+    /** Port of iOS `GADSettingsTests` (1.39.0): the settings' barriers reach the SDK. */
+    @Test
+    fun thePositionBarriersOfTheSettingsReachTheSDK() {
+        val standard = VenueService.configuration(backend, ProximiioServiceOptions())
+        assertEquals(BarrierConfiguration(), standard.positioning.barriers)
+        assertTrue(standard.positioning.barriers.isEnabled)
+        // The relay-only positioning stays: no beacon scanning on the phone.
+        assertFalse(standard.positioning.iBeaconScanningEnabled)
+        val barriers = BarrierConfiguration(isEnabled = false, maxWalkingSpeed = 3.0, wallMargin = 0.2)
+        val changed = backend.copy(settings = GadSettings(positionBarriers = barriers))
+        assertEquals(barriers, VenueService.configuration(changed, ProximiioServiceOptions()).positioning.barriers)
     }
 
     @Test
