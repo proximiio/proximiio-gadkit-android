@@ -2,8 +2,8 @@
 
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
-Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.33.1 uses SDK
-6.0.0-beta.36 and Map 6.0.0-beta.38.
+Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.37.1 uses SDK
+6.0.0-beta.37 and Map 6.0.0-beta.39.
 
 Each change has a mark:
 
@@ -79,7 +79,7 @@ built again: both have a new trailing parameter.
 | Map 6.0.0-beta.37 | The venue's features are encoded once per app process, as soon as the session has them, so a map opened again draws sooner; a few MB stay in memory after the map closes. New and off by default: `JourneyNavigator.markReached(stopId)`, `upcomingStop`, `drawsNextLegWhileReached`, `RouteFollowRules.progressCorridorMeters`. | | Info |
 | SDK 6.0.0-beta.37 | New overload `geofenceEvents(replayingEntered: Boolean)`. `geofenceEvents()` is unchanged. `sdk::geofenceEvents` as a function reference without an expected function type is ambiguous. | Call the function: `sdk.geofenceEvents()`. | **Required** with a bare reference |
 | Map 6.0.0-beta.39 | New constant `JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED`. | A `when` over `JourneyOrderStrategy` used as an expression without `else` does not compile. Add the branch. | **Required** with such a `when` |
-| Map 6.0.0-beta.39 | `MapOptions.cameraBounds` (default `null`) keeps the screen inside a box. ProximiioGADKit for Android 1.37.0 sets it from `GadSettings.cameraBounds`. `ProximiioMap(session)` given a new session shows the new session's map. | | Info |
+| Map 6.0.0-beta.39 | `MapOptions.cameraBounds` (default `null`) keeps the screen inside a box. ProximiioGADKit for Android 1.37.1 sets it from `GadSettings.cameraBounds`. `ProximiioMap(session)` given a new session shows the new session's map. | | Info |
 
 ### Added
 
@@ -144,8 +144,8 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK 6.0.0-beta.37 and later and Map 6.0.0-beta.39 and later are not used by ProximiioGADKit for
-Android 1.33.1. A host app that declares them gets them instead of the versions above.
+SDK versions after 6.0.0-beta.37 and Map versions after 6.0.0-beta.39 are not used by ProximiioGADKit
+for Android 1.37.1. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -165,9 +165,9 @@ Android 1.33.1. A host app that declares them gets them instead of the versions 
 ### Step 1: Dependencies (Required)
 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
-  depend on `io.proximi.gadkit:proximiio-gadkit:1.33.1` (README "Adding the library"). No git
+  depend on `io.proximi.gadkit:proximiio-gadkit:1.37.1` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.36` and Map `6.0.0-beta.38` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.37` and Map `6.0.0-beta.39` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.

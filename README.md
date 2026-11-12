@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.33.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.37.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.33.1
+git -C gadkit checkout 1.37.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.36` and Map `6.0.0-beta.38` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.37` and Map `6.0.0-beta.39` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -1113,7 +1113,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.68 and Map 6.0.0-beta.61 | SDK 6.0.0-beta.36 and Map 6.0.0-beta.38 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.70 and Map 6.0.0-beta.62 | SDK 6.0.0-beta.37 and Map 6.0.0-beta.39 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1146,6 +1146,20 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+No changes since 1.37.1.
+
+### [1.37.1] — 2026-11-12
+
+The behaviour of the iOS package 1.37.1, which includes 1.35.0 to 1.37.0, on SDK 6.0.0-beta.37 and Map
+6.0.0-beta.39, with the `ProximiMap` replay of the entered geofences of iOS 1.38.0. There is no Android
+1.35.x, 1.36.0 or 1.37.0. The position barriers of iOS 1.38.0 come with the Android SDK release that has
+them; the zoom range of iOS 1.34.0 is not taken (see "Not taken from iOS").
+
+Breaking for the host app: SDK 6.0.0-beta.37 and Map 6.0.0-beta.39, the new case
+`ProximiMapEvent.GalleryNearby`, four renamed string resources, and two source edges of the SDK and the
+Map (a `when` over `JourneyOrderStrategy` without `else`, `sdk::geofenceEvents` as a function reference).
+The entries below and MIGRATION.md say what to change.
 
 #### Added (iOS 1.35.0)
 
