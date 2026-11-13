@@ -1176,14 +1176,14 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   `ProximiioConfiguration.positioning.barriers`. `ProximiMapView` uses the host app's SDK
   configuration. A new setting with a default: the host app changes nothing.
 
-#### Added (SDK 6.0.0-beta.38; PM, Monday "Takes quite a long time to get position after a privacy zone", 2026-11-11; not in iOS yet)
+#### Added (SDK 6.0.0-beta.38; iOS 1.40.0; PM, Monday "Takes quite a long time to get position after a privacy zone", 2026-11-11)
 
 - **Visible:** `GadSettings.privacyZoneExitDelay` (1 s). `ProximiMap` passes it to
   `ProximiioConfiguration.privacyZoneExitDelay`: the position comes back about 1 s after the visitor
   leaves a privacy zone. Before, it took 5 s (`geofenceExitDelay`). Artwork geofences still exit after
   5 s. `null` keeps the 5 s. `ProximiMapView` uses the host app's SDK configuration: a host app that
-  wants the same sets `privacyZoneExitDelay = 1.0` (see "Privacy zones"). The iOS package takes the
-  same setting with iOS SDK 6.0.0-beta.72.
+  wants the same sets `privacyZoneExitDelay = 1.0` (see "Privacy zones"). The iOS package has the
+  same setting since 1.40.0, on iOS SDK 6.0.0-beta.73.
 
 ### [1.37.1] — 2026-11-12
 
