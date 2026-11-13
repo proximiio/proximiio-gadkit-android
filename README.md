@@ -1158,7 +1158,7 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 - **BREAKING:** the library depends on SDK `6.0.0-beta.38` (was `6.0.0-beta.37`). A host app that
   declares it itself moves to the same version. No source or binary change: the SDK's API only gains
-  members. Map stays `6.0.0-beta.39`.
+  members.
 - **Visible:** in a venue with barrier features (a line or a polygon with `metadata.type` `"barrier"`
   on a level), a position that jumps through a wall stops 0.4 m short of the wall, on the visitor's
   side. The dot, the follow, the arrival and the geofence events use the stopped point, so a geofence
@@ -1168,6 +1168,12 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   route network, which both `ProximiMap` and `ProximiMapView` install. The SDK turns the barriers on by
   default, so this holds for the host app's SDK under `ProximiMapView` too. To turn them off there:
   `positioning = configuration.positioning.copy(barriers = BarrierConfiguration(isEnabled = false))` in `configuration.copy(…)`, which keeps the other positioning sources of the configuration.
+
+#### Changed (Map 6.0.0-beta.40)
+
+- **BREAKING:** the library depends on Map `6.0.0-beta.40` (was `6.0.0-beta.39`). A host app that
+  declares it itself moves to the same version. The Map changes only its SDK pin, to `6.0.0-beta.38`:
+  no source, binary or behaviour change.
 
 #### Added (iOS 1.39.0)
 
