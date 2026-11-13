@@ -1167,7 +1167,7 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   barriers behaves as before; the GAD venue had none on 2026-11-11. The SDK reads the barriers with the
   route network, which both `ProximiMap` and `ProximiMapView` install. The SDK turns the barriers on by
   default, so this holds for the host app's SDK under `ProximiMapView` too. To turn them off there:
-  `positioning = ProximiioConfiguration.defaultPositioning.copy(barriers = BarrierConfiguration(isEnabled = false))`.
+  `positioning = configuration.positioning.copy(barriers = BarrierConfiguration(isEnabled = false))` in `configuration.copy(…)`, which keeps the other positioning sources of the configuration.
 
 #### Added (iOS 1.39.0)
 
