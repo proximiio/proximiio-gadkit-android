@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.37.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.40.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.37.1
+git -C gadkit checkout 1.40.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.37` and Map `6.0.0-beta.39` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.38` and Map `6.0.0-beta.40` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -1120,7 +1120,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.70 and Map 6.0.0-beta.62 | SDK 6.0.0-beta.37 and Map 6.0.0-beta.39 | The same SDK and Map changes on both platforms. The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.73 and Map 6.0.0-beta.64 | SDK 6.0.0-beta.38 and Map 6.0.0-beta.40 | The same SDK and Map changes on both platforms, except the network changes of iOS SDK 6.0.0-beta.73 (see 1.40.0). The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1153,6 +1153,19 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+No changes since 1.40.0.
+
+### [1.40.0] — 2026-11-13
+
+The behaviour of the iOS package 1.40.0, which includes 1.38.0 and 1.39.0, on SDK 6.0.0-beta.38 and Map
+6.0.0-beta.40. There is no Android 1.38.0 or 1.39.0; the `ProximiMap` replay of iOS 1.38.0 is in 1.37.1.
+The network changes of iOS SDK 6.0.0-beta.73 and the zoom range of iOS 1.34.0 are not taken (see "Not
+taken from iOS").
+
+Breaking for the host app: SDK 6.0.0-beta.38 and Map 6.0.0-beta.40, with no source or binary change.
+The position barriers are on by default in the host app's SDK too, and `privacyZoneExitDelay = 1.0` gives
+it the behaviour of the Proximi GAD app. The entries below and MIGRATION.md say how.
 
 #### Changed (SDK 6.0.0-beta.38; iOS 1.38.0)
 
@@ -1190,6 +1203,14 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   5 s. `null` keeps the 5 s. `ProximiMapView` uses the host app's SDK configuration: a host app that
   wants the same sets `privacyZoneExitDelay = 1.0` (see "Privacy zones"). The iOS package has the
   same setting since 1.40.0, on iOS SDK 6.0.0-beta.73.
+
+#### Not taken from iOS
+
+- iOS 1.40.0 moves to iOS SDK 6.0.0-beta.73, which changes how often the SDK calls the server: the
+  venue data package about once an hour (it was every 5 minutes), waits between failed uploads (60 s,
+  doubling up to 30 min), and the relay's polling fallback every 5 s (it was 1 s). Android SDK
+  6.0.0-beta.38 does not have these changes.
+- The zoom range of iOS 1.34.0, as in 1.37.1.
 
 ### [1.37.1] — 2026-11-12
 

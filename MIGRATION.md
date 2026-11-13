@@ -2,8 +2,8 @@
 
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
-Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.37.1 uses SDK
-6.0.0-beta.37 and Map 6.0.0-beta.39.
+Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.40.0 uses SDK
+6.0.0-beta.38 and Map 6.0.0-beta.40.
 
 Each change has a mark:
 
@@ -147,8 +147,8 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK versions after 6.0.0-beta.37 and Map versions after 6.0.0-beta.39 are not used by ProximiioGADKit
-for Android 1.37.1. A host app that declares them gets them instead of the versions above.
+SDK versions after 6.0.0-beta.38 and Map versions after 6.0.0-beta.40 are not used by ProximiioGADKit
+for Android 1.40.0. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -168,9 +168,9 @@ for Android 1.37.1. A host app that declares them gets them instead of the versi
 ### Step 1: Dependencies (Required)
 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
-  depend on `io.proximi.gadkit:proximiio-gadkit:1.37.1` (README "Adding the library"). No git
+  depend on `io.proximi.gadkit:proximiio-gadkit:1.40.0` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.37` and Map `6.0.0-beta.39` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.38` and Map `6.0.0-beta.40` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - The library needs `minSdk` 26, `compileSdk` 37 and Kotlin 2.2.
