@@ -220,6 +220,20 @@ class ProximiMapTest {
         assertFalse(held.privacy.showsAccuracy)
     }
 
+    /** iOS `theDotWithoutPositionsIsGreyAndStays` (1.45.0): the opacity is a setting, and 0 hides the dot. */
+    @Test
+    fun theOpacityOfTheGreyDotIsASetting() {
+        assertEquals(0.45, GadSettings.STANDARD.positionWithoutFixesOpacity)
+        val freshness = MapStyle.options("en").position.freshness
+        assertEquals(0.45, freshness.staleOpacity)
+        assertEquals(0.45, freshness.lostOpacity)
+        assertEquals(0.0, freshness.driftMetersPerSecond)
+        val hidden = MapStyle.options("en", settings = GadSettings.STANDARD.copy(positionWithoutFixesOpacity = 0.0)).position
+        assertEquals(0.0, hidden.freshness.lostOpacity)
+        assertEquals(0.0, MapStyle.heldPosition(hidden).privacy.color?.alpha)
+        assertEquals(0.0, MapStyle.heldPosition(hidden).dot.shadowOpacity)
+    }
+
     @Test
     fun aDestinationMatchesTheFeatureIdOrItsPropertiesId() {
         val places = listOf(

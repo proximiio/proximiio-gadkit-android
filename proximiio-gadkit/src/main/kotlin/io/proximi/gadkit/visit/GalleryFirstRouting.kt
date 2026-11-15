@@ -31,13 +31,16 @@ import kotlin.math.roundToLong
  *
  * The navigator's legs come from this router (`JourneyRouting`). A leg that ends at its stop goes on
  * from the path to the stop ([routeToStopMaximumMeters], [RouteToStop]); a leg to a gallery ends on the
- * path. The walking times that order the journey come from the SDK's router unchanged. Thread-safe: the
+ * path. Every leg starts at its origin, the visitor's position, when the origin is near the path
+ * ([routeFromOriginMaximumMeters], [RouteToStop.extendedFrom], iOS 1.44.0). The walking times that order the journey come from the SDK's router unchanged. Thread-safe: the
  * navigator routes off the main thread.
  */
 internal class GalleryFirstRouting(
     private val inner: JourneyRouting,
     /** [GadSettings.routeToStopMaximumMeters]. */
     private val routeToStopMaximumMeters: Double = GadSettings.STANDARD.routeToStopMaximumMeters,
+    /** [GadSettings.routeFromOriginMaximumMeters]. */
+    private val routeFromOriginMaximumMeters: Double = GadSettings.STANDARD.routeFromOriginMaximumMeters,
 ) : JourneyRouting {
     data class State(
         val isEnabled: Boolean = false,
@@ -76,7 +79,7 @@ internal class GalleryFirstRouting(
     }
 
     override suspend fun route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey): ComputedRoute? =
-        inner.route(origin, originFloor, destination, destinationFloor)?.let { toStop(it, destination) }
+        inner.route(origin, originFloor, destination, destinationFloor)?.let { fromOrigin(toStop(it, destination), origin) }
 
     override suspend fun route(
         origin: MapCoordinate,
@@ -94,13 +97,18 @@ internal class GalleryFirstRouting(
                 FloorKey(gallery.gallery.level),
                 options,
             )
+            if (result is RouteResult.Route) return RouteResult.Route(fromOrigin(result.route, origin))
             if (result !is RouteResult.NoRoute) return result
             synchronized(lock) { state = state.copy(withoutRoute = state.withoutRoute + Key(destination)) }
             FieldLog.log("gallery first: no route to ${gallery.gallery.name} (${result.reason}) · route ends at the artwork")
         }
         val result = inner.route(origin, originFloor, destination, destinationFloor, options)
-        return if (result is RouteResult.Route) RouteResult.Route(toStop(result.route, destination)) else result
+        return if (result is RouteResult.Route) RouteResult.Route(fromOrigin(toStop(result.route, destination), origin)) else result
     }
+
+    /** [route] from [origin] on ([RouteToStop.extendedFrom]). */
+    private fun fromOrigin(route: ComputedRoute, origin: MapCoordinate): ComputedRoute =
+        RouteToStop.extendedFrom(route, ProximiioCoordinate(origin.latitude, origin.longitude), routeFromOriginMaximumMeters)
 
     /** [route] up to the stop at [destination] ([RouteToStop.extended]). */
     private fun toStop(route: ComputedRoute, destination: MapCoordinate): ComputedRoute =

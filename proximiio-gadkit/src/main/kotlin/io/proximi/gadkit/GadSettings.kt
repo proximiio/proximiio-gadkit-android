@@ -155,6 +155,15 @@ public data class GadSettings(
      * `routeToStopMaximumMeters`.
      */
     val routeToStopMaximumMeters: Double = 15.0,
+    /**
+     * A route starts where its origin projects onto the path network. The line starts at the origin,
+     * in a straight line to that point, when the origin is at most this many metres from it. The origin
+     * is the visitor's position when the route is computed; the segment does not move with later
+     * positions. The remaining distance and the walking time include it. 0: every route starts on the
+     * path (GAD PM, Monday "Routing Tongari-Kun -> Goroka man", 2026-11-15). iOS
+     * `routeFromOriginMaximumMeters` (1.44.0).
+     */
+    val routeFromOriginMaximumMeters: Double = 15.0,
 
     // Map
 
@@ -221,11 +230,18 @@ public data class GadSettings(
      */
     val groupsStopMarkers: Boolean = true,
     /**
+     * The opacity of the position dot without new positions and in a privacy zone, 0 to 1. The dot
+     * turns grey after the map library's stale time and stays at this opacity; its accuracy ring does
+     * not grow. 0 hides the dot (user, 2026-11-15). iOS `positionWithoutFixesOpacity` (1.45.0).
+     */
+    val positionWithoutFixesOpacity: Double = 0.45,
+    /**
      * `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork
      * in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads
-     * to a gallery. `false` shows nothing there, as before 1.43.0. iOS `showsStopDots`.
+     * to a gallery. `false`, the default since 1.44.0, shows nothing there (GAD PM, 2026-11-15: on
+     * hold). iOS `showsStopDots`.
      */
-    val showsStopDots: Boolean = true,
+    val showsStopDots: Boolean = false,
     /**
      * The time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`,
      * map default 0.9 s). Nagarro found the rotation too fast (2026-10-29). iOS `bearingSettlingTime`.

@@ -903,13 +903,15 @@ val configuration = GadConfiguration(
 | `offRouteMeters`, `offRouteAfter` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, also where a later leg passes, or off the route this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
+| `routeFromOriginMaximumMeters` | 15 m | A route starts where its origin projects onto the path network. The line starts at the origin, in a straight line to that point, when the origin is at most this far from it. The origin is the visitor's position when the route is computed; the segment does not move with later positions. 0: every route starts on the path. |
 | `followZoom`, `galleryFollowZoom` | 19.5, `null` | Zoom of "Centre on me" and of the follow, in personalised and curated journeys; in a gallery of a personalised journey, `galleryFollowZoom` (`null` for `followZoom`). |
 | `startZoom`, `startZoomDuration` | 17, 2 s | When the journey starts, on the first fix and when the position comes back, the journey map shows the visitor at `startZoom` for `startZoomDuration`, then follows them. `null` follows at once. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
 | `cameraBounds` | `GadCameraBounds.GUGGENHEIM_ABU_DHABI` | The box the screen stays inside on every map of the library, for gestures and for every camera move; `null` for no limit (`MapOptions.cameraBounds`, map 6.0.0-beta.39). The default is south-west 24.53557985, 54.39348543 and north-east 24.54644005, 54.40758853 (latitude, longitude). The map stops zooming out where the box covers the view; a `minimumZoom` below that zoom is not reached. During a pinch the edge is one frame behind and the camera is put right when it comes to rest. With the heading-up map a corner of the view can show past the box. |
 | `ordersGalleriesByWalkingTime` | `true` | `true` picks the first gallery on a floor and the gallery after a finished one by routed walking time (`JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED`, map 6.0.0-beta.39). `false` picks them by straight-line distance. Which floor comes next and the order inside a gallery use straight-line distance in both. A stop without a route uses the straight line. The first proposal asks the SDK for the walking time between every pair of stops; the time on the GAD venue is not measured. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker with a badge holding the number of the others (PM, Monday "Clustering", 2026-10-29). |
-| `showsStopDots` | `true` | A journey artwork without a numbered marker shows as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `false` shows nothing there. |
+| `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
+| `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
@@ -1165,16 +1167,26 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-#### Added (iOS 1.43.0; Nagarro and GAD PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing", 2026-11-15)
+#### Added (iOS 1.44.0; GAD PM, Monday "Routing Tongari-Kun -> Goroka man", 2026-11-15)
 
-- **Visible:** a journey artwork without a numbered marker shows as a 14 dp dot without a number, in the
-  colours of its state: white with a grey ring for an artwork still to visit, white with a red ring for a
-  visited one, red with a white ring for the active one, grey for a skipped one. This applies to an
-  artwork in a gallery the visitor is not in, to a skipped artwork, and to every artwork while the route
-  leads to a gallery. Before, the map showed nothing there. The dots are above the route and below the
-  level changers, the gallery names and the numbered markers, on the selected floor only. A detour and a
-  stop without a floor have no dot. Nothing to do in the host app.
-- `GadSettings.showsStopDots` (`true`): `false` shows no dots.
+- **Visible:** a route starts at its origin. The SDK's route starts where the origin projects onto the
+  path network, so a visitor who stood a few metres from the path saw a gap between the dot and the line.
+  The line now has a first straight segment from the origin to that point when the origin is at most
+  `GadSettings.routeFromOriginMaximumMeters` (15 m) from it. This applies to every journey leg, also a leg
+  to a gallery, and to the "Go here" routes of the journey map and the museum map. The origin is the
+  visitor's position when the route is computed; the segment does not move with later positions. The
+  remaining distance and the walking time include it. 0 turns it off. Nothing to do in the host app.
+
+#### Added (iOS 1.43.0 and 1.44.0; Nagarro and GAD PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing", 2026-11-15)
+
+- `GadSettings.showsStopDots` (`false`): `true` shows a journey artwork without a numbered marker as a
+  14 dp dot without a number, in the colours of its state: white with a grey ring for an artwork still to
+  visit, white with a red ring for a visited one, red with a white ring for the active one, grey for a
+  skipped one. This applies to an artwork in a gallery the visitor is not in, to a skipped artwork, and
+  to every artwork while the route leads to a gallery. The dots are above the route and below the level
+  changers, the gallery names and the numbered markers, on the selected floor only. A detour and a stop
+  without a floor have no dot. `true` in iOS 1.43.0; `false` since iOS 1.44.0, as the PM put the dots on
+  hold (2026-11-15). With the default the map does not change.
 
 #### Changed (iOS 1.43.0; GAD PM, Monday "Entry POIs, connected to gallery", 2026-11-15)
 
@@ -1253,7 +1265,7 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   sends a keep-alive every 15 s. The SDK also checks its connections to the relay every 15 s and closes
   one that does not answer (Android only). Nothing to do in the host app.
 
-#### Added (Android only)
+#### Added (iOS 1.45.0)
 
 - `ProximiMap.wristbandLabel` (`@ProximiGadAppApi`, for the Proximi GAD app only): the code of the
   connected wristband, as the visitor scanned or typed it, while `wristband` is `Connected`. The
@@ -1261,13 +1273,15 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   (`SharedPreferences` "io.proximi.gadkit.wristband"), until the session ends, so it survives a
   restart. Nothing to do in the host app.
 
-#### Changed (Android only)
+#### Changed (iOS 1.45.0; Nagarro and Annina, 2026-11-15)
 
-- **Visible:** without new positions the position dot stays where it was and turns grey, at the stale
-  opacity of the map library (0.45); it no longer disappears 13 s after the last position. The accuracy
-  ring does not grow while the dot is grey. In a privacy zone the dot is the same grey, at the last
-  position before the zone; it no longer disappears there either. Nothing to do in the host app. The
-  iOS package still hides the dot.
+- **Visible:** without new positions the position dot stays where it was and turns grey, at the opacity
+  `GadSettings.positionWithoutFixesOpacity` (0.45); it no longer disappears 13 s after the last position.
+  The accuracy ring does not grow while the dot is grey. In a privacy zone the dot is the same grey, at
+  the last position before the zone; it no longer disappears there either. The museum map shows the same
+  grey dot in a privacy zone; before, it showed the map library's grey at full opacity with its ring.
+  Nothing to do in the host app.
+- `GadSettings.positionWithoutFixesOpacity` (0.45): the opacity of that dot. 0 hides it, as before.
 
 ### [1.40.0] — 2026-11-13
 

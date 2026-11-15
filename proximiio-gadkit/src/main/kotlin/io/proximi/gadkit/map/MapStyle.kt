@@ -168,8 +168,8 @@ internal object MapStyle {
             },
             // Without new positions the dot stays where it was and turns grey: the passive state
             // (user, 2026-11-15; Nagarro and Annina read a dot that disappeared as a lost position).
-            // It keeps the stale opacity and the accuracy ring does not grow. In a privacy zone it
-            // looks the same (`heldPosition`).
+            // It keeps `GadSettings.positionWithoutFixesOpacity` and the accuracy ring does not grow.
+            // In a privacy zone it looks the same (`heldPosition`).
             freshness = venue.freshness.let {
                 PositionFreshnessRules.of(
                     staleAfter = it.staleAfter,
@@ -177,8 +177,8 @@ internal object MapStyle {
                     maxAccuracyMeters = it.maxAccuracyMeters,
                     greyingSeconds = it.greyingSeconds,
                     lostAfter = it.lostAfter,
-                    staleOpacity = it.staleOpacity,
-                    lostOpacity = it.staleOpacity,
+                    staleOpacity = settings.positionWithoutFixesOpacity,
+                    lostOpacity = settings.positionWithoutFixesOpacity,
                 )
             },
         )
@@ -220,7 +220,8 @@ internal object MapStyle {
      * [position] while a privacy zone holds the dot: grey at the last position before the zone, the
      * same as the dot without new positions (user, 2026-11-15; PM, Monday "Privacy zone to have the
      * same position marker as position disappearing", 2026-10-26). The map library draws a held dot at
-     * full opacity, so its grey, its stroke and its shadow carry the stale opacity. No accuracy ring.
+     * full opacity, so its grey, its stroke and its shadow carry the stale opacity
+     * (`GadSettings.positionWithoutFixesOpacity`). No accuracy ring. 0 draws nothing.
      */
     fun heldPosition(position: PositionStyle): PositionStyle {
         val opacity = position.freshness.staleOpacity

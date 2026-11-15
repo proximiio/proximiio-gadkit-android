@@ -1339,7 +1339,9 @@ internal class VisitViewModel(
                 )
             }
             if (routedAmenity?.id != place.id) return
-            session.setRoute(RouteToStop.extended(route, ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude), settings.routeToStopMaximumMeters))
+            val toStop = RouteToStop.extended(route, ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude), settings.routeToStopMaximumMeters)
+            // The line starts at the visitor (iOS 1.44.0).
+            session.setRoute(RouteToStop.extendedFrom(toStop, ProximiioCoordinate(here.coordinate.latitude, here.coordinate.longitude), settings.routeFromOriginMaximumMeters))
             amenityRouteError = null
         } catch (error: CancellationException) {
             throw error

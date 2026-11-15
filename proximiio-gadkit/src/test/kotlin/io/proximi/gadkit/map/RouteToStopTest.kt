@@ -56,6 +56,35 @@ class RouteToStopTest {
         assertEquals(15.0, GadSettings.STANDARD.routeToStopMaximumMeters)
     }
 
+    /**
+     * PM, Monday "Routing Tongari-Kun -> Goroka man", 2026-11-15: the route started on the path, 9 m
+     * from the visitor. iOS `theRouteStartsAtTheOrigin` (1.44.0).
+     */
+    @Test
+    fun theRouteStartsAtTheOrigin() {
+        // About 2.2 m north of START.
+        val visitor = ProximiioCoordinate(24.50002, 54.4)
+        val route = route()
+        val extended = RouteToStop.extendedFrom(route, visitor, maximumMeters = 15.0)
+        val added = GeoMath.haversineDistance(visitor, START)
+        assertEquals(listOf(visitor, START, END), extended.coordinates)
+        assertEquals(RouteSegment(visitor, START, added), extended.segments.first())
+        assertEquals(route.distanceMeters + added, extended.distanceMeters, 1e-9)
+        val first = extended.instructions.first()
+        assertEquals(RouteInstruction.Kind.Start, first.kind)
+        assertEquals(visitor, first.coordinate)
+        assertEquals(extended.distanceMeters, extended.instructions[1].distanceMeters, 1e-9)
+        assertEquals(extended.durationSeconds, extended.instructions.sumOf { it.durationSeconds }, 1e-9)
+        // An origin on the path, or too far from it, leaves the route.
+        assertSame(route, RouteToStop.extendedFrom(route, START, maximumMeters = 15.0))
+        assertSame(route, RouteToStop.extendedFrom(route, visitor, maximumMeters = 2.0))
+        assertSame(route, RouteToStop.extendedFrom(route, visitor, maximumMeters = 0.0))
+        assertEquals(15.0, GadSettings.STANDARD.routeFromOriginMaximumMeters)
+        // Both ends.
+        val both = RouteToStop.extendedFrom(RouteToStop.extended(route, ARTWORK, maximumMeters = 15.0), visitor, maximumMeters = 15.0)
+        assertEquals(listOf(visitor, START, END, ARTWORK), both.coordinates)
+    }
+
     internal companion object {
         val START = ProximiioCoordinate(24.5, 54.4)
 

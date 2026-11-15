@@ -64,6 +64,7 @@ import io.proximi.map.live.AmenityIcon
 import io.proximi.map.live.ProximiioMapSession
 import io.proximi.sdk.computeRoute
 import io.proximi.sdk.core.model.ProximiioCoordinate
+import io.proximi.sdk.privacyZoneStateChanges
 import io.proximi.sdk.wayfinding.NoRouteReason
 import io.proximi.sdk.wayfinding.WayfindingRoutingError
 import kotlin.math.roundToInt
@@ -100,6 +101,14 @@ internal fun MuseumMapView(
     // The amenity icons, once per session, before the map registers the venue's icons.
     val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context) } }
     LaunchedEffect(session) { MapDiagnostics.follow(session, "museum", this) }
+    // The grey dot in a privacy zone (`MapStyle.heldPosition`), as on the journey map (iOS 1.45.0).
+    LaunchedEffect(session) {
+        val position = MapStyle.options(language, settings = settings).position
+        venue.sdk.privacyZoneStateChanges().collect { state ->
+            val style = if (state.isPrivate) MapStyle.heldPosition(position) else position
+            if (session.options.position != style) session.options = session.options.copy(position = style)
+        }
+    }
     // The labels and floor names follow a language change without a style reload.
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }
 
@@ -154,6 +163,8 @@ internal fun MuseumMapView(
                     options = currentAccessibility.routeOptions,
                 )
             }.let { RouteToStop.extended(it, ProximiioCoordinate(place.coordinate.latitude, place.coordinate.longitude), settings.routeToStopMaximumMeters) }
+                // The line starts at the visitor (iOS 1.44.0).
+                .let { RouteToStop.extendedFrom(it, ProximiioCoordinate(here.coordinate.latitude, here.coordinate.longitude), settings.routeFromOriginMaximumMeters) }
             session.setRoute(route)
             routeError = null
             if (debug != null) {
