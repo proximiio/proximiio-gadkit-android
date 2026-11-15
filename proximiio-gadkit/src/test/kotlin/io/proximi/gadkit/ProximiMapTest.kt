@@ -16,6 +16,8 @@ import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.wristband.TrackingHealth
 import io.proximi.map.core.JourneyEvent
 import io.proximi.map.core.JourneyLegRequest
+import io.proximi.map.core.PositionFreshness
+import io.proximi.map.core.PositionStage
 import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioGeofence
 import io.proximi.sdk.core.sync.SyncEvent
@@ -186,6 +188,21 @@ class ProximiMapTest {
         assertEquals(20.0, MapStyle.options("en", settings = settings).maximumZoom)
         assertEquals(20.0, MapStyle.exploreOptions("en", settings).maximumZoom)
         assertNull(MapStyle.options("en").minimumZoom)
+    }
+
+    /** User, 2026-11-15: without new positions the dot stays, grey, instead of disappearing. */
+    @Test
+    fun withoutNewPositionsTheDotStaysGrey() {
+        val rules = MapStyle.options("en").position.freshness
+        val live = PositionFreshness.appearance(baseAccuracy = 1.0, age = 5.0, rules = rules)
+        val grey = PositionFreshness.appearance(baseAccuracy = 1.0, age = 30.0, rules = rules)
+        val lost = PositionFreshness.appearance(baseAccuracy = 1.0, age = 600.0, rules = rules)
+        assertEquals(PositionStage.LIVE, live.stage)
+        assertEquals(PositionStage.STALE, grey.stage)
+        assertEquals(PositionStage.LOST, lost.stage)
+        assertEquals(0.45, grey.opacity, 1e-9)
+        assertEquals(0.45, lost.opacity, 1e-9)
+        assertEquals(1.0, lost.accuracyMeters)
     }
 
     @Test

@@ -166,18 +166,19 @@ internal object MapStyle {
             } else {
                 PositionTrailStyle()
             },
-            // The dot disappears when the position does (PM, Monday "Privacy zone to have the same
-            // position marker as position disappearing", 2026-10-26). `hidingPosition` hides it in a
-            // privacy zone.
+            // Without new positions the dot stays where it was and turns grey: the passive state
+            // (user, 2026-11-15; Nagarro and Annina read a dot that disappeared as a lost position).
+            // It keeps the stale opacity and the accuracy ring does not grow. `hidingPosition` hides
+            // it in a privacy zone.
             freshness = venue.freshness.let {
                 PositionFreshnessRules.of(
                     staleAfter = it.staleAfter,
-                    driftMetersPerSecond = it.driftMetersPerSecond,
+                    driftMetersPerSecond = 0.0,
                     maxAccuracyMeters = it.maxAccuracyMeters,
                     greyingSeconds = it.greyingSeconds,
                     lostAfter = it.lostAfter,
-                    staleOpacity = 0.0,
-                    lostOpacity = 0.0,
+                    staleOpacity = it.staleOpacity,
+                    lostOpacity = it.staleOpacity,
                 )
             },
         )
