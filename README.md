@@ -1158,8 +1158,9 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 - **Visible:** without new positions the position dot stays where it was and turns grey, at the stale
   opacity of the map library (0.45); it no longer disappears 13 s after the last position. The accuracy
-  ring does not grow while the dot is grey. In a privacy zone the dot stays hidden. Nothing to do in
-  the host app. The iOS package still hides the dot.
+  ring does not grow while the dot is grey. In a privacy zone the dot is the same grey, at the last
+  position before the zone; it no longer disappears there either. Nothing to do in the host app. The
+  iOS package still hides the dot.
 
 ### [1.40.0] — 2026-11-13
 

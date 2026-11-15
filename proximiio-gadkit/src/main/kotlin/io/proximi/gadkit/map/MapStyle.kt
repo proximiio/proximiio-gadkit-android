@@ -168,8 +168,8 @@ internal object MapStyle {
             },
             // Without new positions the dot stays where it was and turns grey: the passive state
             // (user, 2026-11-15; Nagarro and Annina read a dot that disappeared as a lost position).
-            // It keeps the stale opacity and the accuracy ring does not grow. `hidingPosition` hides
-            // it in a privacy zone.
+            // It keeps the stale opacity and the accuracy ring does not grow. In a privacy zone it
+            // looks the same (`heldPosition`).
             freshness = venue.freshness.let {
                 PositionFreshnessRules.of(
                     staleAfter = it.staleAfter,
@@ -217,14 +217,17 @@ internal object MapStyle {
     }
 
     /**
-     * [position] with nothing drawn while a privacy zone holds the dot. The map library draws a held
-     * dot at full opacity; its stroke, shadow and ring are made clear.
+     * [position] while a privacy zone holds the dot: grey at the last position before the zone, the
+     * same as the dot without new positions (user, 2026-11-15; PM, Monday "Privacy zone to have the
+     * same position marker as position disappearing", 2026-10-26). The map library draws a held dot at
+     * full opacity, so its grey, its stroke and its shadow carry the stale opacity. No accuracy ring.
      */
-    fun hidingPosition(position: PositionStyle): PositionStyle {
-        val clear = MapColor.hex(0xFFFFFF, alpha = 0.0)
+    fun heldPosition(position: PositionStyle): PositionStyle {
+        val opacity = position.freshness.staleOpacity
+        val dot = position.dot
         return position.copy(
-            dot = position.dot.copy(strokeColor = clear, shadowOpacity = 0.0),
-            privacy = PositionPrivacyStyle(color = clear, showsAccuracy = false),
+            dot = dot.copy(strokeColor = dot.strokeColor.withAlpha(dot.strokeColor.alpha * opacity), shadowOpacity = dot.shadowOpacity * opacity),
+            privacy = PositionPrivacyStyle(color = dot.staleColor.withAlpha(dot.staleColor.alpha * opacity), showsAccuracy = false),
         )
     }
 

@@ -205,6 +205,18 @@ class ProximiMapTest {
         assertEquals(1.0, lost.accuracyMeters)
     }
 
+    /** User, 2026-11-15: in a privacy zone the dot is grey too, with the opacity of the grey dot. */
+    @Test
+    fun inAPrivacyZoneTheDotIsTheSameGrey() {
+        val position = MapStyle.options("en").position
+        val held = MapStyle.heldPosition(position)
+        val grey = requireNotNull(held.privacy.color)
+        assertEquals(position.dot.staleColor.withAlpha(position.dot.staleColor.alpha * 0.45), grey)
+        assertEquals(0.45 * position.dot.strokeColor.alpha, held.dot.strokeColor.alpha, 1e-9)
+        assertEquals(0.45 * position.dot.shadowOpacity, held.dot.shadowOpacity, 1e-9)
+        assertFalse(held.privacy.showsAccuracy)
+    }
+
     @Test
     fun aDestinationMatchesTheFeatureIdOrItsPropertiesId() {
         val places = listOf(

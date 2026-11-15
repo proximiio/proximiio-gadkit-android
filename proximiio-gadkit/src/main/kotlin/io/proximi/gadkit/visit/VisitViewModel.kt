@@ -448,7 +448,7 @@ internal class VisitViewModel(
         monitor.start()
         // No tracking or wristband alerts: the host app handles the wristband states (PM 2026-10-15).
         scope.launch { monitor.health.drop(1).collect { onEvent(VisitEvent.TrackingChanged(it)) } }
-        // No dot while a privacy zone holds it (`MapStyle.hidingPosition`).
+        // A grey dot while a privacy zone holds it (`MapStyle.heldPosition`).
         scope.launch { monitor.health.collect(::applyPositionStyle) }
         // The position is live again after an old one or a silent wristband (iOS 1.35.0). A first
         // position is the "first position" of `VisitContent`.
@@ -722,10 +722,10 @@ internal class VisitViewModel(
         session.followMyFloor()
     }
 
-    /** No dot while a privacy zone holds it (`MapStyle.hidingPosition`). */
+    /** A grey dot while a privacy zone holds it (`MapStyle.heldPosition`). */
     private fun applyPositionStyle(health: TrackingHealth) {
         val position = MapStyle.options(language, routeMarkers = false, settings = settings).position
-        val style = if (health == TrackingHealth.PRIVACY_ZONE) MapStyle.hidingPosition(position) else position
+        val style = if (health == TrackingHealth.PRIVACY_ZONE) MapStyle.heldPosition(position) else position
         if (session.options.position != style) session.options = session.options.copy(position = style)
     }
 
