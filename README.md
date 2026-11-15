@@ -1166,6 +1166,14 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   sends a keep-alive every 15 s. The SDK also checks its connections to the relay every 15 s and closes
   one that does not answer (Android only). Nothing to do in the host app.
 
+#### Added (Android only)
+
+- `ProximiMap.wristbandLabel` (`@ProximiGadAppApi`, for the Proximi GAD app only): the code of the
+  connected wristband, as the visitor scanned or typed it, while `wristband` is `Connected`. The
+  library now stores that code on the phone, in the app's private storage
+  (`SharedPreferences` "io.proximi.gadkit.wristband"), until the session ends, so it survives a
+  restart. Nothing to do in the host app.
+
 #### Changed (Android only)
 
 - **Visible:** without new positions the position dot stays where it was and turns grey, at the stale

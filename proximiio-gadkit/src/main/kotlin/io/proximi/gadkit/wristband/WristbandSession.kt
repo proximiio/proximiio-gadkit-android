@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
 /**
  * The visitor's wristband session, held by the SDK's `BlueiotWristbandBinding`, as iOS
  * `WristbandSession`. The SDK stores the session in Keystore-backed storage and confirms it with
- * the relay-api at launch (`restore()`). The app stores no wristband id of its own.
+ * the relay-api at launch (`restore()`). The library also stores the code the visitor connected
+ * the band with ([label]), for the Proximi GAD app's Hub; the SDK's session holds no tag id.
  *
  * A bind of a band another phone follows is a take-over. The relay-api accepts or rejects it, and
  * the other phone's session ends with `Superseded`. The SDK never asks for location. When the
@@ -53,6 +54,15 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
     /** The notice for an ended session (`WristbandCopy.notice`), or `null` while none has ended. */
     internal val endNotice: UiText? get() = (state.value.toCore() as? BindingState.Ended)?.let { WristbandCopy.notice(it.reason) }
 
+    private val labels = context.applicationContext.getSharedPreferences(LABEL_PREFERENCES, Context.MODE_PRIVATE)
+    private val mutableLabel = MutableStateFlow(labels.getString(LABEL_KEY, null))
+
+    /**
+     * The code of the last bind that succeeded, as scanned or typed, until its session ends. A
+     * session the SDK restores at launch is that bind's, so the code survives a restart.
+     */
+    internal val label: StateFlow<String?> = mutableLabel.asStateFlow()
+
     private var isRunning = false
 
     /** The SDK that gets the relay's privacy signal ([forwardPrivacy]). */
@@ -73,6 +83,8 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
         scope.launch {
             binding.stateChanges().collect {
                 mutableState.value = it
+                // The latest state, not a close of the session a new bind replaced.
+                if (it is BlueiotBindingState.Ended && binding.state is BlueiotBindingState.Ended) storeLabel(null)
                 forwardPrivacy()
                 if (FieldLog.isEnabled) {
                     FieldLog.log("wristband: ${WristbandCopy.logLine(it.toCore())}")
@@ -138,6 +150,7 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
     override suspend fun bind(label: String) {
         try {
             val session = binding.bind(tagID = label)
+            storeLabel(label.trim())
             FieldLog.log("wristband bind: ${BindingLog.bind(label, session.bindingID)}")
         } catch (error: BlueiotBindingError) {
             FieldLog.log("wristband bind: ${BindingLog.bind(label, error)}")
@@ -159,8 +172,15 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
         }
     }
 
+    private fun storeLabel(label: String?) {
+        mutableLabel.value = label
+        labels.edit().apply { if (label == null) remove(LABEL_KEY) else putString(LABEL_KEY, label) }.apply()
+    }
+
     internal companion object {
         private const val DIAGNOSTICS_INTERVAL_MILLIS = 10_000L
+        private const val LABEL_PREFERENCES = "io.proximi.gadkit.wristband"
+        private const val LABEL_KEY = "label"
 
         /**
          * When the relay saw the band fall silent in a privacy zone (relay clock, epoch

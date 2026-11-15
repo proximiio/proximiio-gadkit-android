@@ -54,9 +54,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -161,6 +164,16 @@ public class ProximiMap(
 
     /** The phone's wristband session. */
     public val wristband: StateFlow<WristbandStatus> = mutableWristband.asStateFlow()
+
+    /**
+     * The code of the connected wristband, as the visitor scanned or typed it, while [wristband] is
+     * [WristbandStatus.Connected]; `null` otherwise. The Proximi GAD app shows it on the Hub's
+     * wristband card, so a tester sees which band the phone follows.
+     */
+    @ProximiGadAppApi
+    public val wristbandLabel: StateFlow<String?> =
+        combine(mutableWristband, session.label) { status, label -> label.takeIf { status == WristbandStatus.Connected } }
+            .stateIn(mainScope, SharingStarted.Eagerly, null)
 
     /** The screen or sheet on screen, or `null`. */
     public val screen: StateFlow<Screen?> = presenter.screen
