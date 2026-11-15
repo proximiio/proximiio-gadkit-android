@@ -2,6 +2,7 @@ package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.visit.VisitPlan
+import io.proximi.sdk.core.model.ProximiioAmenity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -104,7 +105,7 @@ class GalleryOutlineTest {
 
 /** Port of ProximiioGADKit `LevelChangerPlaceTests` (1.4.0). */
 class LevelChangerPlaceTest {
-    private fun feature(id: String, type: String, level: Double, levels: Any?, geometry: String = "Point") = VenueFeature(
+    private fun feature(id: String, type: String, level: Double, levels: Any?, geometry: String = "Point", amenity: String? = null) = VenueFeature(
         id = id,
         type = type,
         geometry = Geometry(geometry, listOf(54.399, 24.5397)),
@@ -112,6 +113,7 @@ class LevelChangerPlaceTest {
             put("type", type)
             put("level", level)
             if (levels != null) put("levels", levels)
+            if (amenity != null) put("amenity", amenity)
         },
         level = level,
     )
@@ -150,6 +152,38 @@ class LevelChangerPlaceTest {
             ),
         )
         assertEquals(listOf(listOf(1.0, 2.0), listOf(3.0), listOf(2.0), listOf(1.0)), changers.map { it.levels })
+    }
+
+    /** Port of iOS `LevelChangerIconTests.aRampAndAHillAreLevelChangers` (1.47.0). */
+    @Test
+    fun aRampAndAHillAreLevelChangers() {
+        assertEquals(listOf("elevator", "staircase", "escalator", "ramp", "hill"), LevelChangerPlace.FEATURE_TYPES)
+        val changers = LevelChangerPlace.all(
+            listOf(
+                feature("ramp", "ramp", 0.0, listOf(0.0, 1.0), amenity = "org:ramp"),
+                feature("hill", "hill", 1.0, null, amenity = ""),
+            ),
+        )
+        assertEquals(listOf("ramp", "hill"), changers.map { it.id })
+        assertEquals(listOf("org:ramp", null), changers.map { it.amenityId })
+        assertTrue(changers[0].serves(0.0) && changers[0].serves(1.0))
+    }
+
+    /** Port of iOS `LevelChangerIconTests.onlyAnAmenityThatIsNeitherStairsNorALiftShowsItsOwnIcon` (1.47.0). */
+    @Test
+    fun onlyAnAmenityThatIsNeitherStairsNorALiftShowsItsOwnIcon() {
+        assertTrue(LevelChangerPlace.showsAmenityIcon("org:1", "Ramp"))
+        assertTrue(LevelChangerPlace.showsAmenityIcon("org:2", "Escalator UP"))
+        assertTrue(LevelChangerPlace.showsAmenityIcon("org:3", null))
+        assertFalse(LevelChangerPlace.showsAmenityIcon("org:4", "Staircase"))
+        assertFalse(LevelChangerPlace.showsAmenityIcon("org:5", "Elevator"))
+        assertFalse(LevelChangerPlace.showsAmenityIcon("org:lift", null))
+        val amenities = listOf(
+            ProximiioAmenity(id = "org:1", title = "Ramp"),
+            ProximiioAmenity(id = "org:4", title = "Staircase"),
+        )
+        val icons = mapOf("org:1" to "ramp icon", "org:4" to "stairs icon", "org:9" to "unknown icon")
+        assertEquals(mapOf("org:1" to "ramp icon"), LevelChangerPlace.amenityIcons(amenities, icons))
     }
 
     /** Each gallery style has its own style image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). */

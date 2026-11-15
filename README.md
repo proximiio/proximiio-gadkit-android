@@ -1168,6 +1168,15 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
+#### Changed (iOS 1.47.0; GAD PM, Monday "Ramp icon is not visible", 2026-11-12)
+
+- **Visible:** a level changer that is not on the route shows its amenity's icon of the venue data when
+  that amenity names neither stairs nor a lift, for example a ramp or an escalator. Stairs and lifts keep
+  the design's icons, and the level changer of the route keeps its red marker. This applies to the journey
+  map, the museum map and the explore map. Nothing to do in the host app.
+- **Visible:** a point feature of type `ramp` or `hill` is a level changer on the map, drawn on every
+  floor of its `levels`, as a lift, a staircase and an escalator. Nothing to do in the host app.
+
 #### Changed (iOS 1.46.0; GAD PM, Monday "Re-routing going from gallery 104 to 102" and "after pause & resume not picking user's location", 2026-11-15)
 
 - **Visible:** a personalised journey orders the stops ahead again from the visitor when an artwork is

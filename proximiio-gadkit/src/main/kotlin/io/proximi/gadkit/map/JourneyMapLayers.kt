@@ -86,6 +86,9 @@ internal class JourneyMapLayers {
     private var connector: List<Coordinate> = emptyList()
     private var levelChanger: LevelChanger? = null
     private var levelChangers: List<LevelChangerPlace> = emptyList()
+
+    /** The venue data icons level changers show, by amenity id (iOS 1.47.0). */
+    private var changerAmenityIcons: Map<String, Bitmap> = emptyMap()
     private var highlight: Highlight? = null
     private var galleryMarkers: List<GalleryMarker> = emptyList()
     private var stopDots: List<StopDot> = emptyList()
@@ -105,6 +108,9 @@ internal class JourneyMapLayers {
         internal companion object {
             /** The style image of a level changer that is not on the route: its amenity marker. */
             fun standardImageName(featureType: String): String = "$LEVEL_CHANGER_IMAGE-standard-$featureType"
+
+            /** The style image of the venue data icon of a level changer's amenity (iOS 1.47.0). */
+            fun amenityImageName(amenityId: String): String = "$LEVEL_CHANGER_IMAGE-amenity-$amenityId"
         }
     }
 
@@ -190,11 +196,30 @@ internal class JourneyMapLayers {
         canvas?.style?.let(::applyStopDots)
     }
 
-    /** The venue's lifts, staircases and escalators. Each shows on the floors it serves. */
-    fun updateLevelChangers(changers: List<LevelChangerPlace>) {
-        if (changers == levelChangers) return
+    /**
+     * The venue's lifts, staircases, escalators, ramps and hills. Each shows on the floors it serves.
+     * [amenityIcons] are the venue data icons level changers show, by amenity id
+     * ([LevelChangerPlace.amenityIcons]).
+     */
+    fun updateLevelChangers(changers: List<LevelChangerPlace>, amenityIcons: Map<String, Bitmap> = emptyMap()) {
+        if (changers == levelChangers && amenityIcons.keys == changerAmenityIcons.keys) return
         levelChangers = changers
-        canvas?.style?.let(::applyLevelChanger)
+        changerAmenityIcons = amenityIcons
+        val canvas = canvas ?: return
+        val style = canvas.style ?: return
+        addChangerAmenityIcons(canvas.context, style)
+        applyLevelChanger(style)
+    }
+
+    /** The venue data icons of [changerAmenityIcons] in the style, at the size of the other level changer markers. */
+    private fun addChangerAmenityIcons(context: Context, style: Style) {
+        val size = (MARKER_DP * context.resources.displayMetrics.density).roundToInt()
+        for ((amenityId, image) in changerAmenityIcons) {
+            if (image.width <= 0 || image.height <= 0) continue
+            val scale = size.toFloat() / maxOf(image.width, image.height)
+            val scaled = Bitmap.createScaledBitmap(image, maxOf(1, (image.width * scale).roundToInt()), maxOf(1, (image.height * scale).roundToInt()), true)
+            style.addImage(LevelChanger.amenityImageName(amenityId), scaled)
+        }
     }
 
     /** The line from the visitor to the start of the route ahead. `null` removes it. */
@@ -235,6 +260,7 @@ internal class JourneyMapLayers {
             val standard = LevelChanger.standardImageName(type)
             if (style.getImage(standard) == null) standardLevelChangerImage(canvas.context, type)?.let { style.addImage(standard, it) }
         }
+        addChangerAmenityIcons(canvas.context, style)
         for (icon in AmenityKind.entries.map { it.gadIcon }.toSet()) {
             val name = Highlight.imageName(icon)
             if (style.getImage(name) == null) redMarker(canvas.context, icon)?.let { style.addImage(name, it) }
@@ -424,7 +450,10 @@ internal class JourneyMapLayers {
         val highlighted = levelChanger?.takeIf { VenueLevel.same(it.level, level) }
         val features = levelChangers
             .filter { it.serves(level) && it.coordinate != highlighted?.coordinate }
-            .map { point(it.coordinate, LevelChanger.standardImageName(it.featureType), sort = 0) }
+            .map { changer ->
+                val amenityId = changer.amenityId?.takeIf { it in changerAmenityIcons }
+                point(changer.coordinate, amenityId?.let(LevelChanger::amenityImageName) ?: LevelChanger.standardImageName(changer.featureType), sort = 0)
+            }
             .toMutableList()
         if (highlighted != null) features += point(highlighted.coordinate, highlighted.imageName, sort = 1)
         highlight?.takeIf { VenueLevel.same(it.level, level) }?.let { features += point(it.coordinate, it.imageName, sort = 2) }

@@ -252,7 +252,12 @@ internal fun MuseumMapView(
     val dataVersion by venue.data.version.collectAsStateWithLifecycle()
     LaunchedEffect(dataVersion) {
         val levelChangers = venue.levelChangers()
-        layers.updateLevelChangers(levelChangers)
+        // A ramp or an escalator with its own amenity shows that amenity's icon (iOS 1.47.0).
+        val amenities = venue.catalogue()
+        val icons = withContext(Dispatchers.Default) {
+            amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
+        }
+        layers.updateLevelChangers(levelChangers, LevelChangerPlace.amenityIcons(amenities, icons))
         layers.updateCones(VenueCone.all(venue.venueFeatures()))
         // Nor the gallery entrances (iOS 1.43.0).
         val entrances = VenuePlace.galleryEntranceIds(venue.places(language), settings.galleryEntranceAmenityId)

@@ -786,7 +786,7 @@ internal class VisitViewModel(
         // and level changers stay (PM review 2026-10-12). [layers] draws the level changers on
         // every floor they serve.
         val levelChangers = venue.levelChangers()
-        layers.updateLevelChangers(levelChangers)
+        layers.updateLevelChangers(levelChangers, LevelChangerPlace.amenityIcons(amenities, icons))
         layers.updateCones(VenueCone.all(venue.venueFeatures()))
         levelChangerPlaces = levelChangers
         hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet() +

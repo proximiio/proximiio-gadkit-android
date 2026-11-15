@@ -1,5 +1,6 @@
 package io.proximi.gadkit.explore
 
+import io.proximi.gadkit.map.LevelChangerPlace
 import io.proximi.gadkit.map.VenueCone
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -235,7 +237,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
             FieldLog.log("explore: ${destinations.size} galleries · $polygons filled on their polygon, ${destinations.size - polygons} on their geofence · $outlines gallery polygons in the venue data")
         }
         catalog = ExploreCatalog.of(places, destinations, categories, changerTitles, AmenityListing.facilities(amenities))
-        layers.updateLevelChangers(levelChangers)
+        layers.updateLevelChangers(levelChangers, LevelChangerPlace.amenityIcons(amenities, amenityIcons.mapValues { it.value.asAndroidBitmap() }))
         layers.updateCones(VenueCone.all(features))
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the card's dot show them (PM, Monday "Explore museum view:

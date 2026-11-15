@@ -1,10 +1,12 @@
 package io.proximi.gadkit.map
 
 import io.proximi.gadkit.Coordinate
+import io.proximi.sdk.core.model.ProximiioAmenity
 
 /**
- * A staircase, lift or escalator POI: a point feature of type `staircase`, `elevator` or
- * `escalator`, as iOS `LevelChangerPlace`. The map library draws a POI on its own floor only;
+ * A staircase, lift, escalator, ramp or hill POI: a point feature of type `staircase`, `elevator`,
+ * `escalator`, `ramp` or `hill`, the types the SDK router rides, as iOS `LevelChangerPlace` (1.47.0).
+ * The map library draws a POI on its own floor only;
  * GADKit hides these POIs and draws them on every floor they serve ([JourneyMapLayers]), as the web
  * map does (Monday "All level changers visible", 2026-10-15).
  *
@@ -13,6 +15,11 @@ import io.proximi.gadkit.Coordinate
  * GAD data lift 9f411e5a is a POI on level 0 with `levels` [1, 2, 3, 4]; that router does not use it
  * on level 0, so GADKit does not draw it there. Without usable `levels` the POI serves its own
  * floor. The Android SDK router takes the same rule in 6.0.0-beta.26.
+ *
+ * The marker of a level changer that is not on the route is the design's lift or stairs icon when its
+ * amenity names a lift or stairs, and the amenity's icon of the venue data otherwise: a ramp or an
+ * escalator with its own amenity shows that icon (GAD PM, Monday "Ramp icon is not visible",
+ * 2026-11-12; iOS 1.47.0).
  */
 internal data class LevelChangerPlace(
     val id: String,
@@ -20,11 +27,13 @@ internal data class LevelChangerPlace(
     val coordinate: Coordinate,
     /** The floors in `properties.levels`, or the POI's own floor when `levels` is missing, empty or unreadable. */
     val levels: List<Double>,
+    /** `properties.amenity`, or `null`. */
+    val amenityId: String? = null,
 ) {
     fun serves(level: Double): Boolean = levels.any { VenueLevel.same(it, level) }
 
     internal companion object {
-        val FEATURE_TYPES: List<String> = listOf("elevator", "staircase", "escalator")
+        val FEATURE_TYPES: List<String> = listOf("elevator", "staircase", "escalator", "ramp", "hill")
 
         /** `null` for every feature that is not a point of a level changer type. */
         fun from(feature: VenueFeature): LevelChangerPlace? {
@@ -35,7 +44,23 @@ internal data class LevelChangerPlace(
             val longitude = pair[0].jsonDouble() ?: return null
             val latitude = pair[1].jsonDouble() ?: return null
             val listed = feature.properties?.get("levels")?.let(::levels)
-            return LevelChangerPlace(feature.id, type, Coordinate(latitude, longitude), listed ?: listOfNotNull(feature.level))
+            val amenityId = (feature.properties?.get("amenity") as? String)?.takeIf { it.isNotEmpty() }
+            return LevelChangerPlace(feature.id, type, Coordinate(latitude, longitude), listed ?: listOfNotNull(feature.level), amenityId)
+        }
+
+        /**
+         * `true` when a level changer with this amenity shows the amenity's icon of the venue data:
+         * every amenity whose id and title name neither stairs nor a lift. Pure; covered by tests.
+         */
+        fun showsAmenityIcon(amenityId: String, title: String?): Boolean {
+            val kind = AmenityKind.kind(amenityId, title)
+            return kind != AmenityKind.STAIRS && kind != AmenityKind.ELEVATOR
+        }
+
+        /** The icons of [icons] (by amenity id) that level changers show instead of the design's lift and stairs icons. */
+        fun <T> amenityIcons(amenities: List<ProximiioAmenity>, icons: Map<String, T>): Map<String, T> {
+            val shown = amenities.filter { showsAmenityIcon(it.id, it.title) }.map { it.id }.toSet()
+            return icons.filterKeys { it in shown }
         }
 
         /**
