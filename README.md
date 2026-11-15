@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.40.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.47.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.40.0
+git -C gadkit checkout 1.47.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1168,6 +1168,20 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
+No changes since 1.47.0.
+
+### [1.47.0] — 2026-11-15
+
+The behaviour of the iOS package 1.47.0, which includes 1.41.0 to 1.46.1, on SDK 6.0.0-beta.40 and Map
+6.0.0-beta.40. There is no Android 1.41.0 to 1.46.1. With SDK 6.0.0-beta.40 the library has the network
+changes of iOS SDK 6.0.0-beta.73 that 1.40.0 did not take. The zoom range of iOS 1.34.0 is still not
+taken (see "Not taken from iOS").
+
+Breaking for the host app: the new `ProximiMapEvent` cases `ArtworkArrived` and `ArtworkVisited`, and SDK
+6.0.0-beta.40, with no source or binary change. A host app with an exhaustive `when` over
+`ProximiMapEvent` adds the two cases or an `else` branch. The other changes add settings with defaults
+or change what the screens show. The entries below say what the host app has to do.
+
 #### Changed (iOS 1.47.0; GAD PM, Monday "Ramp icon is not visible", 2026-11-12)
 
 - **Visible:** a level changer that is not on the route shows its amenity's icon of the venue data when
@@ -1312,6 +1326,10 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   grey dot in a privacy zone; before, it showed the map library's grey at full opacity with its ring.
   Nothing to do in the host app.
 - `GadSettings.positionWithoutFixesOpacity` (0.45): the opacity of that dot. 0 hides it, as before.
+
+#### Not taken from iOS
+
+- The zoom range of iOS 1.34.0, as in 1.40.0.
 
 ### [1.40.0] — 2026-11-13
 
