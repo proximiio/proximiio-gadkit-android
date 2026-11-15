@@ -72,6 +72,30 @@ class GalleryFirstRoutingTest {
         return GalleryFirstRouting.State(isEnabled, mapOf(key to destination), if (reached) setOf(key) else emptySet())
     }
 
+    /** iOS 1.46.0; GAD PM, Monday "Re-routing going from gallery 104 to 102", 2026-11-15. */
+    @Test
+    fun theVisitorInTheGalleryOfALaterArtworkIsFound() {
+        val other = MapCoordinate(5.5, 5.5)
+        val otherGallery = GalleryDestination(
+            Gallery("104", "104 Abstractions", 3.0, listOf(Coordinate(5.0, 5.0), Coordinate(5.0, 6.0), Coordinate(6.0, 6.0), Coordinate(6.0, 5.0))),
+            entry = Coordinate(5.9, 5.9),
+            placeId = "poi-104",
+        )
+        val galleries = mapOf(GalleryFirstRouting.Key(artwork) to destination, GalleryFirstRouting.Key(other) to otherGallery)
+        fun found(origin: Coordinate, level: Double? = 3.0, next: MapCoordinate, later: List<MapCoordinate>) =
+            GalleryFirstRouting.isInGalleryOfLaterArtwork(origin, level, next, later, galleries)
+        // The next stop is in 104, the visitor stands in G303 with an artwork still to visit.
+        assertTrue(found(inside, next = other, later = listOf(artwork)))
+        // The visitor stands in the next stop's gallery.
+        assertFalse(found(inside, next = artwork, later = listOf(other)))
+        // No artwork still to visit in the visitor's gallery.
+        assertFalse(found(inside, next = other, later = emptyList()))
+        // Outside every gallery, and on another floor.
+        assertFalse(found(outside, next = other, later = listOf(artwork)))
+        assertFalse(found(inside, level = 1.0, next = other, later = listOf(artwork)))
+        assertTrue(io.proximi.gadkit.GadSettings.STANDARD.ordersFromVisitorGallery)
+    }
+
     @Test
     fun aLegFromOutsideTheGalleryEndsAtTheGallery() {
         assertEquals(destination, GalleryFirstRouting.gallery(outside, 3.0, artwork, state()))

@@ -912,6 +912,7 @@ val configuration = GadConfiguration(
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker with a badge holding the number of the others (PM, Monday "Clustering", 2026-10-29). |
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. |
+| `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
@@ -1166,6 +1167,26 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Changed (iOS 1.46.0; GAD PM, Monday "Re-routing going from gallery 104 to 102" and "after pause & resume not picking user's location", 2026-11-15)
+
+- **Visible:** a personalised journey orders the stops ahead again from the visitor when an artwork is
+  marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an
+  artwork still to visit. The leg then leads to an artwork in the visitor's gallery. Before, the leg led
+  back to the next stop's gallery until the visitor entered an artwork geofence or was off the route. A
+  curated tour keeps its order. Nothing to do in the host app.
+- **Visible:** a resumed journey shows the visitor's floor and follows the visitor again: after "Resume
+  your Journey" on the pause card or on the detour card, and after the host app sets `isPaused` to
+  `false`. Before, a camera moved or a floor picked during the pause stayed, and the map stood still.
+  Without a position the camera stays. Nothing to do in the host app.
+
+#### Added (iOS 1.46.0)
+
+- `GadSettings.ordersFromVisitorGallery` (`true`): `false` keeps the order, as before.
+
+#### Changed (iOS 1.46.1)
+
+- The field log names every skip: the stop, its state, the active stop, and a refused skip.
 
 #### Added (iOS 1.44.0; GAD PM, Monday "Routing Tongari-Kun -> Goroka man", 2026-11-15)
 

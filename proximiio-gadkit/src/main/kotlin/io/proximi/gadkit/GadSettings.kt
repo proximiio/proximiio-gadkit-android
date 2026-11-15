@@ -243,6 +243,13 @@ public data class GadSettings(
      */
     val showsStopDots: Boolean = false,
     /**
+     * `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is
+     * marked visited while the visitor stands in another gallery than the next stop's, and that gallery
+     * has an artwork still to visit (GAD PM, Monday "Re-routing going from gallery 104 to 102",
+     * 2026-11-15). `false` keeps the order, as before. iOS `ordersFromVisitorGallery` (1.46.0).
+     */
+    val ordersFromVisitorGallery: Boolean = true,
+    /**
      * The time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`,
      * map default 0.9 s). Nagarro found the rotation too fast (2026-10-29). iOS `bearingSettlingTime`.
      */

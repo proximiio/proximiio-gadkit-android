@@ -1189,8 +1189,22 @@ internal class VisitViewModel(
         if (floorGuide.phase.value is FloorWithoutPositioningGuide.Phase.OnFloor) {
             returnOrigin = floorDestination?.coordinate
             floorGuide.returnFromFloor()
+        } else {
+            followVisitorAfterResume()
         }
         scope.launch { controller.resumeJourney() }
+    }
+
+    /**
+     * A resumed journey shows the visitor's floor and follows them again. A gesture or a floor picked
+     * during the pause left the camera free, and the map stood still after the resume (GAD PM, Monday
+     * "after pause & resume not picking user's location", 2026-11-15; iOS 1.46.0). Without a position
+     * the camera stays.
+     */
+    private fun followVisitorAfterResume() {
+        if (session.position.value == null) return
+        session.followMyFloor()
+        recentre(reason = "journey resumed")
     }
 
     /** Marks the lift or stairs of the route's next level change on the shown floor in red. */
@@ -1260,6 +1274,7 @@ internal class VisitViewModel(
      * [ProximiMapView.Option.SKIP_PROMPT], else only the event.
      */
     fun requestSkip(stop: JourneyStop) {
+        FieldLog.log("skip requested: ${stop.id} ${stop.state.name.lowercase()}")
         if (options.hasPrompt(ProximiMapView.Option.SKIP_PROMPT)) stopToSkip = stop
         onEvent(VisitEvent.SkipRequested(stop))
     }
@@ -1492,6 +1507,7 @@ internal class VisitViewModel(
         FieldLog.log("host app resumed the journey · detour ${controller.navigator.detourStop?.id ?: "-"}")
         val wasPaused = controller.isPaused.value
         controller.resumeFromPause()
+        followVisitorAfterResume()
         if (!detourPausesJourney) return
         if (wasPaused) {
             // "Add a stop" during the host app's pause: the detour's card shows now, and the journey
@@ -1508,6 +1524,7 @@ internal class VisitViewModel(
         // A detour added during the pause keeps the journey paused.
         setPaused(detourPausesJourney)
         scope.launch { controller.resumeFromPause() }
+        followVisitorAfterResume()
         onEvent(VisitEvent.JourneyResumed)
     }
 

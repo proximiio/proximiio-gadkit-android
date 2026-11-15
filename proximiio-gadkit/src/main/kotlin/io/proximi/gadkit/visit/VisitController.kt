@@ -845,14 +845,42 @@ internal class VisitController(
                 val changed = navigator.markDone(stopId)
                 save()
                 if (changed) doneStop(stopId)?.let { onArtworkVisited?.invoke(it, cause) }
+                if (changed) orderFromTheVisitorsGallery()
             }
         }
+    }
+
+    /**
+     * Called after an artwork is marked visited. A personalised journey whose next stop is in another
+     * gallery than the one the visitor stands in, while that gallery has an artwork still to visit: the
+     * stops ahead are ordered again from the visitor, so the leg leads to an artwork in their gallery
+     * (GAD PM, Monday "Re-routing going from gallery 104 to 102", 2026-11-15; iOS 1.46.0). The route
+     * from the visitor starts on the leg, so the off-route order never ran there.
+     */
+    private suspend fun orderFromTheVisitorsGallery() {
+        if (!settings.ordersFromVisitorGallery || keepsOrder || navigator.detourStop != null || navigator.hasArrived) return
+        val next = navigator.activeStop ?: return
+        val position = session.position.value ?: return
+        val later = navigator.journey.value.stops.filter { it.state == JourneyStop.State.PENDING && it.id != next.id }.map { it.coordinate }
+        val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+        if (!galleryRouting.isInGalleryOfLaterArtwork(origin, position.floor?.level, next.coordinate, later)) return
+        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return
+        val first = proposal.order.firstOrNull()
+        if (!proposal.isImprovement || first == null || first == next.id) return
+        FieldLog.log("visitor in another gallery: $first is nearer than ${next.title} · journey ordered again")
+        rerouting { apply(proposal) }
     }
 
     private fun doneStop(stopId: String): JourneyStop? = navigator.journey.value.stops.firstOrNull { it.id == stopId }
 
     suspend fun skip(stopId: String) {
-        if (!navigator.skip(stopId)) return
+        // Every skip in the field log (iOS 1.46.1).
+        val active = navigator.activeStop
+        FieldLog.log("skip $stopId: ${doneStop(stopId)?.state?.name?.lowercase() ?: "-"} · active ${active?.id ?: "-"} ${active?.state?.name?.lowercase() ?: "-"}")
+        if (!navigator.skip(stopId)) {
+            FieldLog.log("skip $stopId: refused")
+            return
+        }
         save()
     }
 

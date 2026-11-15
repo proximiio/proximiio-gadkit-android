@@ -73,6 +73,10 @@ internal class GalleryFirstRouting(
     /** The gallery that a leg to [artwork] leads to first while the visitor is outside it, or `null`. */
     fun gallery(artwork: MapCoordinate): GalleryDestination? = state.gallery(Key(artwork))
 
+    /** [isInGalleryOfLaterArtwork] with the galleries of this router. */
+    fun isInGalleryOfLaterArtwork(origin: Coordinate, originLevel: Double?, next: MapCoordinate, later: List<MapCoordinate>): Boolean =
+        isInGalleryOfLaterArtwork(origin, originLevel, next, later, state.galleries)
+
     /** The visitor entered the gallery of [artwork]: legs to it end at the artwork from now on. */
     fun markReached(artwork: MapCoordinate) {
         synchronized(lock) { state = state.copy(reached = state.reached + Key(artwork)) }
@@ -121,6 +125,21 @@ internal class GalleryFirstRouting(
         inner.durations(origins, destinations, options)
 
     companion object {
+        /**
+         * `true` when [origin] lies in the gallery of an artwork in [later] and outside the gallery of
+         * [next]. [galleries] is the gallery of each artwork, as in [State]. Pure; covered by tests.
+         */
+        fun isInGalleryOfLaterArtwork(
+            origin: Coordinate,
+            originLevel: Double?,
+            next: MapCoordinate,
+            later: List<MapCoordinate>,
+            galleries: Map<Key, GalleryDestination>,
+        ): Boolean {
+            if (galleries[Key(next)]?.gallery?.contains(origin, originLevel) == true) return false
+            return later.any { galleries[Key(it)]?.gallery?.contains(origin, originLevel) == true }
+        }
+
         /** The gallery where a leg from [origin] to [destination] ends instead of the artwork, or `null`. Pure; covered by tests. */
         fun gallery(origin: Coordinate, originLevel: Double, destination: MapCoordinate, state: State): GalleryDestination? {
             val gallery = state.gallery(Key(destination)) ?: return null
