@@ -243,7 +243,9 @@ internal fun MuseumMapView(
         val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers)
         layers.updateCones(VenueCone.all(venue.venueFeatures()))
-        session.hiddenFeatureIds = levelChangers.map { it.id }.toSet()
+        // Nor the gallery entrances (iOS 1.43.0).
+        val entrances = VenuePlace.galleryEntranceIds(venue.places(language), settings.galleryEntranceAmenityId)
+        session.hiddenFeatureIds = levelChangers.map { it.id }.toSet() + entrances
     }
     if (debug?.galleryFills != true) {
         LaunchedEffect(selectedFloor) { layers.update(emptyList(), selectedFloor.level) }
@@ -259,7 +261,7 @@ internal fun MuseumMapView(
     }
 
     LaunchedEffect(language) {
-        places = venue.places(language)
+        places = VenuePlace.withoutGalleryEntrances(venue.places(language), settings.galleryEntranceAmenityId)
         shortcuts = searchShortcuts()
         // The picked places take their titles in the new language.
         destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
@@ -271,7 +273,7 @@ internal fun MuseumMapView(
     }
     LaunchedEffect(language) {
         venue.data.version.drop(1).collect {
-            places = venue.places(language)
+            places = VenuePlace.withoutGalleryEntrances(venue.places(language), settings.galleryEntranceAmenityId)
             shortcuts = searchShortcuts()
             destination = destination?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }
             selectedPlace = selectedPlace?.let { picked -> places.firstOrNull { it.id == picked.id } ?: picked }

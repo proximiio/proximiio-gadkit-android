@@ -2,6 +2,8 @@ package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.ringContains
+import io.proximi.gadkit.map.ringDistance
+import kotlin.math.max
 
 /**
  * The shape of an artwork geofence: a polygon, or a circle around [center], as iOS `ArtworkArea`.
@@ -24,6 +26,13 @@ internal data class ArtworkArea(
         if (center == null || (center.latitude == 0.0 && center.longitude == 0.0) || radius <= 0) return false
         return center.distanceTo(point) <= radius
     }
+
+    /** Metres from [point] to the border of the area: 0 inside it, infinite without a shape. iOS `distance(to:)`. */
+    internal fun distanceTo(point: Coordinate): Double {
+        ring?.let { return ringDistance(it, point) }
+        if (center == null || (center.latitude == 0.0 && center.longitude == 0.0) || radius <= 0) return Double.POSITIVE_INFINITY
+        return max(0.0, center.distanceTo(point) - radius)
+    }
 }
 
 /**
@@ -45,6 +54,12 @@ internal object ArtworkArrival {
         if (stop.kind == StopKind.DETOUR || remoteIds[stop.poiId ?: stop.id] != remoteId) return null
         return stop.id
     }
+
+    /**
+     * Whether [distance] metres from the border of the artwork's geofence is beyond
+     * [io.proximi.gadkit.GadSettings.artworkVisitedMeters]. iOS `isBeyondVisit`.
+     */
+    internal fun isBeyondVisit(distance: Double, artworkVisitedMeters: Double): Boolean = distance > artworkVisitedMeters
 }
 
 /**

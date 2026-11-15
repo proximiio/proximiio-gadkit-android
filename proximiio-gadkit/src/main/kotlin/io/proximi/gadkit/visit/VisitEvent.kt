@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.ArtworkVisitCause
 import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.wristband.TrackingHealth
 import io.proximi.map.core.JourneyEvent
@@ -88,12 +89,15 @@ internal sealed interface VisitEvent {
      */
     data class PositionUncertain(val stop: JourneyStop) : VisitEvent
 
+    /** The visitor is at an artwork of the journey ([io.proximi.gadkit.ProximiMapEvent.ArtworkArrived]). */
+    data class ArtworkArrived(val stop: JourneyStop) : VisitEvent
+
+    /** An artwork of the journey is visited ([io.proximi.gadkit.ProximiMapEvent.ArtworkVisited]). */
+    data class ArtworkVisited(val stop: JourneyStop, val cause: ArtworkVisitCause) : VisitEvent
+
     /**
-     * The visitor left the geofence of the active stop's artwork
-     * ([io.proximi.gadkit.GadSettings.advancesOnArtworkExit]),
-     * or 2 s after they entered it or stood in its area without that setting. The stop is done when
-     * this event arrives, and the route leads to the next stop. The navigator reports no
-     * `StopReached` for artworks.
+     * The active artwork is visited. Sent after [ArtworkVisited], for host apps written before
+     * 1.41.0. The navigator reports no `StopReached` for artworks.
      */
     data class ArtworkReached(val stop: JourneyStop) : VisitEvent
 
@@ -120,7 +124,7 @@ internal sealed interface VisitEvent {
 
     /**
      * An event of the journey navigator: `LegChanged`, `StopSkipped`, `Rerouted`, `DetourStarted`,
-     * `StopReached` (detours only), `JourneyFinished` and others. For artworks use [ArtworkReached]:
+     * `StopReached` (detours only), `JourneyFinished` and others. For artworks use [ArtworkVisited]:
      * the navigator does not report them reached.
      */
     data class Journey(val event: JourneyEvent) : VisitEvent

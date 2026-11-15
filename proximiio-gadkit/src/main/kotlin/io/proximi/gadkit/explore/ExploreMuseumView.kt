@@ -128,6 +128,7 @@ import io.proximi.gadkit.map.MapLoadingSpinner
 import io.proximi.gadkit.map.MapStyle
 import io.proximi.gadkit.map.PlaceFraming
 import io.proximi.gadkit.map.VenueLevel
+import io.proximi.gadkit.map.VenuePlace
 import io.proximi.gadkit.map.gadIcon
 import io.proximi.gadkit.map.levelChangers
 import io.proximi.gadkit.map.places
@@ -212,7 +213,9 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
      * waited for.
      */
     suspend fun load(): Unit = withContext(Dispatchers.Main.immediate) {
-        val places = venue.places(language)
+        val allPlaces = venue.places(language)
+        val entranceAmenityId = venue.settings.galleryEntranceAmenityId
+        val places = VenuePlace.withoutGalleryEntrances(allPlaces, entranceAmenityId)
         val amenities = venue.catalogue()
         amenityIcons = withContext(Dispatchers.Default) {
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it.asImageBitmap() } }.toMap()
@@ -236,9 +239,10 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         layers.updateCones(VenueCone.all(features))
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the card's dot show them (PM, Monday "Explore museum view:
-        // default map view", 2026-10-26).
+        // default map view", 2026-10-26). Nor are the gallery entrances (iOS 1.43.0).
         val amenityPlaces = places.filter { place -> !place.isArtwork && AmenityKind.entries.any { it.matches(place) } }
-        hiddenFeatureIds = levelChangers.map { it.id }.toSet() + places.filter { it.isArtwork }.map { it.id } + amenityPlaces.map { it.id }
+        hiddenFeatureIds = levelChangers.map { it.id }.toSet() + places.filter { it.isArtwork }.map { it.id } + amenityPlaces.map { it.id } +
+            VenuePlace.galleryEntranceIds(allPlaces, entranceAmenityId)
         selected = selected?.let { current -> catalog.all.firstOrNull { it.id == current.id } }
     }
 

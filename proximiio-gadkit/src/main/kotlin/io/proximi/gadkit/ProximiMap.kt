@@ -817,6 +817,8 @@ public class ProximiMap(
                 is VisitEvent.GalleryNearby -> stop(event.stop).let { mapped -> mapped.gallery?.let { ProximiMapEvent.GalleryNearby(it, mapped) } }
                 is VisitEvent.PositionUncertain -> ProximiMapEvent.PositionUncertain(stop(event.stop))
                 is VisitEvent.StopPlaceDeleted -> ProximiMapEvent.StopPlaceDeleted(stop(event.stop))
+                is VisitEvent.ArtworkArrived -> ProximiMapEvent.ArtworkArrived(stop(event.stop))
+                is VisitEvent.ArtworkVisited -> ProximiMapEvent.ArtworkVisited(stop(event.stop), event.cause)
                 is VisitEvent.ArtworkReached -> ProximiMapEvent.ArtworkReached(stop(event.stop))
                 is VisitEvent.ArtworkVisitedOutOfOrder -> ProximiMapEvent.ArtworkVisitedOutOfOrder(stop(event.stop))
                 is VisitEvent.TrackingChanged -> ProximiMapEvent.TrackingChanged(event.health)

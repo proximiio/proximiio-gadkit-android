@@ -83,6 +83,7 @@ built again: both have a new trailing parameter.
 | SDK 6.0.0-beta.38 | Position barriers, on by default: in a venue with barrier features (`metadata.type` `"barrier"`), a position that jumps through a wall stops 0.4 m short of it, and is let through after 10 stopped positions over 5 s. The positions, the geofences and the visitor analytics get the stopped point. The barriers come with the route network. A venue without barriers is unchanged. | Nothing. To turn them off: `positioning = configuration.positioning.copy(barriers = BarrierConfiguration(isEnabled = false))` in `configuration.copy(…)`, which keeps the other positioning sources of the configuration. | Info |
 | SDK 6.0.0-beta.38 | `ProximiioConfiguration.privacyZoneExitDelay` (default `null`: the `geofenceExitDelay`). ProximiioGADKit for Android sets it to 1 s from `GadSettings.privacyZoneExitDelay`. | For the same on your own SDK: `privacyZoneExitDelay = 1.0`. | Recommended |
 | Map 6.0.0-beta.40 | The Map moves to SDK 6.0.0-beta.38. Nothing in the map's code changed. | Nothing. | Info |
+| SDK 6.0.0-beta.40 | The SDK calls the server less often: the venue data package about once an hour, waits between failed uploads and retries. | Nothing. | Info |
 | SDK 6.0.0-beta.39 | A wristband position stream that receives nothing for 45 s ends and connects again; after three failed tries in a row the SDK asks for the position instead. Before, a connection that did not answer stopped the position until the app was restarted. The SDK checks its connections to the relay every 15 s (Android only). | Nothing. | Info |
 
 ### Added
@@ -289,6 +290,11 @@ them.
 | `resumeJourney()` | No call. The route follows a visitor who left it. |
 | `setRouteOptions(options)` | The `routeAccessibility` parameter (`RouteAccessibility`) |
 
+The view reports `ProximiMapEvent.ArtworkVisited(stop, ArtworkVisitCause.APP)` on `onEvent` after the
+app set a stop to `VISITED`, also without `PROGRESS` (1.41.0). The app does not set the stop again for
+this event. An audio guide that marks an artwork visited sets the stop's state to `VISITED`; the map,
+the route and the list follow.
+
 A swipe on a stop in the list reports `ProximiMapEvent.SkipRequested(stop)` on `onEvent` and changes
 nothing. The app sets the stop to `SKIPPED`, or asks the visitor first. Without this the swipe has no
 effect. `ProximiStop.id` is the POI id and `ProximiStop.artworkId` the collection id (`remote_id`); the
@@ -312,7 +318,7 @@ navigator"):
 |---|---|
 | `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies the app's change of `journey` (`update(to)`). |
 | `FarFromRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (30 m) and `GadSettings.offRouteAfter` (300 s). |
-| `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival. The visitor reaches an artwork by entering its geofence, which the app's `geofenceEvents()` reports. |
+| `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival. The visitor reaches an artwork by entering its geofence, which the app's `geofenceEvents()` reports. With `PROGRESS` the view also reports `ProximiMapEvent.ArtworkArrived` and `ArtworkVisited` (1.41.0). |
 | The cue `APPROACHING_DESTINATION` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery; other legs end at the artwork. |
 
 Every time and distance of the view is in `GadSettings` (README "Settings"), passed as `settings`.

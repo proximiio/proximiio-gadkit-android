@@ -1,6 +1,7 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.Coordinate
+import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.ProximiGallery
 import io.proximi.gadkit.ProximiMap
 import io.proximi.gadkit.ProximiMapEvent
@@ -14,6 +15,7 @@ import io.proximi.map.core.VenuePosition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import io.proximi.map.core.JourneyStop as MapJourneyStop
 
 /** Port of ProximiioGADKit `ProximiMapTests` for the gallery of a stop and `galleryNearby` (iOS 1.37.0). */
@@ -78,5 +80,52 @@ class GalleryNearbyDetectorTest {
         val outline = GalleryDestination(Gallery("G403", "G403 Weaving", 3.0, ring), entry = poi, placeId = "poi-g403")
         val inside = position(metresNorth = 30.0, level = 3.0)
         assertEquals("poi-a", detector.update(inside, mapStop("poi-a"), places, listOf(outline))?.id)
+    }
+
+    /** iOS 1.42.0. */
+    @Test
+    fun aGalleryWithEntrancesIsNearbyAtAnEntranceNotAtItsPOI() {
+        val amenity = GadSettings.STANDARD.galleryEntranceAmenityId
+        // Two entrances of G403, 40 m north and 40 m south of the gallery's POI, and one of another gallery at the POI.
+        fun entrance(id: String, metresNorth: Double, gallery: String) = VenuePlace(
+            id = id, title = "Entrance", coordinate = Coordinate(poi.latitude + metresNorth / 111_320, poi.longitude), level = 3.0,
+            amenityId = amenity, galleryId = gallery,
+        )
+        val withEntrances = places + listOf(entrance("e1", 40.0, "G403"), entrance("e2", -40.0, "G403"), entrance("e3", 0.0, "G101"))
+        assertEquals(listOf("e1", "e2"), GalleryNearbyDetector.entrances("G403", withEntrances, amenity).map { it.id })
+        assertTrue(GalleryNearbyDetector.entrances("G403", places, amenity).isEmpty())
+        // The maps and the search leave the entrances out and hide their features (iOS 1.43.0).
+        assertEquals(places, VenuePlace.withoutGalleryEntrances(withEntrances, amenity))
+        assertEquals(setOf("e1", "e2", "e3"), VenuePlace.galleryEntranceIds(withEntrances, amenity))
+        assertTrue(VenuePlace.matching("entrance", VenuePlace.withoutGalleryEntrances(withEntrances, amenity)).isEmpty())
+        val detector = GalleryNearbyDetector(nearbyMeters = 5.0)
+        // At the gallery's POI: not nearby, the gallery has entrances.
+        assertNull(detector.update(position(2.0, 3.0), mapStop("poi-a"), withEntrances, emptyList()))
+        assertEquals("poi-a", detector.update(position(-37.0, 3.0), mapStop("poi-a"), withEntrances, emptyList())?.id)
+        detector.reset()
+        assertEquals("poi-a", detector.update(position(43.0, 3.0), mapStop("poi-a"), withEntrances, emptyList())?.id)
+    }
+
+    /** iOS 1.42.0. */
+    @Test
+    fun anotherGalleryOfTheJourneyIsReportedWhenTheVisitorEntersIt() {
+        // G403 around its POI, 20 m wide. poi-a is an artwork in G403; the active stop poi-b has no gallery.
+        val d = 10 / 111_320.0
+        val ring = listOf(-d to -d, -d to d, d to d, d to -d).map { (lat, lng) -> Coordinate(poi.latitude + lat, poi.longitude + lng) }
+        val outline = GalleryDestination(Gallery("G403", "G403 Weaving", 3.0, ring), entry = poi, placeId = "poi-g403")
+        val detector = GalleryNearbyDetector(nearbyMeters = 5.0)
+        val open = listOf(mapStop("poi-b"), mapStop("poi-a"))
+        fun update(metresNorth: Double, active: String = "poi-b") =
+            detector.update(position(metresNorth, 3.0), mapStop(active), places, listOf(outline), open)?.id
+        assertNull(update(60.0))
+        // Inside G403 while the route leads to poi-b: reported once, with the artwork of G403.
+        assertEquals("poi-a", update(2.0))
+        assertNull(update(3.0))
+        // Out and in again: reported again.
+        assertNull(update(60.0))
+        assertEquals("poi-a", update(2.0))
+        // The artwork of G403 becomes the active stop while the visitor is still inside: not reported twice.
+        assertNull(update(2.0, active = "poi-a"))
+        assertNull(update(3.0, active = "poi-a"))
     }
 }

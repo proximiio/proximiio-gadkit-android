@@ -28,12 +28,12 @@ public data class GadSettings(
     // Arrival
 
     /**
-     * `true`: the journey moves to the next stop when the visitor leaves the geofence of the active
-     * artwork: on the SDK's exit event, or after [geofenceExitDelay] outside it without one (Nagarro,
-     * 2026-10-30: the next stop comes from the exit event). Inside the geofence the artwork is reached:
-     * the card and the destination marker keep the artwork, and the route shows the leg to the next
-     * stop (`JourneyNavigator.drawsNextLegWhileReached`; GAD PM and Nagarro, 2026-10-30). `false`:
-     * [artworkAdvanceDelay] after the visitor entered it. iOS `advancesOnArtworkExit`.
+     * `true`: the journey moves to the next stop when the visitor leaves the active artwork: they are
+     * more than [artworkVisitedMeters] from its geofence for [artworkVisitedSeconds], or they enter the
+     * geofence of another artwork of the journey (GAD PM, 2026-11-15). Inside the geofence the artwork
+     * is reached: the card and the destination marker keep the artwork, and the route shows the leg to
+     * the next stop (`JourneyNavigator.drawsNextLegWhileReached`; GAD PM and Nagarro, 2026-10-30).
+     * `false`: [artworkAdvanceDelay] after the visitor entered it. iOS `advancesOnArtworkExit`.
      */
     val advancesOnArtworkExit: Boolean = true,
     /**
@@ -41,6 +41,13 @@ public data class GadSettings(
      * and the route to the next stop.
      */
     val artworkAdvanceDelay: Duration = 2.seconds,
+    /**
+     * With [advancesOnArtworkExit]: the artwork the visitor arrived at is visited when they are more
+     * than this many metres from the border of its geofence…
+     */
+    val artworkVisitedMeters: Double = 5.0,
+    /** …for this long. One position beyond the distance does not end the visit. */
+    val artworkVisitedSeconds: Duration = 2.seconds,
     /**
      * Time inside the geofence of an artwork that is not the next stop before it counts as visited
      * out of order. A longer time keeps a visitor who crosses it on the way from marking it.
@@ -93,11 +100,18 @@ public data class GadSettings(
      */
     val stopNearbyMeters: Double = 5.0,
     /**
-     * [ProximiMapEvent.GalleryNearby]: the POI of the active stop's gallery is less than this many
-     * metres away in a straight line, on the visitor's level. A visitor inside the gallery's outline
-     * is nearby at any distance. iOS `galleryNearbyMeters`.
+     * [ProximiMapEvent.GalleryNearby]: an entrance of the active stop's gallery is less than this
+     * many metres away in a straight line, on the visitor's level. A gallery without an entrance POI
+     * uses its own POI. A visitor inside the gallery's outline is nearby at any distance. iOS
+     * `galleryNearbyMeters`.
      */
     val galleryNearbyMeters: Double = 5.0,
+    /**
+     * The amenity of the gallery entrance POIs. An entrance names its gallery in
+     * `metadata.gallery_id`; a gallery can have several (GAD PM, 2026-11-15). iOS
+     * `galleryEntranceAmenityID`.
+     */
+    val galleryEntranceAmenityId: String = "7405e6e6-d9f6-4146-adda-de6adbf4a8a1:3c274297-2461-4c4b-b380-262d76a5eca5",
 
     // Route
 
@@ -206,6 +220,12 @@ public data class GadSettings(
      * number of the others (PM, Monday "Clustering", 2026-10-29). iOS `groupsStopMarkers`.
      */
     val groupsStopMarkers: Boolean = true,
+    /**
+     * `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork
+     * in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads
+     * to a gallery. `false` shows nothing there, as before 1.43.0. iOS `showsStopDots`.
+     */
+    val showsStopDots: Boolean = true,
     /**
      * The time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`,
      * map default 0.9 s). Nagarro found the rotation too fast (2026-10-29). iOS `bearingSettlingTime`.

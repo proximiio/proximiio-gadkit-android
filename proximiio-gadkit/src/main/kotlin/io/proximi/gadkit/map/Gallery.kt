@@ -54,27 +54,7 @@ internal data class Gallery(
      * Metres from [coordinate] to the outline, 0 inside it. Measured on a flat projection around
      * [coordinate], which is exact enough within a building.
      */
-    internal fun distanceTo(coordinate: Coordinate): Double {
-        if (contains(coordinate, null)) return 0.0
-        val metersPerLatitude = 111_320.0
-        val metersPerLongitude = metersPerLatitude * cos(coordinate.latitude * PI / 180)
-        fun x(point: Coordinate) = (point.longitude - coordinate.longitude) * metersPerLongitude
-        fun y(point: Coordinate) = (point.latitude - coordinate.latitude) * metersPerLatitude
-        var nearest = Double.POSITIVE_INFINITY
-        var j = ring.size - 1
-        for (i in ring.indices) {
-            val ax = x(ring[j])
-            val ay = y(ring[j])
-            val dx = x(ring[i]) - ax
-            val dy = y(ring[i]) - ay
-            val lengthSquared = dx * dx + dy * dy
-            // The point of the edge nearest the origin, [coordinate].
-            val t = if (lengthSquared > 0) (-(ax * dx + ay * dy) / lengthSquared).coerceIn(0.0, 1.0) else 0.0
-            nearest = min(nearest, hypot(ax + t * dx, ay + t * dy))
-            j = i
-        }
-        return nearest
-    }
+    internal fun distanceTo(coordinate: Coordinate): Double = ringDistance(ring, coordinate)
 
     /** Fill colours of a level as ARGB, opaque. */
     internal data class Colors(val destination: Long, val visited: Long)
@@ -237,4 +217,30 @@ internal fun ringContains(ring: List<Coordinate>, coordinate: Coordinate): Boole
         j = i
     }
     return inside
+}
+
+/**
+ * Metres from [coordinate] to the border of [ring], 0 inside it. [ring] is (latitude, longitude)
+ * pairs. Measured on a flat projection around [coordinate], which is exact enough within a building.
+ */
+internal fun ringDistance(ring: List<Coordinate>, coordinate: Coordinate): Double {
+    if (ringContains(ring, coordinate)) return 0.0
+    val metersPerLatitude = 111_320.0
+    val metersPerLongitude = metersPerLatitude * cos(coordinate.latitude * PI / 180)
+    fun x(point: Coordinate) = (point.longitude - coordinate.longitude) * metersPerLongitude
+    fun y(point: Coordinate) = (point.latitude - coordinate.latitude) * metersPerLatitude
+    var nearest = Double.POSITIVE_INFINITY
+    var j = ring.size - 1
+    for (i in ring.indices) {
+        val ax = x(ring[j])
+        val ay = y(ring[j])
+        val dx = x(ring[i]) - ax
+        val dy = y(ring[i]) - ay
+        val lengthSquared = dx * dx + dy * dy
+        // The point of the edge nearest the origin, [coordinate].
+        val t = if (lengthSquared > 0) (-(ax * dx + ay * dy) / lengthSquared).coerceIn(0.0, 1.0) else 0.0
+        nearest = min(nearest, hypot(ax + t * dx, ay + t * dy))
+        j = i
+    }
+    return nearest
 }

@@ -152,6 +152,19 @@ internal data class VenuePlace(
         internal fun place(id: String, places: List<VenuePlace>): VenuePlace? =
             places.firstOrNull { it.id == id } ?: places.firstOrNull { it.id.endsWith(":$id") }
 
+        /**
+         * [places] without the gallery entrance POIs (amenity [amenityId],
+         * [io.proximi.gadkit.GadSettings.galleryEntranceAmenityId]). The maps and the search do not show
+         * them; `GalleryNearby` measures from them (PM, Monday "Entry POIs, connected to gallery",
+         * 2026-11-15; iOS 1.43.0). Pure; covered by tests.
+         */
+        internal fun withoutGalleryEntrances(places: List<VenuePlace>, amenityId: String): List<VenuePlace> =
+            places.filter { it.amenityId != amenityId }
+
+        /** The ids of the gallery entrance POIs of [places] (amenity [amenityId]). Pure; covered by tests. */
+        internal fun galleryEntranceIds(places: List<VenuePlace>, amenityId: String): Set<String> =
+            places.filter { it.amenityId == amenityId }.map { it.id }.toSet()
+
         /** Case- and diacritic-insensitive substring match on the title. An empty query matches all. */
         internal fun matching(query: String, places: List<VenuePlace>): List<VenuePlace> {
             val needle = query.trim()

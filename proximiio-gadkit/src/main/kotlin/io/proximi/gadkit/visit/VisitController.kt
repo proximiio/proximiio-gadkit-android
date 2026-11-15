@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.ArtworkVisitCause
 import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.map.RouteAccessibility
 import io.proximi.gadkit.map.VenueGeofence
@@ -63,10 +64,12 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  *   only `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
  *   [GadSettings.geofenceExitDelay], 5 s; the SDK default is 3 s), so an artwork counts as inside
  *   up to that long after the visitor left it.
- * - The journey moves to the next stop when the visitor leaves the artwork's geofence
- *   ([GadSettings.advancesOnArtworkExit]; Nagarro, 2026-10-30): on the SDK's exit event
- *   ([artworkGeofenceExited]), after [GadSettings.geofenceExitDelay] outside it without one, or at
- *   once when the visitor is in another open artwork's geofence. Until then the artwork is reached
+ * - The journey moves to the next stop when the visitor leaves the artwork
+ *   ([GadSettings.advancesOnArtworkExit]; Nagarro, 2026-10-30): more than
+ *   [GadSettings.artworkVisitedMeters] from the border of its geofence for
+ *   [GadSettings.artworkVisitedSeconds], or at once when the visitor is in another open artwork's
+ *   geofence (GAD PM, 2026-11-15; in a curated tour the next artwork's). The SDK's exit event does not
+ *   move the journey (iOS 1.41.0). Until then the artwork is reached
  *   (`JourneyNavigator.markReached`): it stays the active stop with the destination marker, and the
  *   navigator draws the leg to the next stop from the visitor (`drawsNextLegWhileReached`; GAD PM and
  *   Nagarro, 2026-10-30). A reached artwork that the navigator moves past (a detour, a chosen stop) is
@@ -244,11 +247,14 @@ internal class VisitController(
      */
     var enteredGeofenceIds: Set<String> = emptySet()
 
+    /** Called when the visitor is at an artwork of the journey. [VisitViewModel] reports [VisitEvent.ArtworkArrived]. */
+    var onArtworkArrived: ((JourneyStop) -> Unit)? = null
+
     /**
-     * Called when an artwork stop is done: `true` for the active stop (its geofence, 2 s after the
-     * arrival), `false` for an artwork visited out of order. The stop is read after `markDone`.
+     * Called after an artwork stop is done, with the reason. The stop is read after `markDone`.
+     * [VisitViewModel] reports [VisitEvent.ArtworkVisited].
      */
-    var onArtworkDone: ((JourneyStop, isActiveStop: Boolean) -> Unit)? = null
+    var onArtworkVisited: ((JourneyStop, ArtworkVisitCause) -> Unit)? = null
 
     /** Stops whose move to the next artwork is scheduled. */
     private val scheduledDone = mutableSetOf<String>()
@@ -259,7 +265,10 @@ internal class VisitController(
      */
     private var arrivedStopId: String? = null
 
-    /** The first fix outside the geofence of [arrivedStopId], for a leave without an exit event (ms). */
+    /**
+     * The first fix more than [GadSettings.artworkVisitedMeters] from the geofence of [arrivedStopId]
+     * (ms); `null` while the visitor is closer.
+     */
     private var outsideArrivedSince: Long? = null
 
     /** The artwork the navigator holds reached (`markReached`) and that is not yet reported visited. */
@@ -397,7 +406,9 @@ internal class VisitController(
         refreshGalleryAhead()
         when (event) {
             is JourneyEvent.StopReached ->
-                if (event.stop.kind != JourneyStop.Kind.DETOUR && !settings.advancesOnArtworkExit) scheduleDone(event.stop.id, settings.artworkAdvanceDelay)
+                if (event.stop.kind != JourneyStop.Kind.DETOUR && !settings.advancesOnArtworkExit) {
+                    scheduleDone(event.stop.id, settings.artworkAdvanceDelay, ArtworkVisitCause.ADVANCE_DELAY)
+                }
             is JourneyEvent.DetourEnded -> if (event.completed) doneJobs += scope.launch { serially { rerouting { orderRemaining() } } }
             is JourneyEvent.LeftRoute, is JourneyEvent.FarFromRoute, is JourneyEvent.OffRouteTooLong -> offRouteEpisode()
             is JourneyEvent.LegChanged -> {
@@ -585,11 +596,13 @@ internal class VisitController(
         if (!managesProgress || mutablePaused.value || navigator.detourStop != null) return
         val id = ArtworkArrival.activeStopId(remoteId, journey, artworkRemoteIds) ?: return
         if (!settings.advancesOnArtworkExit) {
+            if (id in scheduledDone) return
             FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"}")
-            return scheduleDone(id, settings.artworkAdvanceDelay)
+            doneStop(id)?.let { onArtworkArrived?.invoke(it) }
+            return scheduleDone(id, settings.artworkAdvanceDelay, ArtworkVisitCause.ADVANCE_DELAY)
         }
-        outsideArrivedSince = null
         if (arrivedStopId == id) return
+        outsideArrivedSince = null
         arrivedStopId = id
         FieldLog.log("artwork geofence arrival: $id remote ${remoteId ?: "-"} · next stop at the exit")
         doneJobs += scope.launch {
@@ -599,6 +612,7 @@ internal class VisitController(
                 navigator.drawsNextLegWhileReached = true
                 if (!navigator.markReached(id)) return@serially
                 reachedStopId = id
+                doneStop(id)?.let { onArtworkArrived?.invoke(it) }
                 // A next leg from inside the next artwork's gallery ends at the artwork. Without the mark,
                 // `checkGalleryFirst` routed that leg again at the first fix after the exit (iOS 1.31.1).
                 val next = navigator.upcomingStop
@@ -624,30 +638,17 @@ internal class VisitController(
         if (stop.state != JourneyStop.State.DONE) return
         reachedStopId = null
         FieldLog.log("artwork left (the journey moved on): $id")
-        onArtworkDone?.invoke(stop, true)
-    }
-
-    /**
-     * The SDK reports that the visitor left an artwork geofence. Leaving the active artwork they
-     * arrived at moves the journey to the next stop ([GadSettings.advancesOnArtworkExit]).
-     */
-    fun artworkGeofenceExited(remoteId: String?) {
-        if (!managesProgress || mutablePaused.value) return
-        val arrived = arrivedStopId ?: return
-        if (remoteId == null) return
-        val stop = navigator.journey.value.stops.firstOrNull { it.id == arrived }
-        if (artworkRemoteIds[stop?.poiId ?: arrived] != remoteId) return
-        leaveArrivedArtwork("exit event")
+        onArtworkVisited?.invoke(stop, ArtworkVisitCause.JOURNEY_MOVED_ON)
     }
 
     /** The visitor left the active artwork they arrived at: the journey moves to the next stop. */
-    private fun leaveArrivedArtwork(reason: String) {
+    private fun leaveArrivedArtwork(reason: String, cause: ArtworkVisitCause) {
         val id = arrivedStopId ?: return
         arrivedStopId = null
         outsideArrivedSince = null
         if (navigator.activeStop?.id != id) return
         FieldLog.log("artwork left ($reason): $id · next stop")
-        scheduleDone(id, Duration.ZERO)
+        scheduleDone(id, Duration.ZERO, cause)
     }
 
     /**
@@ -675,7 +676,12 @@ internal class VisitController(
             reachedStopId = activeId
         }
         var inside = mutableSetOf<String>()
-        var isInsideActive = false
+        // Metres from the border of the active artwork's geofence; 0 inside it.
+        var activeDistance = Double.POSITIVE_INFINITY
+        // A curated tour counts no artwork out of order, but the next artwork's geofence still ends
+        // the visit of the active one (GAD PM, 2026-11-15).
+        val upcomingId = if (navigator.hasArrived) navigator.upcomingStop?.id else null
+        var isInsideUpcoming = false
         for (stop in navigator.journey.value.stops) {
             if (stop.kind == JourneyStop.Kind.DETOUR) continue
             if (stop.state != JourneyStop.State.PENDING && stop.state != JourneyStop.State.ACTIVE && stop.state != JourneyStop.State.REACHED) continue
@@ -683,12 +689,14 @@ internal class VisitController(
             val areas = artworkAreas[remoteId] ?: continue
             val stopLevel = stop.floor?.level
             if (!VenueLevel.matches(stopLevel, level)) continue
+            if (stop.id == activeId) activeDistance = areas.minOfOrNull { it.distanceTo(point) } ?: Double.POSITIVE_INFINITY
             if (areas.none { it.id in enteredGeofenceIds || it.contains(point) }) continue
             if (stop.id == activeId) {
-                isInsideActive = true
                 artworkGeofenceEntered(remoteId)
             } else if (countsOutOfOrder) {
                 inside += stop.id
+            } else if (stop.id == upcomingId) {
+                isInsideUpcoming = true
             }
         }
         val arrived = arrivedStopId
@@ -701,18 +709,21 @@ internal class VisitController(
                 }
                 // In another open artwork: the visitor has moved on. That artwork counts from the next
                 // fix, after the journey moved on.
-                inside.isNotEmpty() -> {
-                    leaveArrivedArtwork("in another artwork")
+                inside.isNotEmpty() || isInsideUpcoming -> {
+                    leaveArrivedArtwork("in another artwork", ArtworkVisitCause.ENTERED_ANOTHER_ARTWORK)
                     inside = mutableSetOf()
                 }
-                // No exit event: the SDK did not count the visitor inside, or the event was missed.
-                !isInsideActive -> {
+                ArtworkArrival.isBeyondVisit(activeDistance, settings.artworkVisitedMeters) -> {
                     val now = System.currentTimeMillis()
                     val since = outsideArrivedSince ?: now.also { outsideArrivedSince = it }
-                    if (now - since >= settings.geofenceExitDelay.inWholeMilliseconds) {
-                        leaveArrivedArtwork("outside for ${settings.geofenceExitDelay.inWholeSeconds} s")
+                    if (now - since >= settings.artworkVisitedSeconds.inWholeMilliseconds) {
+                        leaveArrivedArtwork(
+                            "more than ${settings.artworkVisitedMeters} m away for ${settings.artworkVisitedSeconds.inWholeSeconds} s",
+                            ArtworkVisitCause.LEFT,
+                        )
                     }
                 }
+                else -> outsideArrivedSince = null
             }
         }
         for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) markOutOfOrder(id)
@@ -793,7 +804,12 @@ internal class VisitController(
                         navigator.move(stopId, toIndex = 0)
                         val isDone = navigator.markDone(stopId)
                         mutablePassingStopId.value = null
-                        if (isDone) doneStop(stopId)?.let { onArtworkDone?.invoke(it, false) }
+                        if (isDone) {
+                            doneStop(stopId)?.let {
+                                onArtworkArrived?.invoke(it)
+                                onArtworkVisited?.invoke(it, ArtworkVisitCause.OUT_OF_ORDER)
+                            }
+                        }
                         orderRemaining()
                         // The navigator draws a new leg only when the active stop changes. Without a
                         // change the old leg, from where the visitor was, would stay (PM "Route drawing
@@ -812,7 +828,7 @@ internal class VisitController(
     }
 
     /** Marks [stopId] visited after [after] if it is still the active stop. The leg to the next artwork is drawn. */
-    private fun scheduleDone(stopId: String, after: Duration) {
+    private fun scheduleDone(stopId: String, after: Duration, cause: ArtworkVisitCause) {
         if (!scheduledDone.add(stopId)) return
         doneJobs += scope.launch {
             try {
@@ -828,7 +844,7 @@ internal class VisitController(
                 if (reachedStopId == stopId) reachedStopId = null
                 val changed = navigator.markDone(stopId)
                 save()
-                if (changed) doneStop(stopId)?.let { onArtworkDone?.invoke(it, true) }
+                if (changed) doneStop(stopId)?.let { onArtworkVisited?.invoke(it, cause) }
             }
         }
     }
@@ -928,7 +944,18 @@ internal class VisitController(
      * first call merges against it.
      */
     private suspend fun performApply(target: CoreJourney) {
+        // The artworks the host app marks visited with this journey (iOS 1.41.0).
+        val done = navigator.journey.value.stops.filter { it.state == JourneyStop.State.DONE }.map { it.id }.toSet()
+        val marked = target.stops.filter { it.kind != StopKind.DETOUR && it.state == StopState.DONE && it.id !in done }.map { it.id }
+        // Reported below, not by [reportReachedStopDone] on the leg change.
+        if (reachedStopId != null && reachedStopId in marked) reachedStopId = null
         val taken = navigator.update(to = target.toMap())
+        for (id in marked) {
+            val stop = doneStop(id) ?: continue
+            if (stop.state != JourneyStop.State.DONE) continue
+            FieldLog.log("artwork visited (the host app): $id")
+            onArtworkVisited?.invoke(stop, ArtworkVisitCause.APP)
+        }
         FieldLog.log("journey applied · ${target.stops.size} stops · ${if (taken) "taken" else "not taken: two stops with one id"}")
     }
 

@@ -192,10 +192,16 @@ public sealed interface ProximiMapEvent {
     public data class StopNearby(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
-     * The gallery of the active stop is nearby: its POI is less than [GadSettings.galleryNearbyMeters]
-     * away in a straight line on the visitor's level, or the visitor is inside the gallery's outline.
-     * Sent once while the gallery stays the gallery of the active stop, also for a journey opened
-     * there. Not sent while the journey is paused or during a detour; sent again when it resumes.
+     * The gallery of the active stop is nearby: one of its entrances is less than
+     * [GadSettings.galleryNearbyMeters] away in a straight line on the visitor's level, or the visitor
+     * is inside the gallery's outline. An entrance is a POI with the amenity
+     * [GadSettings.galleryEntranceAmenityId] and the gallery's id in `metadata.gallery_id`; a gallery
+     * without one uses its own POI. Sent once while the gallery stays the gallery of the active stop,
+     * also for a journey opened there. Not sent while the journey is paused or during a detour; sent
+     * again when it resumes.
+     *
+     * Also sent when the visitor enters another gallery with an artwork of the journey still to
+     * visit: [stop] is the first such artwork. Once per entry.
      */
     public data class GalleryNearby(public val gallery: ProximiGallery, public val stop: ProximiStop) : ProximiMapEvent
 
@@ -217,15 +223,36 @@ public sealed interface ProximiMapEvent {
     public data class StopPlaceDeleted(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
-     * The visitor left the geofence of the active stop's artwork ([GadSettings.advancesOnArtworkExit]),
-     * or [GadSettings.artworkAdvanceDelay] after they reached it without that setting: the stop is
-     * done and the route leads to the next stop.
+     * The visitor is at an artwork of the journey. Once per visit of the artwork.
+     *
+     * The active stop: the visitor entered its geofence, or the leg started inside it. An artwork
+     * further down a personalised journey: the visitor was inside its geofence for
+     * [GadSettings.outOfOrderDwell]; [ArtworkVisited] follows at once. Not sent during a detour,
+     * while the journey is paused, or for an artwork the host app marked visited.
+     */
+    public data class ArtworkArrived(public val stop: ProximiStop) : ProximiMapEvent
+
+    /**
+     * An artwork of the journey is visited: its stop is done. [cause] says why
+     * ([ArtworkVisitCause]). Also sent when the host app marked the stop visited in the `journey`
+     * of [ProximiMapView] ([ArtworkVisitCause.APP]); the host app does not mark the stop again for
+     * this event.
+     *
+     * For one artwork: [ArtworkArrived], [ArtworkVisited], then [NextStop], [StopOrderChanged] or
+     * [JourneyFinished].
+     */
+    public data class ArtworkVisited(public val stop: ProximiStop, public val cause: ArtworkVisitCause) : ProximiMapEvent
+
+    /**
+     * Use [ArtworkVisited]. The active artwork is visited: sent after [ArtworkVisited] for every
+     * cause but [ArtworkVisitCause.OUT_OF_ORDER] and [ArtworkVisitCause.APP]. Removed in a later
+     * release.
      */
     public data class ArtworkReached(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
-     * The visitor stayed at an artwork further down the journey. It counts as visited. A
-     * personalised journey orders the stops ahead again.
+     * Use [ArtworkVisited] with the cause [ArtworkVisitCause.OUT_OF_ORDER]. Sent after it. Removed
+     * in a later release.
      */
     public data class ArtworkVisitedOutOfOrder(public val stop: ProximiStop) : ProximiMapEvent
 
@@ -336,4 +363,28 @@ public sealed class ProximiMapException(message: String) : Exception(message) {
 
     /** None of the plan's artworks is a POI of the venue. */
     public class NoKnownArtworks internal constructor(message: String) : ProximiMapException(message)
+}
+
+/** Why an artwork of the journey is visited ([ProximiMapEvent.ArtworkVisited]). */
+public enum class ArtworkVisitCause {
+    /**
+     * The visitor left the artwork they arrived at: more than [GadSettings.artworkVisitedMeters]
+     * from the border of its geofence for [GadSettings.artworkVisitedSeconds].
+     */
+    LEFT,
+
+    /** The visitor entered the geofence of another artwork of the journey while at this one. */
+    ENTERED_ANOTHER_ARTWORK,
+
+    /** [GadSettings.artworkAdvanceDelay] passed after the arrival ([GadSettings.advancesOnArtworkExit] `false`). */
+    ADVANCE_DELAY,
+
+    /** A personalised journey: the visitor was at an artwork further down the journey. */
+    OUT_OF_ORDER,
+
+    /** The journey moved past the artwork the visitor was at: a detour ended or the visitor chose another stop. */
+    JOURNEY_MOVED_ON,
+
+    /** The host app marked the stop visited in the `journey` of [ProximiMapView]. */
+    APP,
 }

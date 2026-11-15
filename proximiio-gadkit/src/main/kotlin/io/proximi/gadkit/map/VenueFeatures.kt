@@ -68,7 +68,10 @@ internal suspend fun VenueService.galleryDestinations(places: List<VenuePlace>):
  */
 internal suspend fun VenueService.galleries(language: String?): List<Gallery> {
     val features = venueFeatures()
-    val places = withContext(Dispatchers.Default) { VenuePlace.all(features, language) }
+    // Without the gallery entrance POIs (iOS 1.43.0).
+    val places = withContext(Dispatchers.Default) {
+        VenuePlace.withoutGalleryEntrances(VenuePlace.all(features, language), settings.galleryEntranceAmenityId)
+    }
     val destinations = Gallery.destinations(venueGeofences(), places, features).values.toList()
     var outlines = withContext(Dispatchers.Default) { Gallery.all(features, places) }
     if (outlines.isEmpty()) {

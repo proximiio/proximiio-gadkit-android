@@ -1,6 +1,8 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.map.GalleryFill
+import io.proximi.gadkit.map.JourneyMapLayers
+import io.proximi.gadkit.map.JourneyMapLayers.StopDot.Style as DotStyle
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.map.Gallery
@@ -293,5 +295,42 @@ class GalleryPolygonTest {
         assertEquals(setOf("visited-g101", "active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = null))
         assertEquals(setOf("visited-g101"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g303"))
         assertEquals(setOf("active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g101"))
+    }
+
+    /**
+     * An artwork without a numbered marker has a dot in the colours of its state: the artworks in the
+     * hidden set and the skipped ones, or every artwork while the numbers are hidden. A detour and a
+     * stop without a floor have none (iOS 1.43.0).
+     */
+    @Test
+    fun artworksWithoutANumberedMarkerHaveADot() {
+        fun stop(id: String, state: MapJourneyStop.State = MapJourneyStop.State.PENDING, kind: MapJourneyStop.Kind = MapJourneyStop.Kind.PLANNED, level: Double? = 1.0) =
+            MapJourneyStop(id = id, title = id, coordinate = MapCoordinate(24.5, 54.4), floor = level?.let { FloorKey(it) }, poiId = id, kind = kind, state = state)
+        val stops = listOf(
+            stop("visited", state = MapJourneyStop.State.DONE),
+            stop("skipped", state = MapJourneyStop.State.SKIPPED),
+            stop("reached", state = MapJourneyStop.State.REACHED),
+            stop("pending"),
+            stop("pending-here"),
+            stop("no-floor", level = null),
+            stop("cafe", kind = MapJourneyStop.Kind.DETOUR),
+        )
+        val hidden = setOf("visited", "reached", "pending", "no-floor", "cafe")
+        val dots = VisitViewModel.stopDots(stops, hidden, showsNumbers = true)
+        assertEquals(listOf(DotStyle.VISITED, DotStyle.SKIPPED, DotStyle.ACTIVE, DotStyle.PENDING), dots.map { it.style })
+        assertTrue(dots.all { it.level == 1.0 })
+        // Numbers hidden: every artwork with a floor.
+        assertEquals(
+            listOf(DotStyle.VISITED, DotStyle.SKIPPED, DotStyle.ACTIVE, DotStyle.PENDING, DotStyle.PENDING),
+            VisitViewModel.stopDots(stops, emptySet(), showsNumbers = false).map { it.style },
+        )
+        // Numbers shown and nothing hidden: the skipped artwork only.
+        assertEquals(listOf(DotStyle.SKIPPED), VisitViewModel.stopDots(stops, emptySet(), showsNumbers = true).map { it.style })
+        // One image per style, in the stop markers' colours.
+        assertEquals(4, JourneyMapLayers.StopDot.Style.entries.map { JourneyMapLayers.StopDot.imageName(it) }.toSet().size)
+        assertEquals(Triple(0xFFED3731.toInt(), 0xFFFFFFFF.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.ACTIVE))
+        assertEquals(Triple(0xFFFFFFFF.toInt(), 0xFFEEEDED.toInt(), 1f), JourneyMapLayers.stopDotColors(DotStyle.PENDING))
+        assertEquals(Triple(0xFFFFFFFF.toInt(), 0xFFED3731.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.VISITED))
+        assertEquals(Triple(0xFFBDBDBD.toInt(), 0xFFFFFFFF.toInt(), 1f), JourneyMapLayers.stopDotColors(DotStyle.SKIPPED))
     }
 }

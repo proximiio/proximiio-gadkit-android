@@ -25,6 +25,7 @@ import io.proximi.sdk.geofencing.GeofenceEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -86,10 +87,12 @@ class ProximiMapTest {
 
     @Test
     fun visitEventsBecomeHostEventsWithTheArtworkId() {
-        assertEquals(
-            ProximiMapEvent.ArtworkReached(ProximiStop(id = "poi-a", title = "poi-a", artworkId = "GAD.2010.00033", level = 1)),
-            ProximiMap.event(VisitEvent.ArtworkReached(stop("poi-a")), places),
-        )
+        val mapped = ProximiStop(id = "poi-a", title = "poi-a", artworkId = "GAD.2010.00033", level = 1)
+        assertEquals(ProximiMapEvent.ArtworkReached(mapped), ProximiMap.event(VisitEvent.ArtworkReached(stop("poi-a")), places))
+        assertEquals(ProximiMapEvent.ArtworkArrived(mapped), ProximiMap.event(VisitEvent.ArtworkArrived(stop("poi-a")), places))
+        val visited = ProximiMap.event(VisitEvent.ArtworkVisited(stop("poi-a"), ArtworkVisitCause.LEFT), places)
+        assertEquals(ProximiMapEvent.ArtworkVisited(mapped, ArtworkVisitCause.LEFT), visited)
+        assertNotEquals<ProximiMapEvent?>(ProximiMapEvent.ArtworkVisited(mapped, ArtworkVisitCause.APP), visited)
         assertEquals(
             ProximiMapEvent.DetourStarted(ProximiStop(id = "poi-cafe", title = "Café", artworkId = null, level = 0)),
             ProximiMap.event(VisitEvent.DetourStarted(places[2]), places),

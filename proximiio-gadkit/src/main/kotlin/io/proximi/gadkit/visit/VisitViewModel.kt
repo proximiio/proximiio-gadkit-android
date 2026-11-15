@@ -4,6 +4,7 @@ import io.proximi.gadkit.map.venueFeatures
 import io.proximi.gadkit.map.VenueCone
 import io.proximi.gadkit.map.galleryDestinations
 import io.proximi.gadkit.UiText
+import io.proximi.gadkit.ArtworkVisitCause
 import io.proximi.gadkit.map.VenueLevel
 import android.app.Application
 import androidx.compose.runtime.getValue
@@ -213,7 +214,7 @@ internal class VisitViewModel(
     private val stopNearby = StopNearbyDetector(settings.stopNearbyMeters)
 
     /** The gallery of the active stop within [GadSettings.galleryNearbyMeters] or around the visitor. */
-    private val galleryNearby = GalleryNearbyDetector(settings.galleryNearbyMeters)
+    private val galleryNearby = GalleryNearbyDetector(settings.galleryNearbyMeters, settings.galleryEntranceAmenityId)
 
     /** Whether the journey has a stop. Without one the screen shows the map alone. */
     val hasStops: Boolean = journey.stops.isNotEmpty()
@@ -251,6 +252,9 @@ internal class VisitViewModel(
     val showsList: Boolean get() = mode == VisitMode.LIST && hasStops
     var places by mutableStateOf(emptyList<VenuePlace>())
         private set
+
+    /** [places] and the gallery entrance POIs, for `GalleryNearby` (iOS 1.43.0). */
+    private var allPlaces = emptyList<VenuePlace>()
     var galleries by mutableStateOf(emptyList<Gallery>())
         private set
 
@@ -411,8 +415,15 @@ internal class VisitViewModel(
         // Before `controller.start` below: the host app's collectors get the journey's first events.
         onNavigator?.invoke(controller.navigator)
         applyStopMarkers()
-        controller.onArtworkDone = { stop, isActiveStop ->
-            onEvent(if (isActiveStop) VisitEvent.ArtworkReached(stop.toCore()) else VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))
+        controller.onArtworkArrived = { stop -> onEvent(VisitEvent.ArtworkArrived(stop.toCore())) }
+        controller.onArtworkVisited = { stop, cause ->
+            onEvent(VisitEvent.ArtworkVisited(stop.toCore(), cause))
+            // The events of host apps written before 1.41.0.
+            when (cause) {
+                ArtworkVisitCause.OUT_OF_ORDER -> onEvent(VisitEvent.ArtworkVisitedOutOfOrder(stop.toCore()))
+                ArtworkVisitCause.APP -> Unit
+                else -> onEvent(VisitEvent.ArtworkReached(stop.toCore()))
+            }
         }
         floorGuide.onEnter = { change ->
             // Under the Map / List toggle, beside the map buttons, above the stop card.
@@ -606,10 +617,10 @@ internal class VisitViewModel(
                     }
                     event is GeofenceEvent.Exited && event.geofence.isGallery ->
                         if (currentGallery == event.geofence.name) currentGallery = null
+                    // The exit event does not move the journey (iOS 1.41.0): the distance does
+                    // ([VisitController.checkArtworkGeofences]).
                     event is GeofenceEvent.Entered && event.geofence.isArtwork ->
                         controller.artworkGeofenceEntered(event.geofence.remoteId)
-                    event is GeofenceEvent.Exited && event.geofence.isArtwork ->
-                        controller.artworkGeofenceExited(event.geofence.remoteId)
                 }
             }
         }
@@ -649,7 +660,8 @@ internal class VisitViewModel(
      */
     private fun reportGalleryNearby(position: VenuePosition?) {
         if (controller.isPaused.value || controller.navigator.detourStop != null) return
-        galleryNearby.update(position, controller.navigator.activeStop, places, galleryDestinations)
+        val openStops = controller.navigator.journey.value.stops.filter { it.kind != MapJourneyStop.Kind.DETOUR && it.state == MapJourneyStop.State.PENDING }
+        galleryNearby.update(position, controller.navigator.activeStop, allPlaces, galleryDestinations, openStops)
             ?.let { onEvent(VisitEvent.GalleryNearby(it.toCore())) }
     }
 
@@ -760,7 +772,8 @@ internal class VisitViewModel(
     }
 
     private suspend fun loadVenue() {
-        places = venue.places(language)
+        allPlaces = venue.places(language)
+        places = VenuePlace.withoutGalleryEntrances(allPlaces, settings.galleryEntranceAmenityId)
         val amenities = venue.catalogue()
         val icons = withContext(Dispatchers.Default) {
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
@@ -776,7 +789,8 @@ internal class VisitViewModel(
         layers.updateLevelChangers(levelChangers)
         layers.updateCones(VenueCone.all(venue.venueFeatures()))
         levelChangerPlaces = levelChangers
-        hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet()
+        hiddenFeatureIds = (places.filter { it.isArtwork }.map { it.id } + levelChangers.map { it.id }).toSet() +
+            VenuePlace.galleryEntranceIds(allPlaces, settings.galleryEntranceAmenityId)
         val destinations = venue.galleryDestinations(places)
         galleryDestinations = destinations.values.toList()
         applyHiddenFeatures()
@@ -1082,6 +1096,8 @@ internal class VisitViewModel(
      * an artwork in a gallery shows only while the visitor is in that gallery, in every state (PM, Monday
      * "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0). It runs on each
      * change of the journey and of the visitor's gallery.
+     *
+     * An artwork without a numbered marker shows as a dot ([stopDots], [GadSettings.showsStopDots]).
      */
     private fun applyStopMarkers() {
         val shows = showsArtworkMarkers(
@@ -1094,6 +1110,7 @@ internal class VisitViewModel(
             .let { if (settings.groupsStopMarkers) it else it.copy(groupsOverlapping = false) }
             .let { it.copy(hiddenStopIds = stopsOutsideTheVisitorsGallery(controller.navigator.journey.value.stops, visitorGalleryId)) }
         if (session.journeyStopMarkerStyle != style) session.journeyStopMarkerStyle = style
+        layers.updateStopDots(if (settings.showsStopDots) stopDots(controller.navigator.journey.value.stops, style.hiddenStopIds, shows) else emptyList())
     }
 
     /** Finds the gallery the visitor is in, on every fix. */
@@ -1404,7 +1421,14 @@ internal class VisitViewModel(
         if (controller.navigator.noRouteReasons.value[stopId] != null) {
             controller.cancelDetour()
             destinationFailed(routed.requested, ProximiDestination.Failure.NO_ROUTE)
+            return
         }
+        // As "Add a stop": the host app's pause control shows the journey paused, and its resume is
+        // "Resume your Journey" (Nagarro, 2026-11-15: a destination paused the journey on the map
+        // only; iOS 1.42.0).
+        detourPausesJourney = true
+        setPaused(true)
+        onEvent(VisitEvent.JourneyPaused)
     }
 
     /** Ends the route the destination started, after the host app set it to `null`. */
@@ -1607,6 +1631,27 @@ internal class VisitViewModel(
             stops.mapNotNullTo(LinkedHashSet()) { stop ->
                 val gallery = stop.group
                 if (stop.kind == MapJourneyStop.Kind.DETOUR || gallery == null || gallery == visitorGallery) null else stop.id
+            }
+
+        /**
+         * The dots of the artworks that have no numbered marker: every artwork while the numbers are
+         * hidden ([showsNumbers] false), else the artworks in [hiddenStopIds] and the skipped ones. A
+         * detour and a stop without a floor have none. Nagarro reported the artworks as disappearing
+         * from the map (PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing",
+         * 2026-11-15; iOS 1.43.0). Pure; covered by tests.
+         */
+        internal fun stopDots(stops: List<MapJourneyStop>, hiddenStopIds: Set<String>, showsNumbers: Boolean): List<JourneyMapLayers.StopDot> =
+            stops.mapNotNull { stop ->
+                val level = stop.floor?.level ?: return@mapNotNull null
+                if (stop.kind == MapJourneyStop.Kind.DETOUR) return@mapNotNull null
+                if (showsNumbers && stop.id !in hiddenStopIds && stop.state != MapJourneyStop.State.SKIPPED) return@mapNotNull null
+                val style = when (stop.state) {
+                    MapJourneyStop.State.PENDING -> JourneyMapLayers.StopDot.Style.PENDING
+                    MapJourneyStop.State.ACTIVE, MapJourneyStop.State.REACHED -> JourneyMapLayers.StopDot.Style.ACTIVE
+                    MapJourneyStop.State.DONE -> JourneyMapLayers.StopDot.Style.VISITED
+                    MapJourneyStop.State.SKIPPED -> JourneyMapLayers.StopDot.Style.SKIPPED
+                }
+                JourneyMapLayers.StopDot(Coordinate(stop.coordinate.latitude, stop.coordinate.longitude), level, style)
             }
 
         /** Whether the artworks' markers show. Pure; covered by tests. */

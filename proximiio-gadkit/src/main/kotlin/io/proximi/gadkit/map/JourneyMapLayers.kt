@@ -59,6 +59,10 @@ import org.maplibre.geojson.Polygon
  *   PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). Of names that would overlap one
  *   shows, a visited gallery's first; they give way to the stop markers. The destination's name always
  *   shows (iOS 1.25.0).
+ * - a 14 dp dot for each journey artwork without a numbered marker, in the colours of the stop
+ *   marker of its state ([updateStopDots], [StopDot]; iOS 1.43.0, Nagarro, Monday "Artwork icons
+ *   disappearing from the map", 2026-11-15): above the route, below the level changers, the gallery
+ *   names and the numbered markers.
  * - the visited and the destination galleries over the venue's artworks, furniture and inner walls
  *   (`proximiio-inner_wall`), under labels, POI icons, the route and the stop markers.
  * - the building's cones on the shown floor, each an image of the design's metal gradient
@@ -84,6 +88,7 @@ internal class JourneyMapLayers {
     private var levelChangers: List<LevelChangerPlace> = emptyList()
     private var highlight: Highlight? = null
     private var galleryMarkers: List<GalleryMarker> = emptyList()
+    private var stopDots: List<StopDot> = emptyList()
     private var cones: List<VenueCone> = emptyList()
 
     /** The cones' images, drawn when their floor first shows. */
@@ -126,6 +131,29 @@ internal class JourneyMapLayers {
         val imageName: String get() = "gad-gallery-${style.name.lowercase()}-$name"
     }
 
+    /** The dot of a journey artwork that has no numbered marker (`VisitViewModel.stopDots`). iOS `StopDot`. */
+    data class StopDot(val coordinate: Coordinate, val level: Double, val style: Style) {
+        enum class Style {
+            /** Still to visit: white with the grey ring of a pending stop marker. */
+            PENDING,
+
+            /** Visited: white with the red ring of a visited stop marker. */
+            VISITED,
+
+            /** The active stop: red with a white ring. */
+            ACTIVE,
+
+            /** Skipped: grey with a white ring. */
+            SKIPPED,
+        }
+
+        val imageName: String get() = imageName(style)
+
+        internal companion object {
+            fun imageName(style: Style): String = "gad-stop-dot-${style.name.lowercase()}"
+        }
+    }
+
     /** Installs the layers on every style [canvas] loads, the loaded one included. */
     fun attach(canvas: ProximiioMapCanvas) {
         detach()
@@ -150,8 +178,16 @@ internal class JourneyMapLayers {
         apply(style)
         if (levelChanged) {
             applyLevelChanger(style)
+            applyStopDots(style)
             applyCones(style)
         }
+    }
+
+    /** The dots of the journey artworks without a numbered marker. Does nothing when nothing changed. */
+    fun updateStopDots(dots: List<StopDot>) {
+        if (dots == stopDots) return
+        stopDots = dots
+        canvas?.style?.let(::applyStopDots)
     }
 
     /** The venue's lifts, staircases and escalators. Each shows on the floors it serves. */
@@ -228,6 +264,22 @@ internal class JourneyMapLayers {
             )
             canvas.addLayer(destination, MapCanvasLayerAnchor.Above(GALLERY_NAME_LAYER))
         }
+        if (style.getSource(STOP_DOT_SOURCE) == null) {
+            for (dot in StopDot.Style.entries) {
+                val name = StopDot.imageName(dot)
+                if (style.getImage(name) == null) style.addImage(name, stopDotImage(canvas.context, dot))
+            }
+            style.addSource(GeoJsonSource(STOP_DOT_SOURCE))
+            val layer = SymbolLayer(STOP_DOT_LAYER, STOP_DOT_SOURCE).withProperties(
+                PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
+                PropertyFactory.iconAllowOverlap(true),
+                PropertyFactory.iconIgnorePlacement(true),
+                // The active stop's dot over the others.
+                PropertyFactory.symbolSortKey(Expression.get(SORT_PROPERTY)),
+            )
+            // Above the route, below the level changers, the gallery names and the numbered markers.
+            canvas.addLayer(layer, MapCanvasLayerAnchor.Below(LEVEL_CHANGER_LAYER))
+        }
         if (style.getSource(GALLERY_SOURCE) == null) {
             style.addSource(GeoJsonSource(GALLERY_SOURCE))
             // The visited and the destination galleries over the venue's artworks, furniture and inner
@@ -276,8 +328,20 @@ internal class JourneyMapLayers {
         apply(style)
         applyConnector(style)
         applyLevelChanger(style)
+        applyStopDots(style)
         applyCones(style)
         styleConeOutlines(style)
+    }
+
+    private fun applyStopDots(style: Style) {
+        val source = style.getSource(STOP_DOT_SOURCE) as? GeoJsonSource ?: return
+        val features = stopDots.filter { VenueLevel.same(it.level, level) }.map { dot ->
+            Feature.fromGeometry(Point.fromLngLat(dot.coordinate.longitude, dot.coordinate.latitude)).apply {
+                addStringProperty(IMAGE_PROPERTY, dot.imageName)
+                addNumberProperty(SORT_PROPERTY, if (dot.style == StopDot.Style.ACTIVE) 1 else 0)
+            }
+        }
+        source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
     /** The venue's cones, at the start and after a change of the venue data. */
@@ -501,6 +565,32 @@ internal class JourneyMapLayers {
 
         private data class PillColors(val fill: Int, val outline: Int, val outlineDp: Float, val text: Int)
 
+        /** The fill, the ring and the ring's width in dp of a stop dot (iOS `stopDotImage(style:)`). Pure; covered by tests. */
+        fun stopDotColors(style: StopDot.Style): Triple<Int, Int, Float> = when (style) {
+            StopDot.Style.PENDING -> Triple(Color.WHITE, PENDING_RING_COLOR, 1f)
+            StopDot.Style.VISITED -> Triple(Color.WHITE, MARKER_COLOR, 2f)
+            StopDot.Style.ACTIVE -> Triple(MARKER_COLOR, Color.WHITE, 2f)
+            StopDot.Style.SKIPPED -> Triple(SKIPPED_DOT_COLOR, Color.WHITE, 1f)
+        }
+
+        /** A circle of [STOP_DOT_DP] in the colours of the stop marker of the same state, without the number. */
+        fun stopDotImage(context: Context, style: StopDot.Style): Bitmap {
+            val density = context.resources.displayMetrics.density
+            val size = (STOP_DOT_DP * density).roundToInt()
+            val (fill, ring, ringDp) = stopDotColors(style)
+            val width = ringDp * density
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val radius = (size - width) / 2f
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill }
+            canvas.drawCircle(size / 2f, size / 2f, radius, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = width
+            paint.color = ring
+            canvas.drawCircle(size / 2f, size / 2f, radius, paint)
+            return bitmap
+        }
+
         private fun coneId(id: String): String = "gad-cone-$id"
 
         /** The venue style's gallery fill; the cone images go under it. */
@@ -548,6 +638,13 @@ internal class JourneyMapLayers {
         private fun kindFilter(kind: PointKind): Expression =
             Expression.eq(Expression.get(KIND_PROPERTY), Expression.literal(kind.value))
         const val MARKER_DP = 30
+        const val STOP_DOT_SOURCE = "gad-stop-dots"
+        const val STOP_DOT_LAYER = "gad-stop-dots"
+
+        /** The diameter of a stop dot. iOS `stopDotDiameter`. */
+        const val STOP_DOT_DP = 14
+        const val PENDING_RING_COLOR = 0xFFEEEDED.toInt()
+        const val SKIPPED_DOT_COLOR = 0xFFBDBDBD.toInt()
         const val MARKER_COLOR = 0xFFED3731.toInt()
         const val INK_COLOR = 0xFF2B2B2B.toInt()
     }
