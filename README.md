@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.38` and Map `6.0.0-beta.40` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.39` and Map `6.0.0-beta.40` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -1120,7 +1120,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.73 and Map 6.0.0-beta.64 | SDK 6.0.0-beta.38 and Map 6.0.0-beta.40 | The same SDK and Map changes on both platforms, except the network changes of iOS SDK 6.0.0-beta.73 (see 1.40.0). The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.73 and Map 6.0.0-beta.64 | SDK 6.0.0-beta.39 and Map 6.0.0-beta.40 | The same SDK and Map changes on both platforms, except the network changes of iOS SDK 6.0.0-beta.73 (see 1.40.0). The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1153,6 +1153,18 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+#### Changed (SDK 6.0.0-beta.39)
+
+- **BREAKING:** the library depends on SDK `6.0.0-beta.39` (was `6.0.0-beta.38`). A host app that
+  declares it itself moves to the same version. No source or binary change. Map `6.0.0-beta.40` stays.
+- **Visible:** the wristband position comes back after the connection to the relay stalls. Before, a
+  reconnect that got no answer waited for ever: the position stopped until the app was restarted, and
+  walking did not help (Nagarro and Annina, 2026-11-15). Now a position stream that receives nothing for
+  45 s ends and connects again, after 1 s, then up to 30 s between tries; after three failed tries in a
+  row the SDK asks for the position every few seconds instead. A quiet stream stays open: the relay
+  sends a keep-alive every 15 s. The SDK also checks its connections to the relay every 15 s and closes
+  one that does not answer (Android only). Nothing to do in the host app.
 
 #### Changed (Android only)
 

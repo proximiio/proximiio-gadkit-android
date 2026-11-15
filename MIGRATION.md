@@ -83,6 +83,7 @@ built again: both have a new trailing parameter.
 | SDK 6.0.0-beta.38 | Position barriers, on by default: in a venue with barrier features (`metadata.type` `"barrier"`), a position that jumps through a wall stops 0.4 m short of it, and is let through after 10 stopped positions over 5 s. The positions, the geofences and the visitor analytics get the stopped point. The barriers come with the route network. A venue without barriers is unchanged. | Nothing. To turn them off: `positioning = configuration.positioning.copy(barriers = BarrierConfiguration(isEnabled = false))` in `configuration.copy(…)`, which keeps the other positioning sources of the configuration. | Info |
 | SDK 6.0.0-beta.38 | `ProximiioConfiguration.privacyZoneExitDelay` (default `null`: the `geofenceExitDelay`). ProximiioGADKit for Android sets it to 1 s from `GadSettings.privacyZoneExitDelay`. | For the same on your own SDK: `privacyZoneExitDelay = 1.0`. | Recommended |
 | Map 6.0.0-beta.40 | The Map moves to SDK 6.0.0-beta.38. Nothing in the map's code changed. | Nothing. | Info |
+| SDK 6.0.0-beta.39 | A wristband position stream that receives nothing for 45 s ends and connects again; after three failed tries in a row the SDK asks for the position instead. Before, a connection that did not answer stopped the position until the app was restarted. The SDK checks its connections to the relay every 15 s (Android only). | Nothing. | Info |
 
 ### Added
 
