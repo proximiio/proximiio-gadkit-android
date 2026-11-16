@@ -1198,7 +1198,16 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-The behaviour of the iOS package 1.49.0, which includes 1.48.0. There is no Android 1.48.0.
+No changes since 1.49.0.
+
+### [1.49.0] — 2026-11-16
+
+The behaviour of the iOS package 1.49.0, which includes 1.48.0, on SDK 6.0.0-beta.40 and Map
+6.0.0-beta.40 as 1.47.0. There is no Android 1.48.0.
+
+Breaking for the host app, with no source change: the field log is on by default and is sent to the
+relay-api of the build, and an artwork entered out of order is visited when the visitor leaves it, not
+at the entry. The entries below say what the host app has to do.
 
 #### Changed (iOS 1.49.0; operator, 2026-11-16: the logs of every tester on site are collected)
 
