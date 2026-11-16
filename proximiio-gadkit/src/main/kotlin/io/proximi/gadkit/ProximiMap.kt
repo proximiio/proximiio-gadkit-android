@@ -121,6 +121,11 @@ public class ProximiMap(
 
     private val context = context.applicationContext
 
+    init {
+        // The field log is on by default (iOS 1.49.0); a host app that called `FieldLog.start` keeps its file.
+        FieldLog.ensureStarted(this.context, configuration.secrets)
+    }
+
     /** Main-thread work for the life of [scope]. */
     private val mainScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]) + Dispatchers.Main.immediate)
 
@@ -266,6 +271,10 @@ public class ProximiMap(
             } else {
                 VenueService.start(context, configuration, session.binding).also { started ->
                     this.venue = started
+                    FieldLog.startUploading(
+                        context, configuration.relayEndpoint.baseUrl, configuration.relayApiAppToken,
+                        configuration.settings.fieldLogUploadInterval,
+                    )
                     session.forwardPrivacy(started.sdk)
                 }
             }

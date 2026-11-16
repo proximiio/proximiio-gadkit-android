@@ -78,8 +78,11 @@ import io.proximi.gadkit.visit.Journey as CoreJourney
  * - Artwork legs have no arrival by distance ([artworkGuidanceRules]). An artwork the visitor walks
  *   past without entering its geofence stays unvisited until it is skipped.
  * - Out of order: a visitor inside the geofence of another open artwork for
- *   [GadSettings.outOfOrderDwell] (0 while testing) marks it visited (PM review 2026-10-12).
- * - After an out-of-order visit, the stops still ahead are ordered again from the visitor.
+ *   [GadSettings.outOfOrderDwell] (0 while testing) makes it the current stop: it is reached, and
+ *   visited by the rules of any reached artwork. The stops still ahead are ordered again from the
+ *   visitor when it is visited (GAD PM, 2026-11-16; iOS 1.48.0). With
+ *   [GadSettings.visitsOutOfOrderAtEntry], or without [GadSettings.advancesOnArtworkExit], it is
+ *   visited at the entry and the stops are ordered at once (PM review 2026-10-12).
  * - A curated tour ignores such an artwork: it stays open ([countsOutOfOrder]; PM, Monday "Curated
  *   tours: ignore other artworks", 2026-10-23).
  * - An amenity has no geofence. A detour is reached within 5–10 m for 5 s ([detourGuidanceRules],
@@ -277,8 +280,14 @@ internal class VisitController(
     /** Time inside the geofence of each open artwork that is not the active stop. */
     private val outOfOrderDwell = GeofenceDwell()
 
-    /** Out-of-order artworks being marked visited. */
+    /** Out-of-order artworks being marked visited, or being made the current stop. */
     private val markingOutOfOrder = mutableSetOf<String>()
+
+    /**
+     * The artwork that became the current stop because the visitor entered it out of order. The
+     * stops ahead are ordered again from the visitor when it is visited.
+     */
+    private var outOfOrderArrivedId: String? = null
 
     private val mutableOffRoute = MutableStateFlow(false)
 
@@ -706,6 +715,7 @@ internal class VisitController(
                 arrived != activeId -> {
                     arrivedStopId = null
                     outsideArrivedSince = null
+                    if (outOfOrderArrivedId == arrived) outOfOrderArrivedId = null
                 }
                 // In another open artwork: the visitor has moved on. That artwork counts from the next
                 // fix, after the journey moved on.
@@ -726,7 +736,42 @@ internal class VisitController(
                 else -> outsideArrivedSince = null
             }
         }
-        for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) markOutOfOrder(id)
+        for (id in outOfOrderDwell.update(inside, System.currentTimeMillis(), outOfOrderDwellMillis)) {
+            if (arrivesOutOfOrder(settings)) arriveOutOfOrder(id) else markOutOfOrder(id)
+        }
+    }
+
+    /**
+     * Makes a pending artwork the visitor entered out of order the current stop. The next check of
+     * the fix finds the visitor inside the active artwork's geofence: the artwork is reached, and it
+     * is visited as any reached artwork (GAD PM, 2026-11-16: an artwork entered out of order is not
+     * visited at the entry; iOS 1.48.0). An artwork the visitor is still at is left first
+     * ([leaveArrivedArtwork], "in another artwork"); this runs after it.
+     */
+    private fun arriveOutOfOrder(stopId: String) {
+        if (!markingOutOfOrder.add(stopId)) return
+        doneJobs += scope.launch {
+            serially {
+                try {
+                    // `arrivedStopId`: another artwork entered at the same fix is already the current stop.
+                    if (mutablePaused.value || navigator.detourStop != null || navigator.hasArrived || arrivedStopId != null) return@serially
+                    if (navigator.journey.value.stops.firstOrNull { it.id == stopId }?.state != JourneyStop.State.PENDING) return@serially
+                    FieldLog.log("artwork entered out of order: $stopId · it is the current stop")
+                    val isActive = rerouting {
+                        // The artwork moves before the stops still to visit: the numbers follow the
+                        // visit order, and the navigator leads to it.
+                        navigator.move(stopId, toIndex = 0)
+                        navigator.activeStop?.id == stopId
+                    }
+                    if (!isActive) return@serially
+                    outOfOrderArrivedId = stopId
+                    save()
+                    checkArtworkGeofences()
+                } finally {
+                    markingOutOfOrder.remove(stopId)
+                }
+            }
+        }
     }
 
     /**
@@ -845,7 +890,15 @@ internal class VisitController(
                 val changed = navigator.markDone(stopId)
                 save()
                 if (changed) doneStop(stopId)?.let { onArtworkVisited?.invoke(it, cause) }
-                if (changed) orderFromTheVisitorsGallery()
+                if (!changed) return@serially
+                if (outOfOrderArrivedId == stopId) {
+                    // Entered out of order: the stops ahead are ordered from the visitor, as they
+                    // were at the entry before 1.48.0.
+                    outOfOrderArrivedId = null
+                    rerouting { orderRemaining() }
+                } else {
+                    orderFromTheVisitorsGallery()
+                }
             }
         }
     }
@@ -1108,6 +1161,12 @@ internal class VisitController(
     }
 
     companion object {
+        /**
+         * Whether an artwork entered out of order becomes the current stop and waits for the visit
+         * rules, or is visited at the entry. iOS `VisitController.arrivesOutOfOrder(settings:)`.
+         */
+        fun arrivesOutOfOrder(settings: GadSettings): Boolean = settings.advancesOnArtworkExit && !settings.visitsOutOfOrderAtEntry
+
         /** The order strategy for [settings]. Pure; covered by tests. */
         internal fun orderStrategy(settings: GadSettings): JourneyOrderStrategy =
             if (settings.ordersGalleriesByWalkingTime) JourneyOrderStrategy.FLOOR_THEN_GALLERY_ROUTED else JourneyOrderStrategy.FLOOR_THEN_GALLERY

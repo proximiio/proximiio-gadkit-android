@@ -8,7 +8,9 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
+import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import java.io.File
+import java.net.URI
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -16,12 +18,16 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.Executors
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A text log of positions, tracking health, geofence, journey and binding events for field tests,
- * as iOS `FieldLog`. It is off until the host app calls [start], in test builds only. The file is
+ * as iOS `FieldLog`. It is on by default since 1.49.0: `ProximiMap` opens the file when it is
+ * created, and the host app turns the log off with [isEnabled]. The file is
  * `files/fieldlog/gad-debug.log` in app-private storage; [share] hands it to the share sheet through
- * the FileProvider `<applicationId>.gadkit.fieldlog`. Each line also goes to Logcat (tag `GAD`).
+ * the FileProvider `<applicationId>.gadkit.fieldlog`, and [startUploading] sends it to the relay-api
+ * (`FieldLogUpload.kt`). Each line also goes to Logcat (tag `GAD`).
  *
  * A line is `[GAD] <time stamp> <message>`. The time stamp is ISO 8601 in UTC with the date and
  * milliseconds, for example `2026-10-19T12:52:10.123Z` ([TIME_STAMP]).
@@ -29,24 +35,39 @@ import java.util.concurrent.Executors
  * The secrets passed to [start] are replaced by `<redacted>`. The file is cut to its last
  * [KEEP_BYTES] when it grows past [MAX_BYTES]. While it is off, every call returns at once.
  */
+@Suppress("StaticFieldLeak") // The application context.
 public object FieldLog {
     private const val MAX_BYTES = 8_000_000L
     private const val KEEP_BYTES = 4_000_000
     private const val FILE_NAME = "gad-debug.log"
     private const val TAG = "GAD"
 
-    private val writer = lazy { Executors.newSingleThreadExecutor { Thread(it, "gad-field-log").apply { isDaemon = true } } }
+    /** The version of the library, sent with each upload. iOS `FieldLog.packageVersion`. */
+    public const val PACKAGE_VERSION: String = "1.49.0"
+
+    /** The thread of every read and write of the file and of the place of the upload. */
+    internal val writer = lazy { Executors.newSingleThreadExecutor { Thread(it, "gad-field-log").apply { isDaemon = true } } }
 
     /** The log file, `files/fieldlog/gad-debug.log`, after [start]; `null` before. iOS `FieldLog.url`. */
     @Volatile
     public var file: File? = null
         private set
+    @Volatile
     private var secrets: List<String> = emptyList()
 
-    /** True after [start]. */
+    /** The application context, after [start]. */
     @Volatile
-    public var isEnabled: Boolean = false
+    internal var context: Context? = null
         private set
+
+    /**
+     * Whether [log] writes. `true` by default since 1.49.0. To turn the log off, set it to `false`
+     * once at launch, before the host app creates its `ProximiMap`. The log writes after its file
+     * is open: `ProximiMap` opens it when it is created, a host app without `ProximiMap` calls
+     * [start] or [startUploading].
+     */
+    @Volatile
+    public var isEnabled: Boolean = true
 
     /**
      * Turns the log on, opens the file and writes the header of a new session: the host app's
@@ -55,6 +76,7 @@ public object FieldLog {
      */
     public fun start(context: Context, secrets: List<String>) {
         this.secrets = secrets.filter { it.isNotEmpty() }
+        this.context = context.applicationContext
         file = File(File(context.filesDir, "fieldlog").apply { mkdirs() }, FILE_NAME)
         isEnabled = true
         val now = OffsetDateTime.now().truncatedTo(ChronoUnit.SECONDS)
@@ -62,14 +84,50 @@ public object FieldLog {
         log("launch ${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)}) $now")
     }
 
+    /**
+     * Opens the file as [start] does, unless the host app turned the log off or the file is open.
+     * With an open file it adds [secrets] to the tokens to redact.
+     */
+    @Synchronized
+    internal fun ensureStarted(context: Context, secrets: List<String>) {
+        if (!isEnabled) return
+        if (file == null) start(context, secrets) else this.secrets = (this.secrets + secrets.filter { it.isNotEmpty() }).distinct()
+    }
+
+    /**
+     * Starts sending the log to the relay-api of [binding], with its app token: `POST /v1/app-logs`
+     * 10 s after the call, every [interval], and when the app goes to the background. For a host
+     * app on `ProximiMapView`: call it once, after the app created its `BlueiotWristbandBinding`.
+     * `ProximiMap` calls it in `start()` with `GadSettings.fieldLogUploadInterval`. A second call
+     * replaces the first. Does nothing while [isEnabled] is `false`. Opens the log file when it is
+     * not open. iOS `FieldLog.startUploading(binding:interval:)`.
+     *
+     * @param interval the time between uploads. Zero or less sends nothing.
+     */
+    public fun startUploading(context: Context, binding: BlueiotWristbandBinding, interval: Duration = 900.seconds) {
+        startUploading(context, binding.configuration.relayURL.baseUrl, binding.configuration.appToken, interval)
+    }
+
+    /** Starts sending the log to [relayUrl] (scheme and host of the relay-api) with [appToken]. */
+    public fun startUploading(context: Context, relayUrl: URI, appToken: String, interval: Duration = 900.seconds) {
+        ensureStarted(context, listOf(appToken))
+        FieldLogUploader.start(context.applicationContext, relayUrl, appToken, interval)
+    }
+
+    /** Stops the uploads. The log file stays. iOS `FieldLog.stopUploading()`. */
+    public fun stopUploading() {
+        FieldLogUploader.stop()
+    }
+
     /** Appends one line with a time stamp. */
     @SuppressLint("LogNotTimber")
     public fun log(message: String) {
         if (!isEnabled) return
+        // Before the file is open nothing is written, also not to Logcat.
+        val file = file ?: return
         val text = redact(message, secrets)
         val line = "[GAD] ${TIME_STAMP.format(Instant.now())} $text\n"
         Log.i(TAG, text)
-        val file = file ?: return
         writer.value.execute { append(file, line) }
     }
 
@@ -121,6 +179,8 @@ public object FieldLog {
         val newline = (start until data.size).firstOrNull { data[it] == '\n'.code.toByte() }
         if (newline != null) start = newline + 1
         file.writeBytes(data.copyOfRange(start, data.size))
+        // The upload counts its place from the start of the log, not of the file.
+        context?.let { FieldLogUploadState(FieldLogUploadState.store(it)).addRemoved(start.toLong()) }
     }
 
     /** The time stamp of a line: ISO 8601 in UTC with the date and milliseconds, as iOS `FieldLog.timeStamp`. */

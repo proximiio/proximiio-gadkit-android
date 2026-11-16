@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.47.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.49.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.47.0
+git -C gadkit checkout 1.49.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -837,7 +837,7 @@ lists:
 | `GalleryNearby(gallery, stop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityId` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. It is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
 | `PositionUncertain(stop)` | `ProximiMapView` without `PROMPTS`: the position is uncertain near the active stop, where the prompt would ask "Probably at …". At most once per `locationQuestionQuietPeriod`. |
 | `StopPlaceDeleted(stop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. See "Venue data changes". |
-| `ArtworkArrived(stop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence, just before its `ArtworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `GeofenceEntered` arrives at the enter. |
+| `ArtworkArrived(stop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence it becomes the active stop (`NextStop`), then this event comes, and `ArtworkVisited` follows when the visitor leaves it; with `visitsOutOfOrderAtEntry` it comes just before its `ArtworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `GeofenceEntered` arrives at the enter. |
 | `ArtworkVisited(stop, cause)` | An artwork of the journey is visited: its stop is done. Sent for every `ArtworkVisitCause`: `LEFT` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `ENTERED_ANOTHER_ARTWORK` (a fix in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `ADVANCE_DELAY` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `OUT_OF_ORDER` (personalised journeys: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `JOURNEY_MOVED_ON` (a detour ended or the visitor chose another stop while at the artwork) and `APP` (the host app set the stop to `VISITED` in the journey of `ProximiMapView`). The host app does not set the stop to `VISITED` again for this event. For one artwork the order is `ArtworkArrived`, `ArtworkVisited`, then `NextStop`, `StopOrderChanged` or `JourneyFinished`. The SDK's `GeofenceExited` of the artwork does not move the journey. |
 | `ArtworkReached(stop)` | Use `ArtworkVisited`. Sent after `ArtworkVisited` for every cause but `OUT_OF_ORDER` and `APP`. Removed in a later release. |
 | `ArtworkVisitedOutOfOrder(stop)` | Use `ArtworkVisited` with the cause `OUT_OF_ORDER`. Sent after it. Removed in a later release. |
@@ -891,7 +891,8 @@ val configuration = GadConfiguration(
 | `artworkVisitedMeters` | 5 m | With `advancesOnArtworkExit`: the artwork the visitor arrived at is visited when they are more than this far from the border of its geofence for `artworkVisitedSeconds` (GAD PM, 2026-11-15). A visitor on another level counts as beyond it. |
 | `artworkVisitedSeconds` | 2 s | The time beyond `artworkVisitedMeters`. One position beyond the distance does not end the visit. |
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `null`: at any distance. The remaining distance and the instructions follow every position. |
-| `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
+| `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before the artwork counts as entered out of order (personalised journeys only). |
+| `visitsOutOfOrderAtEntry` | `false` | `false`: an artwork entered out of order becomes the current stop and is visited when the visitor leaves it, enters another artwork, or the host app marks it. `true`: it is visited at the entry, as before 1.49.0. With `advancesOnArtworkExit` `false` it is always visited at the entry. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time the position stays outside an entered geofence before the SDK reports the exit; a privacy zone uses `privacyZoneExitDelay` when it is set. A position back inside within it reports nothing. `ProximiMap` sets it in the SDK it starts; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.geofenceExitDelay` (SDK default 3 s). |
 | `privacyZoneExitDelay` | 1 s | Time the position stays outside an entered privacy zone before the SDK reports its exit. The first position after the zone comes then. `null`: `geofenceExitDelay`. `ProximiMap` sets it; `ProximiMapView` runs on the host app's SDK and its `ProximiioConfiguration.privacyZoneExitDelay` (SDK default `null`). |
@@ -912,6 +913,7 @@ val configuration = GadConfiguration(
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker with a badge holding the number of the others (PM, Monday "Clustering", 2026-10-29). |
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. |
+| `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
@@ -1020,12 +1022,39 @@ It needs the notification permission.
 `FieldLog` writes relay positions, positions during a visit, tracking health, artwork arrivals,
 journey, binding and `ProximiMap` events to `files/fieldlog/gad-debug.log` in app-private storage
 (`FieldLog.file`), and to Logcat with the tag `GAD`. It does not write the SDK's geofence events. It
-is off by default. Turn it on at launch, before `start()`, in test builds only:
+is on by default since 1.49.0, in every build: `ProximiMap` opens the file when it is created, with the
+tokens of its configuration replaced by `<redacted>`. To turn it off, set `FieldLog.isEnabled = false`
+at launch, before the host app creates its `ProximiMap`. A host app that wants the lines from its launch
+on, or the SDK's log entries, calls at launch:
 
 ```kotlin
 FieldLog.start(context, configuration.secrets)   // the tokens are replaced by <redacted>
 Proximiio.logSink = { entry -> FieldLog.log("sdk ${entry.category} ${entry.level.label.lowercase()}: ${entry.message}") }
 ```
+
+### Upload to the relay-api
+
+Since 1.49.0 the library sends the log to the relay-api of the build: `POST <relayApiBaseUrl>/v1/app-logs`
+with the relay app token. The log goes only to that relay: a production build sends it to the client's
+relay, which stores it only when app logs are switched on there.
+
+- `ProximiMap` starts the uploads in `start()`. `GadSettings.fieldLogUploadInterval` (900 s) is the time
+  between two uploads; zero sends nothing.
+- A host app on `ProximiMapView` without `ProximiMap` calls
+  `FieldLog.startUploading(context, binding)` once, after it created its `BlueiotWristbandBinding`. The
+  library takes the relay URL and the app token from the binding's configuration.
+  `FieldLog.startUploading(context, relayUrl, appToken)` takes them as arguments.
+  `FieldLog.stopUploading()` stops the uploads; the file stays.
+- An upload runs 10 s after the start, then at each interval, and when the app goes to the background.
+  It sends the lines written since the last accepted upload, whole lines only, up to 512 000 bytes per
+  request and 8 requests per run.
+- Each request names the install (a random UUID the library creates once), a sequence number, the
+  platform `android`, the application id, the version code and the library version
+  (`FieldLog.PACKAGE_VERSION`).
+- A request that fails is sent again with the same bytes and the same sequence number at the next
+  upload. On `413` the library halves the request size, down to 16 000 bytes. On `401` or `403` it sends
+  nothing more until the next start.
+- Lines that the 8 MB limit cut from the file before they were sent are lost.
 
 `FieldLog.share(context)` opens the share sheet with the file; `FieldLog.share(context, file)` with
 another text file in the same folder, for example an excerpt. A line is `[GAD] <time stamp> <message>`;
@@ -1126,7 +1155,8 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | Launch arguments in the Debug configuration (`-journeyPlayback`) | Intent extras in a debuggable build (`gad.journey`) | Read from the activity that composes `ProximiMapHost`. |
 | A view keeps its state while SwiftUI redraws it | A recreated activity keeps the screen on screen and the journey's state | For example after a language change. After the process ends only the stored journey stays. |
 | Live Activity (`ProximiioGADLiveActivity`) | Ongoing journey notification | No widget extension. |
-| `FieldLog.isEnabled = true` + `logLaunch()`, `FieldLogShareButton` | `FieldLog.start(context, secrets)`, `FieldLog.share(context)` | |
+| `FieldLog.isEnabled` (`true` by default), `logLaunch()`, `FieldLogShareButton` | `FieldLog.isEnabled` (`true` by default), `FieldLog.start(context, secrets)`, `FieldLog.share(context)` | `ProximiMap` opens the file. |
+| `FieldLog.startUploading(binding:interval:)`, `stopUploading()` | `FieldLog.startUploading(context, binding, interval)`, `stopUploading()` | |
 | `ProximiMapView(sdk:journey:…)` with `Binding<ProximiJourney>` | `ProximiMapView(sdk, journey, onJourneyChange, …)` | Compose state hoisting: the host app passes the journey and takes the view's changes in `onJourneyChange`. |
 | `ProximiMapView.Options` (`OptionSet`, `.all`) | `Set<ProximiMapView.Option>` (`Option.ALL`) | `.liveActivity` is `JOURNEY_NOTIFICATION`. |
 | `ProximiExploreView(sdk:settings:)` | `ProximiExploreView(sdk, modifier, settings)` | |
@@ -1168,7 +1198,43 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.47.0.
+The behaviour of the iOS package 1.49.0, which includes 1.48.0. There is no Android 1.48.0.
+
+#### Changed (iOS 1.49.0; operator, 2026-11-16: the logs of every tester on site are collected)
+
+- **BREAKING:** the field log is on by default, in every build. `FieldLog.isEnabled` is `true` and can be
+  set; before, the log was off until the host app called `FieldLog.start`. `ProximiMap` opens the log file
+  when it is created. A host app that wants no log sets `FieldLog.isEnabled = false` at launch, before it
+  creates its `ProximiMap`. A host app that calls `FieldLog.start` changes nothing.
+- **BREAKING:** the library sends the field log to the relay-api of the build, `POST
+  <relayApiBaseUrl>/v1/app-logs` with the relay app token: 10 s after `ProximiMap.start()`, every 15
+  minutes, and when the app goes to the background (README "Field log"). The log holds positions, the
+  wristband label and the binding id, and no token. A host app that wants no upload sets
+  `GadSettings.fieldLogUploadInterval` to zero, or turns the log off.
+- A host app on `ProximiMapView` without `ProximiMap` calls `FieldLog.startUploading(context, binding)`
+  once, after it created its `BlueiotWristbandBinding`. Without the call nothing is sent.
+- New: `GadSettings.fieldLogUploadInterval` (900 s), `FieldLog.startUploading(context, binding, interval)`,
+  `FieldLog.startUploading(context, relayUrl, appToken, interval)`, `FieldLog.stopUploading()`,
+  `FieldLog.PACKAGE_VERSION`.
+- Field log: `log upload: on · every <n> s · <host>`, and one line for each upload that the relay did
+  not store.
+
+#### Changed (iOS 1.48.0; GAD PM, 2026-11-16)
+
+- **BREAKING:** in a personalised journey an artwork the visitor enters out of order is no longer visited
+  at the entry. It becomes the current stop: the host app gets `NextStop` for it, then `ArtworkArrived`.
+  `ArtworkVisited` comes when the visitor is more than `artworkVisitedMeters` from its geofence for
+  `artworkVisitedSeconds` (cause `LEFT`), enters the geofence of another artwork of the journey
+  (`ENTERED_ANOTHER_ARTWORK`), or the host app marks it. The stops ahead are ordered from the visitor
+  when it is visited, not at the entry. `ArtworkVisitedOutOfOrder` and the cause `OUT_OF_ORDER` are no
+  longer sent on this path. A host app that acted on them acts on `ArtworkVisited` with any cause.
+  `GadSettings.visitsOutOfOrderAtEntry = true` restores the behaviour of 1.47.0; with
+  `advancesOnArtworkExit` `false` the artwork is still visited at the entry.
+- An artwork is not entered out of order while the journey is paused, during a detour, or while the
+  visitor is at another artwork; that artwork is left first ("in another artwork").
+- Limit: where the geofences of two open artworks overlap, the visitor arrives at one and is in the
+  other, so the first is visited at once (`ENTERED_ANOTHER_ARTWORK`).
+- Field log: `artwork entered out of order: <stop> · it is the current stop`.
 
 ### [1.47.0] — 2026-11-15
 

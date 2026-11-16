@@ -227,8 +227,10 @@ public sealed interface ProximiMapEvent {
      *
      * The active stop: the visitor entered its geofence, or the leg started inside it. An artwork
      * further down a personalised journey: the visitor was inside its geofence for
-     * [GadSettings.outOfOrderDwell]; [ArtworkVisited] follows at once. Not sent during a detour,
-     * while the journey is paused, or for an artwork the host app marked visited.
+     * [GadSettings.outOfOrderDwell]. It becomes the active stop ([NextStop]), then this event comes;
+     * [ArtworkVisited] follows when the visitor leaves it. With
+     * [GadSettings.visitsOutOfOrderAtEntry], [ArtworkVisited] follows at once. Not sent during a
+     * detour, while the journey is paused, or for an artwork the host app marked visited.
      */
     public data class ArtworkArrived(public val stop: ProximiStop) : ProximiMapEvent
 
@@ -379,7 +381,12 @@ public enum class ArtworkVisitCause {
     /** [GadSettings.artworkAdvanceDelay] passed after the arrival ([GadSettings.advancesOnArtworkExit] `false`). */
     ADVANCE_DELAY,
 
-    /** A personalised journey: the visitor was at an artwork further down the journey. */
+    /**
+     * A personalised journey: the visitor was at an artwork further down the journey, and the
+     * artwork is visited at the entry. Sent only with [GadSettings.visitsOutOfOrderAtEntry], or with
+     * [GadSettings.advancesOnArtworkExit] `false`. Else such an artwork becomes the active stop and
+     * is visited with [LEFT] or [ENTERED_ANOTHER_ARTWORK].
+     */
     OUT_OF_ORDER,
 
     /** The journey moved past the artwork the visitor was at: a detour ended or the visitor chose another stop. */

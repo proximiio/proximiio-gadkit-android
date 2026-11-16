@@ -1,6 +1,7 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.DebugLaunch
+import io.proximi.gadkit.GadSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,6 +33,14 @@ class JourneyKindTest {
         assertEquals(JourneyKind.PERSONALISED, old?.kind)
         val curated = VisitMeta("Your journey", "3 stops", JourneyKind.CURATED)
         assertEquals(curated, VisitStoreCodec.decodeMeta(VisitStoreCodec.encodeMeta(curated)))
+    }
+
+    /** iOS 1.48.0. */
+    @Test
+    fun anArtworkEnteredOutOfOrderWaitsForTheVisitRules() {
+        assertTrue(VisitController.arrivesOutOfOrder(GadSettings()))
+        assertFalse(VisitController.arrivesOutOfOrder(GadSettings(visitsOutOfOrderAtEntry = true)))
+        assertFalse(VisitController.arrivesOutOfOrder(GadSettings(advancesOnArtworkExit = false)))
     }
 
     @Test
