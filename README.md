@@ -1198,6 +1198,12 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
+No changes since 1.49.1.
+
+### [1.49.1] — 2026-11-16
+
+The behaviour of the iOS package 1.49.1. No breaking change.
+
 #### Changed (iOS 1.49.1)
 
 - No change for the host app. The Proximi GAD app reads the wristband binding of the library for its
