@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.49.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.49.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.49.0
+git -C gadkit checkout 1.49.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1198,7 +1198,11 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.49.0.
+#### Changed (iOS 1.49.1)
+
+- No change for the host app. The Proximi GAD app reads the wristband binding of the library for its
+  network test panel (`ProximiMap.wristbandBinding`, marked `@ProximiGadAppApi`: not for host apps).
+- The uploads of the field log name the library version 1.49.1 (`FieldLog.PACKAGE_VERSION`).
 
 ### [1.49.0] — 2026-11-16
 

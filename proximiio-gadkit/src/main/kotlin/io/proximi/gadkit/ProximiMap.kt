@@ -34,6 +34,7 @@ import io.proximi.gadkit.wristband.toCore
 import io.proximi.map.core.JourneyEvent
 import io.proximi.sdk.Proximiio
 import io.proximi.sdk.blueiot.binding.BlueiotBindingState
+import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import io.proximi.sdk.core.model.ProximiioGeofence
 import io.proximi.sdk.geofenceEvents
 import io.proximi.sdk.geofencing.GeofenceEvent
@@ -472,6 +473,13 @@ public class ProximiMap(
      */
     @ProximiGadAppApi
     public fun wristbandBindingStates(): Flow<BlueiotBindingState> = session.binding.stateChanges()
+
+    /**
+     * The SDK's wristband binding of the library, for the Proximi GAD app's network panel: its
+     * diagnostics and its position samples. iOS `wristbandBinding` (1.49.1).
+     */
+    @ProximiGadAppApi
+    public val wristbandBinding: BlueiotWristbandBinding get() = session.binding
 
     /**
      * Posts a notification on the library's channel `alerts`, as the geofence notifications. The
