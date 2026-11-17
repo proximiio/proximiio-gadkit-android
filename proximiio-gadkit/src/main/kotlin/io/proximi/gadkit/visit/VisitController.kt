@@ -250,6 +250,9 @@ internal class VisitController(
      */
     var enteredGeofenceIds: Set<String> = emptySet()
 
+    /** Geofences of [enteredGeofenceIds] whose "not counted" line is written ([isInside]). */
+    private val ignoredEnteredIds = mutableSetOf<String>()
+
     /** Called when the visitor is at an artwork of the journey. [VisitViewModel] reports [VisitEvent.ArtworkArrived]. */
     var onArtworkArrived: ((JourneyStop) -> Unit)? = null
 
@@ -699,7 +702,19 @@ internal class VisitController(
             val stopLevel = stop.floor?.level
             if (!VenueLevel.matches(stopLevel, level)) continue
             if (stop.id == activeId) activeDistance = areas.minOfOrNull { it.distanceTo(point) } ?: Double.POSITIVE_INFINITY
-            if (areas.none { it.id in enteredGeofenceIds || it.contains(point) }) continue
+            val tolerance = settings.artworkVisitedMeters
+            if (areas.none { isInside(it, point, enteredGeofenceIds, tolerance) }) {
+                // The SDK counts the visitor inside, and the fix is further than the visit distance.
+                val area = areas.firstOrNull { it.id in enteredGeofenceIds }
+                if (area != null && ignoredEnteredIds.add(area.id)) {
+                    FieldLog.log {
+                        "artwork geofence of ${stop.title}: entered for the SDK, fix " +
+                            "${String.format(Locale.ROOT, "%.1f", area.distanceTo(point))} m outside · not counted"
+                    }
+                }
+                continue
+            }
+            for (area in areas) ignoredEnteredIds.remove(area.id)
             if (stop.id == activeId) {
                 artworkGeofenceEntered(remoteId)
             } else if (countsOutOfOrder) {
@@ -717,9 +732,9 @@ internal class VisitController(
                     outsideArrivedSince = null
                     if (outOfOrderArrivedId == arrived) outOfOrderArrivedId = null
                 }
-                // In another open artwork: the visitor has moved on. That artwork counts from the next
-                // fix, after the journey moved on.
-                inside.isNotEmpty() || isInsideUpcoming -> {
+                // In another open artwork and outside this one: the visitor has moved on. That artwork
+                // counts from the next fix, after the journey moved on.
+                leavesForAnotherArtwork(inside.isNotEmpty() || isInsideUpcoming, activeDistance) -> {
                     leaveArrivedArtwork("in another artwork", ArtworkVisitCause.ENTERED_ANOTHER_ARTWORK)
                     inside = mutableSetOf()
                 }
@@ -1166,6 +1181,27 @@ internal class VisitController(
          * rules, or is visited at the entry. iOS `VisitController.arrivesOutOfOrder(settings:)`.
          */
         fun arrivesOutOfOrder(settings: GadSettings): Boolean = settings.advancesOnArtworkExit && !settings.visitsOutOfOrderAtEntry
+
+        /**
+         * Whether the visitor at [point] counts as inside [area]: the fix is in it, or the SDK counts
+         * the visitor inside ([entered]) and the fix is within [toleranceMeters] of its border
+         * ([GadSettings.artworkVisitedMeters]). The SDK exits a geofence only after
+         * `geofenceExitDelay`, and an exit event that did not arrive leaves the geofence in [entered]:
+         * without the distance, an artwork the visitor left counted as "another artwork" at the next
+         * arrival, and the journey moved on at once (operator, 2026-11-17). iOS
+         * `VisitController.isInside` (1.50.1).
+         */
+        fun isInside(area: ArtworkArea, point: Coordinate, entered: Set<String>, toleranceMeters: Double): Boolean =
+            area.contains(point) || (area.id in entered && area.distanceTo(point) <= toleranceMeters)
+
+        /**
+         * Whether the geofence of another open artwork ends the visit of the artwork the visitor
+         * arrived at. Not while the visitor is still inside the geofence of that artwork
+         * ([activeDistance] 0): 180 pairs of artwork geofences overlap in the GAD data of 2026-11-17,
+         * and an artwork whose geofence overlaps the geofence of another open journey artwork was
+         * visited at the arrival. iOS `VisitController.leavesForAnotherArtwork` (1.50.0).
+         */
+        fun leavesForAnotherArtwork(isInsideAnother: Boolean, activeDistance: Double): Boolean = isInsideAnother && activeDistance > 0
 
         /** The order strategy for [settings]. Pure; covered by tests. */
         internal fun orderStrategy(settings: GadSettings): JourneyOrderStrategy =

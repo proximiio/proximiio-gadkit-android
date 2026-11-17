@@ -307,6 +307,19 @@ internal object MapStyle {
     val hiddenRoute: RouteLineStyle = route.copy(remainingOpacity = 0.0, completedOpacity = 0.0)
 
     /**
+     * [style] with the numbers of the artworks' markers transparent: the circles stay
+     * ([GadSettings.showsStopNumbers]). The detour's marker and the group badge are not changed. The
+     * map library has no switch for the label. iOS `MapStyle.withoutNumbers`.
+     */
+    fun withoutNumbers(style: JourneyStopMarkerStyle): JourneyStopMarkerStyle = style.copy(
+        done = style.done.copy(labelColor = style.done.labelColor.withAlpha(0.0)),
+        active = style.active.copy(labelColor = style.active.labelColor.withAlpha(0.0)),
+        pending = style.pending.copy(labelColor = style.pending.labelColor.withAlpha(0.0)),
+        passed = style.passed.copy(labelColor = style.passed.labelColor.withAlpha(0.0)),
+        skipped = style.skipped.copy(labelColor = style.skipped.labelColor.withAlpha(0.0)),
+    )
+
+    /**
      * [journeyStops] with the artworks' markers invisible; the detour keeps its marker. A stop marker
      * style of `null` would take the detour's marker off too.
      */

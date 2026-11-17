@@ -25,6 +25,7 @@ import io.proximi.gadkit.visit.VisitMeta
 import io.proximi.gadkit.visit.VisitPlan
 import io.proximi.gadkit.visit.VisitStore
 import io.proximi.gadkit.visit.toCore
+import io.proximi.gadkit.wristband.BindingFieldLog
 import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.wristband.WristbandCopy
 import io.proximi.gadkit.wristband.WristbandPairingFlow
@@ -272,6 +273,7 @@ public class ProximiMap(
             } else {
                 VenueService.start(context, configuration, session.binding).also { started ->
                     this.venue = started
+                    BindingFieldLog.follow(session.binding, logsStates = false)
                     FieldLog.startUploading(
                         context, configuration.relayEndpoint.baseUrl, configuration.relayApiAppToken,
                         configuration.settings.fieldLogUploadInterval,

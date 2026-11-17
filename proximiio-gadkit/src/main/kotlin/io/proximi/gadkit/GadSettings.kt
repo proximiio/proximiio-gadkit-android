@@ -251,6 +251,13 @@ public data class GadSettings(
      */
     val showsStopDots: Boolean = false,
     /**
+     * `true` shows the number of a journey artwork in its marker on the map, on the stop card and in
+     * the list. `false`, the default since 1.50.0, shows the same circles without the number
+     * (operator, 2026-11-17). The badge of grouped markers keeps its count ([groupsStopMarkers]).
+     * iOS `showsStopNumbers`.
+     */
+    val showsStopNumbers: Boolean = false,
+    /**
      * `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is
      * marked visited while the visitor stands in another gallery than the next stop's, and that gallery
      * has an artwork still to visit (GAD PM, Monday "Re-routing going from gallery 104 to 102",

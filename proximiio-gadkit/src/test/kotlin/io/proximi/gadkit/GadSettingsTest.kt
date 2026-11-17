@@ -182,4 +182,23 @@ class GadSettingsTest {
         assertTrue(MapStyle.journeyStops.groupsOverlapping)
         assertFalse(MapStyle.journeyStopsHidden.groupsOverlapping)
     }
+
+    /** Without stop numbers the markers keep their circles and the group badge its count (operator, 2026-11-17). */
+    @Test
+    fun stopNumbersAreOffAndTheCirclesStay() {
+        assertFalse(GadSettings.STANDARD.showsStopNumbers)
+        val numbered = MapStyle.journeyStops
+        val plain = MapStyle.withoutNumbers(numbered)
+        assertEquals(0.0, plain.pending.labelColor.alpha)
+        assertEquals(0.0, plain.active.labelColor.alpha)
+        assertEquals(0.0, plain.done.labelColor.alpha)
+        assertEquals(0.0, plain.passed.labelColor.alpha)
+        assertEquals(numbered.pending.fillColor, plain.pending.fillColor)
+        assertEquals(numbered.pending.strokeColor, plain.pending.strokeColor)
+        assertEquals(1.0, plain.active.opacity)
+        assertEquals(numbered.diameterDp, plain.diameterDp)
+        assertEquals(numbered.detour, plain.detour)
+        assertEquals(numbered.groupBadge, plain.groupBadge)
+        assertTrue(plain.groupsOverlapping)
+    }
 }

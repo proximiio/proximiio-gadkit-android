@@ -31,9 +31,10 @@ import androidx.compose.ui.unit.sp
  * Stop number badge (Figma journey list, node 11820:71364; PM review 2026-10-12): a 34 dp circle,
  * Body Medium. A pending stop is white with a 2 dp #EEEDED stroke. The next stop and a stop being
  * acted on (swiped) are filled red with a white number. A visited stop is white with a red stroke.
+ * A `null` number draws the circle without a number ([io.proximi.gadkit.GadSettings.showsStopNumbers]).
  */
 @Composable
-internal fun StopNumberBadge(number: Int, modifier: Modifier = Modifier, emphasis: Emphasis = Emphasis.Normal) {
+internal fun StopNumberBadge(number: Int?, modifier: Modifier = Modifier, emphasis: Emphasis = Emphasis.Normal) {
     Box(
         modifier
             .size(34.dp)
@@ -42,7 +43,7 @@ internal fun StopNumberBadge(number: Int, modifier: Modifier = Modifier, emphasi
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            number.toString(),
+            number?.toString().orEmpty(),
             style = GadTextStyle.BodyMedium.textStyle,
             color = if (emphasis == Emphasis.Filled) Palette.white else Palette.ink,
         )

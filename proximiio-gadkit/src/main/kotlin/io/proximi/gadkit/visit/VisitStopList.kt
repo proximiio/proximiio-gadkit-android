@@ -123,7 +123,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                             model.requestSkip(stop)
                         },
                     ) {
-                        StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id])
+                        StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id], showsNumbers = model.settings.showsStopNumbers)
                     }
                 }
             }
@@ -148,7 +148,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
  * floor; "AR" and an audio note from the artwork's `metadata`.
  */
 @Composable
-private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: VenuePlace?) {
+private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: VenuePlace?, showsNumbers: Boolean) {
     val isVisited = stop.state == StopState.DONE
     val isActive = stop.state == StopState.ACTIVE || stop.state == StopState.REACHED
     val visited = stringResource(R.string.visited)
@@ -165,7 +165,7 @@ private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StopNumberBadge(
-            number = number,
+            number = number.takeIf { showsNumbers },
             emphasis = when {
                 isRevealed || isActive -> Emphasis.Filled
                 isVisited -> Emphasis.Visited

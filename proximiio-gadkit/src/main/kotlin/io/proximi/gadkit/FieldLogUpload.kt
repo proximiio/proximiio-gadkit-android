@@ -173,6 +173,7 @@ internal object FieldLogUploader {
         stop()
         if (!FieldLog.isEnabled || interval <= Duration.ZERO || appToken.isEmpty()) return
         target = Target(context.applicationContext, URI(relayUrl.scheme, relayUrl.authority, "/v1/app-logs", null, null), appToken)
+        FieldLog.log("install ${FieldLogUploadState(FieldLogUploadState.store(context.applicationContext)).install()}")
         FieldLog.log("log upload: on · every ${interval.inWholeSeconds} s · ${relayUrl.host ?: "-"}")
         loop = scope.launch {
             // The first upload sends what a run that was killed left behind.
@@ -204,6 +205,9 @@ internal object FieldLogUploader {
     /** Sends the chunks that wait, at most [CHUNKS_PER_RUN] per call. */
     suspend fun send() {
         if (!sending.tryLock()) return
+        // One line per run, written after the last chunk: a line per chunk would be the next chunk.
+        var stored = 0
+        var storedBytes = 0L
         try {
             repeat(CHUNKS_PER_RUN) {
                 val target = target ?: return
@@ -221,7 +225,11 @@ internal object FieldLogUploader {
                     return
                 }
                 when (outcome(status)) {
-                    Outcome.STORED -> withContext(writer) { state.accepted(chunk.data.size) }
+                    Outcome.STORED -> {
+                        withContext(writer) { state.accepted(chunk.data.size) }
+                        stored += 1
+                        storedBytes += chunk.data.size
+                    }
                     Outcome.TOO_LARGE -> {
                         chunkBytes = maxOf(SMALLEST_CHUNK_BYTES, chunkBytes / 2)
                         withContext(writer) { state.forgetPending() }
@@ -241,6 +249,7 @@ internal object FieldLogUploader {
             }
         } finally {
             sending.unlock()
+            if (stored > 0) FieldLog.log("log upload: $stored chunks stored · $storedBytes bytes")
         }
     }
 

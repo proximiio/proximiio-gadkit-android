@@ -1108,6 +1108,7 @@ internal class VisitViewModel(
         )
         val style = (if (shows) MapStyle.journeyStops else MapStyle.journeyStopsHidden)
             .let { if (settings.groupsStopMarkers) it else it.copy(groupsOverlapping = false) }
+            .let { if (settings.showsStopNumbers) it else MapStyle.withoutNumbers(it) }
             .let { it.copy(hiddenStopIds = stopsOutsideTheVisitorsGallery(controller.navigator.journey.value.stops, visitorGalleryId)) }
         if (session.journeyStopMarkerStyle != style) session.journeyStopMarkerStyle = style
         layers.updateStopDots(if (settings.showsStopDots) stopDots(controller.navigator.journey.value.stops, style.hiddenStopIds, shows) else emptyList())

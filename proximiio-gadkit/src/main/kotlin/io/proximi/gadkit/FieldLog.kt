@@ -8,6 +8,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
+import io.proximi.gadkit.wristband.BindingFieldLog
 import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import java.io.File
 import java.net.URI
@@ -102,10 +103,15 @@ public object FieldLog {
      * replaces the first. Does nothing while [isEnabled] is `false`. Opens the log file when it is
      * not open. iOS `FieldLog.startUploading(binding:interval:)`.
      *
+     * Since 1.50.1 it also writes the lines of [binding] to the log: its states, sessions,
+     * diagnostics, the relay stream and one relay position every 5 s. The relay-api links the log to
+     * the wristband through them.
+     *
      * @param interval the time between uploads. Zero or less sends nothing.
      */
     public fun startUploading(context: Context, binding: BlueiotWristbandBinding, interval: Duration = 900.seconds) {
         startUploading(context, binding.configuration.relayURL.baseUrl, binding.configuration.appToken, interval)
+        BindingFieldLog.follow(binding, logsStates = true)
     }
 
     /** Starts sending the log to [relayUrl] (scheme and host of the relay-api) with [appToken]. */

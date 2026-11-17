@@ -53,4 +53,36 @@ class ArtworkLeaveTest {
         assertTrue(ArtworkArrival.isBeyondVisit(Double.POSITIVE_INFINITY, settings.artworkVisitedMeters))
         assertTrue(ArtworkArrival.isBeyondVisit(0.1, settings.copy(artworkVisitedMeters = 0.0).artworkVisitedMeters))
     }
+
+    /**
+     * Overlapping artwork geofences: the artwork the visitor arrived at stays the current one while
+     * they are inside its geofence (operator, 2026-11-17; iOS 1.50.0).
+     */
+    @Test
+    fun anotherArtworkEndsTheVisitOnlyOutsideTheArrivedOne() {
+        assertFalse(VisitController.leavesForAnotherArtwork(isInsideAnother = true, activeDistance = 0.0))
+        assertTrue(VisitController.leavesForAnotherArtwork(isInsideAnother = true, activeDistance = 0.5))
+        assertTrue(VisitController.leavesForAnotherArtwork(isInsideAnother = true, activeDistance = Double.POSITIVE_INFINITY))
+        assertFalse(VisitController.leavesForAnotherArtwork(isInsideAnother = false, activeDistance = 3.0))
+    }
+
+    /**
+     * A geofence the SDK counts the visitor inside counts only within the visit distance of its
+     * border: an exit that did not arrive must not make a far artwork "another artwork" (operator,
+     * 2026-11-17; iOS 1.50.1).
+     */
+    @Test
+    fun aGeofenceEnteredForTheSdkCountsOnlyNearIt() {
+        val area = ArtworkArea(center = Coordinate(24.5, 54.4), radius = 3.0, id = "g")
+        val inside = Coordinate(24.50002, 54.4)
+        // About 4.4 m from the centre: 1.4 m outside the border.
+        val near = Coordinate(24.50004, 54.4)
+        // About 44 m from the centre.
+        val far = Coordinate(24.5004, 54.4)
+        assertTrue(VisitController.isInside(area, inside, entered = emptySet(), toleranceMeters = 5.0))
+        assertFalse(VisitController.isInside(area, near, entered = emptySet(), toleranceMeters = 5.0))
+        assertTrue(VisitController.isInside(area, near, entered = setOf("g"), toleranceMeters = 5.0))
+        assertFalse(VisitController.isInside(area, far, entered = setOf("g"), toleranceMeters = 5.0))
+        assertFalse(VisitController.isInside(area, near, entered = setOf("other"), toleranceMeters = 5.0))
+    }
 }
