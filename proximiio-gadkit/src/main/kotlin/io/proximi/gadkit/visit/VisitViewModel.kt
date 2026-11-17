@@ -1093,11 +1093,12 @@ internal class VisitViewModel(
      * The numbered stop markers. With gallery first they are hidden while the leg ends at a gallery,
      * and while the visitor is outside every gallery and the active artwork is in one (PM, Monday
      * "Navigation to a gallery", 2026-10-26 and 2026-10-27). The detour keeps its marker. The marker of
-     * an artwork in a gallery that is still to visit shows only while the visitor is in that gallery
-     * (PM, Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0). The
-     * marker of a visited artwork always shows (Figma "In-Gallery Map": "stop 1 dimmed as completed",
-     * "Gallery 2 finished"; operator, 2026-11-17, after the PM's "visited artworks disappear"; iOS
-     * 1.50.4). It runs on each change of the journey and of the visitor's gallery.
+     * an artwork in a gallery shows only while the visitor is in that gallery, in every state (PM,
+     * Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0). In the
+     * visitor's gallery the marker of a visited artwork also shows while the leg ends at a gallery
+     * (Figma "In-Gallery Map": "Gallery 2 finished"; operator, 2026-11-17, after the PM's "visited
+     * artworks disappear"; iOS 1.50.4 and 1.50.5). It runs on each change of the journey and of the
+     * visitor's gallery.
      *
      * An artwork without a numbered marker shows as a dot ([stopDots], [GadSettings.showsStopDots]).
      */
@@ -1645,20 +1646,20 @@ internal class VisitViewModel(
         }
 
         /**
-         * The artwork stops not visited yet in a gallery ([MapJourneyStop.group]) other than
-         * [visitorGallery]: the map draws no marker for them, and they keep their numbers. Visited
-         * artworks, artworks outside every gallery and detours stay. Pure; covered by tests.
+         * The artwork stops in a gallery ([MapJourneyStop.group]) other than [visitorGallery], in every
+         * state: the map draws no marker for them, and they keep their numbers. Artworks outside every
+         * gallery and detours stay. Pure; covered by tests.
          */
         internal fun stopsOutsideTheVisitorsGallery(stops: List<MapJourneyStop>, visitorGallery: String?): Set<String> =
             stops.mapNotNullTo(LinkedHashSet()) { stop ->
                 val gallery = stop.group
-                if (stop.kind == MapJourneyStop.Kind.DETOUR || stop.state == MapJourneyStop.State.DONE || gallery == null || gallery == visitorGallery) null else stop.id
+                if (stop.kind == MapJourneyStop.Kind.DETOUR || gallery == null || gallery == visitorGallery) null else stop.id
             }
 
         /**
          * The dots of the artworks that have no numbered marker: every artwork while the numbers are
          * hidden ([showsNumbers] false), else the artworks in [hiddenStopIds] and the skipped ones. A
-         * visited artwork has none: its marker always shows (iOS 1.50.4). A detour and a stop without
+         * visited artwork has none (iOS 1.50.4). A detour and a stop without
          * a floor have none. Nagarro reported the artworks as disappearing
          * from the map (PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing",
          * 2026-11-15; iOS 1.43.0). Pure; covered by tests.

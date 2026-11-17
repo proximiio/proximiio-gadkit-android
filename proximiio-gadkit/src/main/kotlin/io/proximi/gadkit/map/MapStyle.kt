@@ -322,7 +322,7 @@ internal object MapStyle {
     /**
      * [journeyStops] with the markers of the artworks still to visit and of the skipped ones invisible.
      * A visited artwork keeps its marker (Figma "In-Gallery Map", "Gallery 2 finished"; operator,
-     * 2026-11-17; iOS 1.50.4), and the detour keeps its marker. A stop marker style of `null` would
+     * 2026-11-17; iOS 1.50.4) unless `hiddenStopIds` holds it, and the detour keeps its marker. A stop marker style of `null` would
      * take the detour's marker off too.
      */
     val journeyStopsHidden: JourneyStopMarkerStyle = journeyStops.copy(

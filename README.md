@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.4")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.5")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.50.4
+git -C gadkit checkout 1.50.5
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1202,7 +1202,20 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.50.4.
+No changes since 1.50.5.
+
+### [1.50.5] — 2026-11-17
+
+The behaviour of the iOS package 1.50.5. No breaking change: the source of a host app needs no change.
+
+#### Changed (iOS 1.50.5; operator's field test of 1.50.4, 2026-11-17)
+
+- **Visible:** the marker of a visited artwork in a gallery shows only while the visitor is in that
+  gallery, as the markers of the other artworks do. In 1.50.4 it showed everywhere. Inside the gallery
+  it still shows while the leg ends at a gallery, which 1.50.4 added. A visited artwork outside every
+  gallery keeps its marker.
+- The host app has nothing to do.
+- Not verified on a phone.
 
 ### [1.50.4] — 2026-11-17
 

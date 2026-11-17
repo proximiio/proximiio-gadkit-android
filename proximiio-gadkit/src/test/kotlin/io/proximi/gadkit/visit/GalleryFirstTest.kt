@@ -301,10 +301,10 @@ class GalleryPolygonTest {
     }
 
     /**
-     * The marker of an artwork still to visit in a gallery shows only while the visitor is in that
-     * gallery; visited artworks, artworks outside every gallery and detours stay (PM, Monday "Gallery
-     * numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0; visited: operator,
-     * 2026-11-17, iOS 1.50.4).
+     * The marker of an artwork in a gallery shows only while the visitor is in that gallery, in every
+     * state; artworks outside every gallery and detours stay (PM, Monday "Gallery numbers in gallery
+     * navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0; visited artworks: operator, 2026-11-17,
+     * iOS 1.50.5).
      */
     @Test
     fun artworkMarkersShowOnlyInTheVisitorsGallery() {
@@ -317,8 +317,8 @@ class GalleryPolygonTest {
             stop("pending-g303", gallery = "g303"),
             stop("cafe", gallery = "g101", kind = MapJourneyStop.Kind.DETOUR),
         )
-        assertEquals(setOf("active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = null))
-        assertTrue(VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g303").isEmpty())
+        assertEquals(setOf("visited-g101", "active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = null))
+        assertEquals(setOf("visited-g101"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g303"))
         assertEquals(setOf("active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g101"))
     }
 
