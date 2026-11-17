@@ -113,4 +113,13 @@ class OffRouteTest {
         // An episode of the whole journey ends with the navigator's `ReturnedToRoute`, not here.
         assertEquals(VisitController.LegDeviation.NONE, deviation(false, 2.0, isEpisode = true, isLegEpisode = false))
     }
+
+    /** iOS 1.50.2: without the off-route prompt the leg is drawn again from a visitor who is off it. */
+    @Test
+    fun offTheLegWithoutTheWarningEveryJourneyIsRoutedAgain() {
+        assertTrue(VisitController.reroutesOffTheLeg(asksApp = false, keepsOrder = false))
+        assertTrue(VisitController.reroutesOffTheLeg(asksApp = false, keepsOrder = true))
+        assertTrue(VisitController.reroutesOffTheLeg(asksApp = true, keepsOrder = true))
+        assertFalse(VisitController.reroutesOffTheLeg(asksApp = true, keepsOrder = false))
+    }
 }

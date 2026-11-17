@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.2")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.50.1
+git -C gadkit checkout 1.50.2
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -452,7 +452,7 @@ The view's navigator differs from a navigator with the map library's default rul
 |---|---|
 | `StopSkipped`, `LegChanged`, `JourneyFinished` | Sent when the view applies a change of `journey` (`update(to)`). |
 | `LeftRoute`, `OffRouteTooLong` | After `GadSettings.offRouteMeters` (12 m, 3 fixes; `leftRouteMeters`) and `GadSettings.offRouteAfter` (300 s). |
-| Off the route | Without `OFF_ROUTE_PROMPT` the route follows the visitor (`JourneyDeviationPolicy.AUTOMATIC`); with it the navigator routes nothing by itself (`ASK_APP`) and the view shows its warning first. While the journey is paused the view passes on no `LeftRoute`, `FarFromRoute`, `OffRouteTooLong` or `ReturnedToRoute`. |
+| Off the route | Without `OFF_ROUTE_PROMPT` the navigator routes again off every leg still to walk (`JourneyDeviationPolicy.AUTOMATIC`), and since 1.50.2 the view draws the leg again from a visitor who is off the leg to the current destination; with it the navigator routes nothing by itself (`ASK_APP`) and the view shows its warning first. While the journey is paused the view passes on no `LeftRoute`, `FarFromRoute`, `OffRouteTooLong` or `ReturnedToRoute`. |
 | `StopReached` and the cue `ARRIVED` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `APPROACHING_DESTINATION` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
 
@@ -1202,7 +1202,25 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.50.1.
+No changes since 1.50.2.
+
+### [1.50.2] — 2026-11-17
+
+The behaviour of the iOS package 1.50.2. No breaking change: the source of a host app needs no change.
+
+#### Fixed (iOS 1.50.2; Nagarro, "Rerouting not working at all", 2026-11-17)
+
+- **Visible:** `ProximiMapView` without `Option.OFF_ROUTE_PROMPT`: the route did not follow a visitor who
+  left the leg to the current destination while a later leg of the journey was within
+  `GadSettings.offRouteMeters` (12 m). The navigator measures against every leg still to walk. The view
+  now also measures against the leg to the current destination, as it does with the prompt, and draws
+  the leg again from the visitor, at most every 5 s. No warning shows. The host app has nothing to do;
+  its route changes more often.
+- Not changed: with `OFF_ROUTE_PROMPT` a personalised journey keeps its leg after the warning, and a
+  curated tour is routed again. `ProximiMap` uses the prompt, so it does not change.
+- Field log: `off route: <n> m off the leg to <stop>`, then `off route: leg drawn again from the visitor`
+  (with the prompt: `… after the warning`).
+- Not verified on a phone.
 
 ### [1.50.1] — 2026-11-17
 

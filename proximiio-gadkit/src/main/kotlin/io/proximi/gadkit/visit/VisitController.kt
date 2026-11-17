@@ -447,11 +447,13 @@ internal class VisitController(
      * current destination (`RouteGuidance.isOffRoute`) gets the warning, as for the navigator's
      * `LeftRoute`, also where a later leg of the journey passes (PM, Monday "Personalized tour:
      * off-route and re-route behaviour", 2026-10-28). Back within two thirds of that distance the
-     * episode ends. Only with the warning (`ASK_APP`); not while paused, during a detour or on a floor
-     * without positioning.
+     * episode ends. Without the warning (`AUTOMATIC`) the leg is drawn again from the visitor instead
+     * (iOS 1.50.2): before, only the navigator routed, and it measures against every leg still to
+     * walk, so a visitor near a later leg kept the old leg (Nagarro, "Rerouting not working at all",
+     * 2026-11-17). Not while paused, during a detour or on a floor without positioning.
      */
     fun checkLegDeviation(guidance: RouteGuidance?, isFloorGuideActive: Boolean) {
-        if (deviationPolicy != JourneyDeviationPolicy.ASK_APP || !isNavigating || mutablePaused.value || isFloorGuideActive ||
+        if (!isNavigating || mutablePaused.value || isFloorGuideActive ||
             navigator.detourStop != null || navigator.hasArrived || guidance == null || guidance.hasArrived
         ) {
             return
@@ -464,10 +466,19 @@ internal class VisitController(
                 isOffRouteEpisode = true
                 isLegOffRouteEpisode = true
                 showOffRouteWarning()
-                if (reroutesAfterWarning) rerouteFromVisitor()
+                // At most every 5 s: a leg that cannot start at the visitor stays off the route after
+                // it is drawn again.
+                val now = System.currentTimeMillis()
+                if (reroutesOffTheLeg(deviationPolicy == JourneyDeviationPolicy.ASK_APP, keepsOrder) && now - lastLegReroute >= 5_000) {
+                    lastLegReroute = now
+                    rerouteFromVisitor()
+                }
             }
         }
     }
+
+    /** The last time [checkLegDeviation] drew the leg again from the visitor, epoch milliseconds. */
+    private var lastLegReroute = 0L
 
     /** What one guidance update off or on the leg does ([legDeviation]). */
     internal enum class LegDeviation {
@@ -555,9 +566,9 @@ internal class VisitController(
     private val reroutesAfterWarning: Boolean
         get() = deviationPolicy == JourneyDeviationPolicy.ASK_APP && keepsOrder
 
-    /** Draws the leg again from the visitor, after the warning. */
+    /** Draws the leg again from the visitor: after the warning, or without one (`AUTOMATIC`). */
     private fun rerouteFromVisitor() {
-        FieldLog.log("off route: warning shown · leg drawn again from the visitor")
+        FieldLog.log("off route: leg drawn again from the visitor${if (deviationPolicy == JourneyDeviationPolicy.ASK_APP) " after the warning" else ""}")
         doneJobs += scope.launch {
             serially {
                 if (!isOffRouteEpisode) return@serially
@@ -1202,6 +1213,13 @@ internal class VisitController(
          * visited at the arrival. iOS `VisitController.leavesForAnotherArtwork` (1.50.0).
          */
         fun leavesForAnotherArtwork(isInsideAnother: Boolean, activeDistance: Double): Boolean = isInsideAnother && activeDistance > 0
+
+        /**
+         * Whether the leg is drawn again from a visitor who is off it. With the warning ([asksApp])
+         * only a journey that keeps its order; a personalised journey keeps its leg. Without the
+         * warning every journey. iOS `VisitController.reroutesOffTheLeg` (1.50.2).
+         */
+        fun reroutesOffTheLeg(asksApp: Boolean, keepsOrder: Boolean): Boolean = !asksApp || keepsOrder
 
         /** The order strategy for [settings]. Pure; covered by tests. */
         internal fun orderStrategy(settings: GadSettings): JourneyOrderStrategy =
