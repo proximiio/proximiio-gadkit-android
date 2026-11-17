@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.49.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.49.1
+git -C gadkit checkout 1.50.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1201,6 +1201,10 @@ under a heading with the version and the date; `[Unreleased]` then says that not
   whether the host app has to do something.
 
 ### [Unreleased]
+
+No changes since 1.50.1.
+
+### [1.50.1] — 2026-11-17
 
 The behaviour of the iOS package 1.50.1, which includes 1.49.2 and 1.50.0, on SDK 6.0.0-beta.40 and Map
 6.0.0-beta.40 as 1.49.1. There is no Android 1.49.2 or 1.50.0.
