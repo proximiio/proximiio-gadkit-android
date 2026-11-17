@@ -86,14 +86,14 @@ class OffRouteTest {
         assertTrue(shows(false, ahead = true, inGallery = false))
     }
 
-    /** The markers are hidden with an invisible style, never `null`: the detour keeps its marker. */
+    /** The markers are hidden with an invisible style, never `null`: the detour and the visited artworks keep their markers. */
     @Test
     fun theHiddenStyleKeepsTheDetour() {
         val hidden = MapStyle.journeyStopsHidden
         assertEquals(0.0, hidden.pending.opacity)
         assertEquals(0.0, hidden.active.opacity)
-        assertEquals(0.0, hidden.done.opacity)
-        assertEquals(0.0, hidden.passed.opacity)
+        assertEquals(1.0, hidden.done.opacity)
+        assertEquals(1.0, hidden.passed.opacity)
         assertEquals(1.0, hidden.detour.opacity)
         assertTrue(hidden != MapStyle.journeyStops)
     }

@@ -323,12 +323,6 @@ internal class VisitViewModel(
      */
     private var visitorGalleryId: String? = null
 
-    /**
-     * The visited galleries the visitor has left. Each stays visited when the visitor enters it again
-     * ([keptVisitedGalleries]).
-     */
-    private var keptVisitedGalleryIds: Set<String> = emptySet()
-
     /** The last field-log line of the gallery fills. */
     private var galleryFillLine: String? = null
 
@@ -993,7 +987,6 @@ internal class VisitViewModel(
     /** Gallery fills and the gallery marker for the current journey and floor. The map library draws the stop markers. */
     private fun refreshMapLayers() {
         if (isClosed) return
-        updateKeptVisitedGalleries()
         val visited = visitedGalleryIds
         // Gallery first: the outline of the gallery the leg ends at, in place of the outline that
         // holds the artwork. The gallery the visitor is in has no fill: the venue's own gallery
@@ -1003,13 +996,12 @@ internal class VisitViewModel(
         val galleryAhead = galleryAheadDestination
         val destination = galleryAhead?.shown?.id ?: activeStopGallery?.id
         var fills = galleries.mapNotNull { gallery ->
-            fillStyle(gallery.id, destination, visited, shownVisitorGalleryId)?.let { GalleryFill(gallery, it) }
+            fillStyle(gallery.id, destination, visited, visitorGalleryId)?.let { GalleryFill(gallery, it) }
         }
         if (galleryAhead != null && galleries.none { it.id == galleryAhead.shown.id }) {
             fills = fills + GalleryFill(galleryAhead.shown, GalleryFill.Style.DESTINATION)
         }
-        val line = "gallery fills: visitor in ${galleries.firstOrNull { it.id == visitorGalleryId }?.name ?: "none"}" +
-            "${if (visitorGalleryId != null && shownVisitorGalleryId == null) " (stays visited)" else ""} · destination " +
+        val line = "gallery fills: visitor in ${galleries.firstOrNull { it.id == visitorGalleryId }?.name ?: "none"} · destination " +
             "${fills.firstOrNull { it.style == GalleryFill.Style.DESTINATION }?.gallery?.name ?: "none"} · " +
             "${fills.count { it.style == GalleryFill.Style.VISITED }} visited · ${fills.count { it.style == GalleryFill.Style.STANDARD }} standard"
         if (line != galleryFillLine) {
@@ -1027,38 +1019,19 @@ internal class VisitViewModel(
      * them (PM, 2026-10-29).
      */
     private val visitedGalleryIds: Set<String>
-        get() = visitedGalleryIds(shownVisitorGalleryId)
-
-    private fun visitedGalleryIds(visitorGallery: String?): Set<String> {
+        get() {
             val stops = controller.navigator.journey.value.stops.filter { it.kind != MapJourneyStop.Kind.DETOUR }.mapNotNull { stop ->
                 Gallery.containing(Coordinate(stop.coordinate.latitude, stop.coordinate.longitude), stop.floor?.level, galleries)?.id?.let { it to stop.state }
             }
-            return visitedGalleries(stops, visitorGallery)
+            return visitedGalleries(stops, visitorGalleryId)
         }
-
-    /**
-     * The gallery the map shows as the visitor's: [visitorGalleryId], but not a visited gallery the
-     * visitor entered again. Such a gallery keeps its visited fill and name, and its artworks stay
-     * hidden (operator, 2026-11-17: "visited" has priority over "visitor in"; iOS 1.50.3).
-     */
-    private val shownVisitorGalleryId: String?
-        get() = shownVisitorGallery(visitorGalleryId, keptVisitedGalleryIds)
-
-    /** The POI of [shownVisitorGalleryId], which the map does not draw. */
-    private val shownVisitorGalleryPlaceId: String?
-        get() = if (shownVisitorGalleryId == null) null else visitorGalleryPlaceId
-
-    /** Keeps [keptVisitedGalleryIds] up to date; called before the map layers and the stop markers. */
-    private fun updateKeptVisitedGalleries() {
-        keptVisitedGalleryIds = keptVisitedGalleries(keptVisitedGalleryIds, visitedGalleryIds(null), visitorGalleryId)
-    }
 
     /** The gallery of the active stop, unless the visitor is in it. */
     private val activeStopGallery: Gallery?
         get() {
             val active = controller.navigator.activeStop ?: return null
             val gallery = Gallery.containing(Coordinate(active.coordinate.latitude, active.coordinate.longitude), active.floor?.level, galleries)
-            return gallery?.takeIf { it.id != shownVisitorGalleryId }
+            return gallery?.takeIf { it.id != visitorGalleryId }
         }
 
     /**
@@ -1071,7 +1044,7 @@ internal class VisitViewModel(
         val visitedGalleries = galleries.filter { it.id in visited }
         val ahead = galleryAheadDestination?.placeId
         val destinationGallery = if (ahead == null) activeStopGallery else null
-        return galleryDestinations.filter { it.placeId != shownVisitorGalleryPlaceId }.map { destination ->
+        return galleryDestinations.filter { it.placeId != visitorGalleryPlaceId }.map { destination ->
             val isGallery = { gallery: Gallery -> gallery.id == destination.shown.id || gallery.contains(destination.entry, destination.gallery.level) }
             val isDestination = destination.placeId == ahead || destinationGallery?.let(isGallery) == true
             val style = when {
@@ -1120,14 +1093,15 @@ internal class VisitViewModel(
      * The numbered stop markers. With gallery first they are hidden while the leg ends at a gallery,
      * and while the visitor is outside every gallery and the active artwork is in one (PM, Monday
      * "Navigation to a gallery", 2026-10-26 and 2026-10-27). The detour keeps its marker. The marker of
-     * an artwork in a gallery shows only while the visitor is in that gallery, in every state (PM, Monday
-     * "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0). It runs on each
-     * change of the journey and of the visitor's gallery.
+     * an artwork in a gallery that is still to visit shows only while the visitor is in that gallery
+     * (PM, Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0). The
+     * marker of a visited artwork always shows (Figma "In-Gallery Map": "stop 1 dimmed as completed",
+     * "Gallery 2 finished"; operator, 2026-11-17, after the PM's "visited artworks disappear"; iOS
+     * 1.50.4). It runs on each change of the journey and of the visitor's gallery.
      *
      * An artwork without a numbered marker shows as a dot ([stopDots], [GadSettings.showsStopDots]).
      */
     private fun applyStopMarkers() {
-        updateKeptVisitedGalleries()
         val shows = showsArtworkMarkers(
             guidesToGalleryFirst = kind.guidesToGalleryFirst && galleryDestinations.isNotEmpty(),
             hasGalleryAhead = galleryAheadDestination != null,
@@ -1137,7 +1111,7 @@ internal class VisitViewModel(
         val style = (if (shows) MapStyle.journeyStops else MapStyle.journeyStopsHidden)
             .let { if (settings.groupsStopMarkers) it else it.copy(groupsOverlapping = false) }
             .let { if (settings.showsStopNumbers) it else MapStyle.withoutNumbers(it) }
-            .let { it.copy(hiddenStopIds = stopsOutsideTheVisitorsGallery(controller.navigator.journey.value.stops, shownVisitorGalleryId)) }
+            .let { it.copy(hiddenStopIds = stopsOutsideTheVisitorsGallery(controller.navigator.journey.value.stops, visitorGalleryId)) }
         if (session.journeyStopMarkerStyle != style) session.journeyStopMarkerStyle = style
         layers.updateStopDots(if (settings.showsStopDots) stopDots(controller.navigator.journey.value.stops, style.hiddenStopIds, shows) else emptyList())
     }
@@ -1649,18 +1623,6 @@ internal class VisitViewModel(
         private const val AMBIGUITY_INTERVAL_MILLIS = 4_000L
 
         /**
-         * The visited galleries that stay visited when the visitor enters them again: a gallery of
-         * [complete] (all its artworks visited or skipped) joins once the visitor is out of it, and
-         * stays while it is complete. Pure; covered by tests. iOS `VisitView.keptVisitedGalleries`.
-         */
-        internal fun keptVisitedGalleries(kept: Set<String>, complete: Set<String>, visitorGallery: String?): Set<String> =
-            complete.filterTo(mutableSetOf()) { it in kept || it != visitorGallery }
-
-        /** [visitorGallery], or `null` when it is a visited gallery the visitor entered again. Pure; covered by tests. */
-        internal fun shownVisitorGallery(visitorGallery: String?, keptVisited: Set<String>): String? =
-            visitorGallery?.takeUnless { it in keptVisited }
-
-        /**
          * The galleries of [stops] whose stops are all done or skipped, at least one done, except
          * [visitorGallery]. Pure; covered by tests.
          */
@@ -1683,27 +1645,28 @@ internal class VisitViewModel(
         }
 
         /**
-         * The artwork stops in a gallery ([MapJourneyStop.group]) other than [visitorGallery]: the map
-         * draws no marker for them, and they keep their numbers. Artworks outside every gallery and
-         * detours stay. Pure; covered by tests.
+         * The artwork stops not visited yet in a gallery ([MapJourneyStop.group]) other than
+         * [visitorGallery]: the map draws no marker for them, and they keep their numbers. Visited
+         * artworks, artworks outside every gallery and detours stay. Pure; covered by tests.
          */
         internal fun stopsOutsideTheVisitorsGallery(stops: List<MapJourneyStop>, visitorGallery: String?): Set<String> =
             stops.mapNotNullTo(LinkedHashSet()) { stop ->
                 val gallery = stop.group
-                if (stop.kind == MapJourneyStop.Kind.DETOUR || gallery == null || gallery == visitorGallery) null else stop.id
+                if (stop.kind == MapJourneyStop.Kind.DETOUR || stop.state == MapJourneyStop.State.DONE || gallery == null || gallery == visitorGallery) null else stop.id
             }
 
         /**
          * The dots of the artworks that have no numbered marker: every artwork while the numbers are
          * hidden ([showsNumbers] false), else the artworks in [hiddenStopIds] and the skipped ones. A
-         * detour and a stop without a floor have none. Nagarro reported the artworks as disappearing
+         * visited artwork has none: its marker always shows (iOS 1.50.4). A detour and a stop without
+         * a floor have none. Nagarro reported the artworks as disappearing
          * from the map (PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing",
          * 2026-11-15; iOS 1.43.0). Pure; covered by tests.
          */
         internal fun stopDots(stops: List<MapJourneyStop>, hiddenStopIds: Set<String>, showsNumbers: Boolean): List<JourneyMapLayers.StopDot> =
             stops.mapNotNull { stop ->
                 val level = stop.floor?.level ?: return@mapNotNull null
-                if (stop.kind == MapJourneyStop.Kind.DETOUR) return@mapNotNull null
+                if (stop.kind == MapJourneyStop.Kind.DETOUR || stop.state == MapJourneyStop.State.DONE) return@mapNotNull null
                 if (showsNumbers && stop.id !in hiddenStopIds && stop.state != MapJourneyStop.State.SKIPPED) return@mapNotNull null
                 val style = when (stop.state) {
                     MapJourneyStop.State.PENDING -> JourneyMapLayers.StopDot.Style.PENDING

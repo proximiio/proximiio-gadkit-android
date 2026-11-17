@@ -285,27 +285,6 @@ class GalleryPolygonTest {
         assertEquals(setOf("g303"), VisitViewModel.visitedGalleries(stops, visitorGallery = "g101"))
     }
 
-    /** iOS 1.50.3: "visited" has priority over "visitor in". */
-    @Test
-    fun aVisitedGalleryStaysVisitedWhenTheVisitorEntersItAgain() {
-        // The last artwork is visited while the visitor is in the gallery: not kept yet.
-        var kept = VisitViewModel.keptVisitedGalleries(emptySet(), complete = setOf("g101"), visitorGallery = "g101")
-        assertTrue(kept.isEmpty())
-        assertEquals("g101", VisitViewModel.shownVisitorGallery("g101", kept))
-        // The visitor is out of it: kept.
-        kept = VisitViewModel.keptVisitedGalleries(kept, complete = setOf("g101"), visitorGallery = null)
-        assertEquals(setOf("g101"), kept)
-        // The visitor enters it again: it stays visited, and the map has no visitor's gallery.
-        kept = VisitViewModel.keptVisitedGalleries(kept, complete = setOf("g101"), visitorGallery = "g101")
-        assertEquals(setOf("g101"), kept)
-        assertNull(VisitViewModel.shownVisitorGallery("g101", kept))
-        assertEquals(GalleryFill.Style.VISITED, VisitViewModel.fillStyle("g101", destination = null, visited = setOf("g101"), visitorGallery = null))
-        // Another gallery is the visitor's as before.
-        assertEquals("g104", VisitViewModel.shownVisitorGallery("g104", kept))
-        // A gallery that is not complete any more is not kept.
-        assertTrue(VisitViewModel.keptVisitedGalleries(kept, complete = emptySet(), visitorGallery = null).isEmpty())
-    }
-
     /**
      * The gallery the visitor is in has no fill, so its artworks and furniture show; every other
      * gallery is destination, visited or the standard colour (PM, Monday "Artwork + furniture
@@ -322,9 +301,10 @@ class GalleryPolygonTest {
     }
 
     /**
-     * The marker of an artwork in a gallery shows only while the visitor is in that gallery, in every
-     * state; artworks outside every gallery and detours stay (PM, Monday "Gallery numbers in gallery
-     * navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0).
+     * The marker of an artwork still to visit in a gallery shows only while the visitor is in that
+     * gallery; visited artworks, artworks outside every gallery and detours stay (PM, Monday "Gallery
+     * numbers in gallery navigation", 2026-10-29 and 2026-10-30; iOS 1.33.0; visited: operator,
+     * 2026-11-17, iOS 1.50.4).
      */
     @Test
     fun artworkMarkersShowOnlyInTheVisitorsGallery() {
@@ -337,8 +317,8 @@ class GalleryPolygonTest {
             stop("pending-g303", gallery = "g303"),
             stop("cafe", gallery = "g101", kind = MapJourneyStop.Kind.DETOUR),
         )
-        assertEquals(setOf("visited-g101", "active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = null))
-        assertEquals(setOf("visited-g101"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g303"))
+        assertEquals(setOf("active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = null))
+        assertTrue(VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g303").isEmpty())
         assertEquals(setOf("active-g303", "pending-g303"), VisitViewModel.stopsOutsideTheVisitorsGallery(stops, visitorGallery = "g101"))
     }
 
@@ -362,11 +342,11 @@ class GalleryPolygonTest {
         )
         val hidden = setOf("visited", "reached", "pending", "no-floor", "cafe")
         val dots = VisitViewModel.stopDots(stops, hidden, showsNumbers = true)
-        assertEquals(listOf(DotStyle.VISITED, DotStyle.SKIPPED, DotStyle.ACTIVE, DotStyle.PENDING), dots.map { it.style })
+        assertEquals(listOf(DotStyle.SKIPPED, DotStyle.ACTIVE, DotStyle.PENDING), dots.map { it.style })
         assertTrue(dots.all { it.level == 1.0 })
-        // Numbers hidden: every artwork with a floor.
+        // Numbers hidden: every artwork with a floor but the visited one, whose marker shows.
         assertEquals(
-            listOf(DotStyle.VISITED, DotStyle.SKIPPED, DotStyle.ACTIVE, DotStyle.PENDING, DotStyle.PENDING),
+            listOf(DotStyle.SKIPPED, DotStyle.ACTIVE, DotStyle.PENDING, DotStyle.PENDING),
             VisitViewModel.stopDots(stops, emptySet(), showsNumbers = false).map { it.style },
         )
         // Numbers shown and nothing hidden: the skipped artwork only.
