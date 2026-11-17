@@ -265,6 +265,27 @@ public data class GadSettings(
      */
     val ordersFromVisitorGallery: Boolean = true,
     /**
+     * `true` draws the leg of a personalised journey again from the visitor while they walk in the
+     * gallery of the current artwork, more than [galleryRouteRefreshMeters] off the leg, at most every
+     * [galleryRouteRefreshSeconds]. With `ProximiMapView.Option.PROGRESS` the stops ahead are ordered
+     * from the visitor first, so the leg leads to the nearest artwork. No off-route warning shows
+     * (GAD PM, field test of 2026-11-17: "The route could be recalculated more frequently"). `false`
+     * keeps the leg up to [offRouteMeters], as before. iOS `refreshesRouteInGallery` (1.51.0).
+     */
+    val refreshesRouteInGallery: Boolean = true,
+    /** Metres off the leg, in the gallery of the current artwork, beyond which [refreshesRouteInGallery] draws the leg again. */
+    val galleryRouteRefreshMeters: Double = 3.0,
+    /** The shortest time between two leg refreshes of [refreshesRouteInGallery]. */
+    val galleryRouteRefreshSeconds: Duration = 3.seconds,
+    /**
+     * `true` orders the stops ahead of a personalised journey again from the visitor when they enter
+     * the gallery of an artwork still to visit that is not the gallery of the current artwork, once
+     * per entry (GAD PM, field test of 2026-11-17: "It should also re-route whenever a gallery geofence
+     * is entered"). Needs `ProximiMapView.Option.PROGRESS`. `false` keeps the order, as before. iOS
+     * `ordersAtGalleryEntry` (1.51.0).
+     */
+    val ordersAtGalleryEntry: Boolean = true,
+    /**
      * The time between two uploads of the field log to the relay-api. `ProximiMap` starts the uploads
      * in `start()` with the relay base URL and app token of its `GadConfiguration`. Zero sends
      * nothing. A host app on `ProximiMapView` calls `FieldLog.startUploading` itself. iOS

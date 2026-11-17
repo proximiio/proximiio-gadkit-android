@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.5")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.51.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.50.5
+git -C gadkit checkout 1.51.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -916,6 +916,8 @@ val configuration = GadConfiguration(
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
+| `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
+| `ordersAtGalleryEntry` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when they enter the gallery of an artwork still to visit that is not the gallery of the current artwork, once per entry. Needs `Option.PROGRESS`. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
@@ -1202,7 +1204,36 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.50.5.
+No changes since 1.51.0.
+
+### [1.51.0] — 2026-11-17
+
+The behaviour of the iOS package 1.51.0. No breaking change: the source of a host app needs no change.
+`GadSettings` has four new settings, so rebuild every module of the app against this one version.
+
+#### Added (iOS 1.51.0; GAD PM, field test of 2026-11-17)
+
+- `GadSettings.refreshesRouteInGallery` (`true`), `galleryRouteRefreshMeters` (3 m) and
+  `galleryRouteRefreshSeconds` (3 s). **Visible:** in a personalised journey, while the visitor walks
+  in the gallery of the current artwork more than 3 m off the leg, the leg is drawn again from the
+  visitor, at most every 3 s. With `Option.PROGRESS` the stops ahead are ordered from the visitor
+  first, so the leg leads to the nearest artwork. No off-route warning shows. Before, the leg stayed up
+  to `offRouteMeters` (12 m), and with `OFF_ROUTE_PROMPT` a personalised journey kept its leg also
+  after the warning. A curated tour does not change. Not while the journey is paused, during a detour,
+  at a reached artwork or on a floor without positioning.
+- `GadSettings.ordersAtGalleryEntry` (`true`). **Visible:** with `Option.PROGRESS`, a personalised
+  journey is ordered again from the visitor when they enter the gallery of an artwork still to visit
+  that is not the gallery of the current artwork. Once per entry; no warning shows. An entry while the
+  journey is paused, during a detour or at a reached artwork orders nothing later.
+- A new order reports `StopOrderChanged` and `NextStop`, as every new order does. A host app that
+  manages the progress itself (no `Option.PROGRESS`) gets the leg drawn again, and no new order.
+- To keep the behaviour of 1.50.5: `GadSettings(refreshesRouteInGallery = false, ordersAtGalleryEntry = false)`.
+- New field log lines: `gallery route: <n> m off the leg in <gallery> · leg drawn again from the visitor`,
+  `gallery route: <id> is nearer than <stop> · journey ordered again` and
+  `gallery entered: <gallery> · <id> is nearer than <stop> · journey ordered again`.
+- Known limits: a visitor who only walks through a journey gallery gets a new order too. An artwork
+  whose venue data names a gallery it does not stand in gets neither rule.
+- Not verified on a phone.
 
 ### [1.50.5] — 2026-11-17
 

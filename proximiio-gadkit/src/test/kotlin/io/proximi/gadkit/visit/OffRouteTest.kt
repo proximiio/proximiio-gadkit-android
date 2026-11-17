@@ -122,4 +122,31 @@ class OffRouteTest {
         assertTrue(VisitController.reroutesOffTheLeg(asksApp = true, keepsOrder = true))
         assertFalse(VisitController.reroutesOffTheLeg(asksApp = true, keepsOrder = false))
     }
+
+    /** iOS 1.51.0: in the gallery of the current artwork the leg is drawn again 3 m off it, at most every 3 s. */
+    @Test
+    fun inTheGalleryTheLegIsDrawnAgainBeyondThreeMetresEveryThreeSeconds() {
+        val settings = io.proximi.gadkit.GadSettings.STANDARD
+        assertTrue(settings.refreshesRouteInGallery)
+        assertEquals(3.0, settings.galleryRouteRefreshMeters)
+        assertEquals(3_000, settings.galleryRouteRefreshSeconds.inWholeMilliseconds)
+        assertTrue(VisitController.refreshesGalleryRoute(3.1, 3_000, settings))
+        assertFalse(VisitController.refreshesGalleryRoute(3.0, 60_000, settings))
+        assertFalse(VisitController.refreshesGalleryRoute(8.0, 2_999, settings))
+        assertFalse(VisitController.refreshesGalleryRoute(8.0, 60_000, settings.copy(refreshesRouteInGallery = false)))
+        assertTrue(VisitController.refreshesGalleryRoute(8.0, 3_000, settings.copy(galleryRouteRefreshMeters = 7.0)))
+    }
+
+    /** iOS 1.51.0, the cases of its test: the stops are ordered once at the entry of a journey gallery. */
+    @Test
+    fun theJourneyIsOrderedAtTheEntryOfAJourneyGallery() {
+        val settings = io.proximi.gadkit.GadSettings.STANDARD
+        assertTrue(settings.ordersAtGalleryEntry)
+        assertTrue(VisitController.ordersAtGalleryEntry(previous = null, current = "g104", active = "g102", settings = settings))
+        assertTrue(VisitController.ordersAtGalleryEntry(previous = "g103", current = "g104", active = null, settings = settings))
+        assertFalse(VisitController.ordersAtGalleryEntry(previous = "g104", current = "g104", active = "g102", settings = settings))
+        assertFalse(VisitController.ordersAtGalleryEntry(previous = null, current = "g102", active = "g102", settings = settings))
+        assertFalse(VisitController.ordersAtGalleryEntry(previous = "g104", current = null, active = "g102", settings = settings))
+        assertFalse(VisitController.ordersAtGalleryEntry(previous = null, current = "g104", active = "g102", settings = settings.copy(ordersAtGalleryEntry = false)))
+    }
 }

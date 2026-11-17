@@ -175,6 +175,9 @@ internal class VisitController(
     /** Times and distances: arrival, out-of-order dwell, off route, route snap, journey order. */
     private val settings: GadSettings = GadSettings.STANDARD,
 ) {
+    /** A curated tour: the stops keep the curators' order, also when the host app manages the progress. */
+    private val isCurated = keepsOrder
+
     private val keepsOrder = keepsOrder || !managesProgress
 
     /** The rule for the order of the stops ([GadSettings.ordersGalleriesByWalkingTime]). */
@@ -510,6 +513,88 @@ internal class VisitController(
                 if (!proposal.isImprovement || first == null || first == active.id) return@serially
                 FieldLog.log("off route: $first is nearer than ${active.title} · journey ordered again")
                 isOffRouteEpisode = false
+                rerouting { apply(proposal) }
+            }
+        }
+    }
+
+    /**
+     * Called on every guidance update. A personalised journey whose visitor walks in the gallery of
+     * the current artwork, more than [GadSettings.galleryRouteRefreshMeters] off the leg: the leg is
+     * drawn again from the visitor, at most every [GadSettings.galleryRouteRefreshSeconds]. With
+     * [managesProgress] the stops ahead are ordered from the visitor first, so the leg leads to the
+     * nearest artwork. No warning shows (GAD PM, field test of 2026-11-17; iOS 1.51.0). Before, the leg
+     * stayed up to [GadSettings.offRouteMeters]. Not while paused, during a detour, at a reached
+     * artwork or on a floor without positioning.
+     */
+    fun checkGalleryRoute(guidance: RouteGuidance?, isFloorGuideActive: Boolean) {
+        if (!settings.refreshesRouteInGallery || isCurated || !isNavigating || mutablePaused.value || isFloorGuideActive ||
+            navigator.detourStop != null || navigator.hasArrived || guidance == null || guidance.hasArrived
+        ) {
+            return
+        }
+        val active = navigator.activeStop ?: return
+        val gallery = galleryRouting.galleryOf(active.coordinate) ?: return
+        val position = session.position.value ?: return
+        if (!gallery.gallery.contains(Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level)) return
+        val now = System.currentTimeMillis()
+        if (!refreshesGalleryRoute(guidance.offRouteMeters, now - lastGalleryRouteRefresh, settings)) return
+        lastGalleryRouteRefresh = now
+        val meters = guidance.offRouteMeters
+        doneJobs += scope.launch {
+            serially {
+                if (navigator.activeStop?.id != active.id) return@serially
+                rerouting {
+                    if (managesProgress) {
+                        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy)
+                        val first = proposal?.order?.firstOrNull()
+                        if (proposal != null && proposal.isImprovement && first != null && first != active.id) {
+                            FieldLog.log("gallery route: $first is nearer than ${active.title} · journey ordered again")
+                            apply(proposal)
+                        }
+                    }
+                    FieldLog.log(String.format(Locale.ROOT, "gallery route: %.0f m off the leg in %s · leg drawn again from the visitor", meters, gallery.gallery.name))
+                    navigator.resumeJourney()
+                }
+                save()
+            }
+        }
+    }
+
+    /** The last time [checkGalleryRoute] drew the leg again, epoch milliseconds. */
+    private var lastGalleryRouteRefresh = 0L
+
+    /** The gallery of an open stop that held the visitor at the last fix ([checkGalleryEntry]). */
+    private var journeyGalleryId: String? = null
+
+    /**
+     * Called on every fix. A personalised journey whose visitor enters the gallery of an open stop
+     * that is not the gallery of the current artwork: the stops ahead are ordered again from the
+     * visitor, once per entry. No warning shows (GAD PM, field test of 2026-11-17; iOS 1.51.0). An
+     * entry while paused, during a detour or at a reached artwork orders nothing later.
+     */
+    fun checkGalleryEntry() {
+        val position = session.position.value ?: return
+        val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+        val level = position.floor?.level
+        val active = navigator.activeStop
+        val open = navigator.journey.value.stops.filter { it.state == JourneyStop.State.PENDING || it.id == active?.id }
+        val current = open.asSequence()
+            .mapNotNull { galleryRouting.galleryOf(it.coordinate) }
+            .firstOrNull { it.gallery.contains(origin, level) }
+        val previous = journeyGalleryId
+        journeyGalleryId = current?.id
+        val activeGallery = active?.let { galleryRouting.galleryOf(it.coordinate)?.id }
+        if (!ordersAtGalleryEntry(previous, current?.id, activeGallery, settings)) return
+        if (!managesProgress || keepsOrder || !isNavigating || mutablePaused.value || navigator.detourStop != null || navigator.hasArrived) return
+        if (active == null || current == null) return
+        doneJobs += scope.launch {
+            serially {
+                if (navigator.activeStop?.id != active.id) return@serially
+                val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return@serially
+                val first = proposal.order.firstOrNull()
+                if (!proposal.isImprovement || first == null || first == active.id) return@serially
+                FieldLog.log("gallery entered: ${current.gallery.name} · $first is nearer than ${active.title} · journey ordered again")
                 rerouting { apply(proposal) }
             }
         }
@@ -1220,6 +1305,22 @@ internal class VisitController(
          * warning every journey. iOS `VisitController.reroutesOffTheLeg` (1.50.2).
          */
         fun reroutesOffTheLeg(asksApp: Boolean, keepsOrder: Boolean): Boolean = !asksApp || keepsOrder
+
+        /**
+         * Whether a visitor in the gallery of the current artwork, [offLegMeters] off the leg, gets the
+         * leg drawn again, [sinceLastMillis] after the last time ([GadSettings.refreshesRouteInGallery]).
+         */
+        fun refreshesGalleryRoute(offLegMeters: Double, sinceLastMillis: Long, settings: GadSettings): Boolean =
+            settings.refreshesRouteInGallery && offLegMeters > settings.galleryRouteRefreshMeters &&
+                sinceLastMillis >= settings.galleryRouteRefreshSeconds.inWholeMilliseconds
+
+        /**
+         * Whether the stops are ordered again at this fix: the visitor is in the gallery [current] of an
+         * open stop, was not in it at the last fix ([previous]), and it is not the gallery [active] of
+         * the current artwork. iOS `ordersAtGalleryEntry` (1.51.0).
+         */
+        fun ordersAtGalleryEntry(previous: String?, current: String?, active: String?, settings: GadSettings): Boolean =
+            settings.ordersAtGalleryEntry && current != null && current != previous && current != active
 
         /** The order strategy for [settings]. Pure; covered by tests. */
         internal fun orderStrategy(settings: GadSettings): JourneyOrderStrategy =

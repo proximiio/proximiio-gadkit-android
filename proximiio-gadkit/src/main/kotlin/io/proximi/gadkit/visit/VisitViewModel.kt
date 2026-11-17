@@ -539,6 +539,7 @@ internal class VisitViewModel(
                 updateNotification()
                 reportStopNearby(session.position.value, navigator.activeStop, guidance)
                 controller.checkLegDeviation(guidance, floorGuide.isActive)
+                controller.checkGalleryRoute(guidance, floorGuide.isActive)
             }
         }
         // A resumed journey reports the gallery ahead again (PM, Monday "Sending entered geofences &
@@ -567,6 +568,7 @@ internal class VisitViewModel(
                 checkArrival()
                 checkRide(position)
                 controller.checkCloserArtwork()
+                controller.checkGalleryEntry()
                 controller.checkWrongFloor(floorGuide.isActive)
             }
         }

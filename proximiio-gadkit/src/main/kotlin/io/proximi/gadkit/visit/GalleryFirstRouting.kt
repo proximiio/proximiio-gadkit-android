@@ -73,6 +73,9 @@ internal class GalleryFirstRouting(
     /** The gallery that a leg to [artwork] leads to first while the visitor is outside it, or `null`. */
     fun gallery(artwork: MapCoordinate): GalleryDestination? = state.gallery(Key(artwork))
 
+    /** The gallery [artwork] stands in, also after the visitor entered it and with gallery first off, or `null`. */
+    fun galleryOf(artwork: MapCoordinate): GalleryDestination? = state.galleries[Key(artwork)]
+
     /** [isInGalleryOfLaterArtwork] with the galleries of this router. */
     fun isInGalleryOfLaterArtwork(origin: Coordinate, originLevel: Double?, next: MapCoordinate, later: List<MapCoordinate>): Boolean =
         isInGalleryOfLaterArtwork(origin, originLevel, next, later, state.galleries)
