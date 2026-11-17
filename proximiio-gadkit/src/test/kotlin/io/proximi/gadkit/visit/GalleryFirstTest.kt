@@ -285,6 +285,27 @@ class GalleryPolygonTest {
         assertEquals(setOf("g303"), VisitViewModel.visitedGalleries(stops, visitorGallery = "g101"))
     }
 
+    /** iOS 1.50.3: "visited" has priority over "visitor in". */
+    @Test
+    fun aVisitedGalleryStaysVisitedWhenTheVisitorEntersItAgain() {
+        // The last artwork is visited while the visitor is in the gallery: not kept yet.
+        var kept = VisitViewModel.keptVisitedGalleries(emptySet(), complete = setOf("g101"), visitorGallery = "g101")
+        assertTrue(kept.isEmpty())
+        assertEquals("g101", VisitViewModel.shownVisitorGallery("g101", kept))
+        // The visitor is out of it: kept.
+        kept = VisitViewModel.keptVisitedGalleries(kept, complete = setOf("g101"), visitorGallery = null)
+        assertEquals(setOf("g101"), kept)
+        // The visitor enters it again: it stays visited, and the map has no visitor's gallery.
+        kept = VisitViewModel.keptVisitedGalleries(kept, complete = setOf("g101"), visitorGallery = "g101")
+        assertEquals(setOf("g101"), kept)
+        assertNull(VisitViewModel.shownVisitorGallery("g101", kept))
+        assertEquals(GalleryFill.Style.VISITED, VisitViewModel.fillStyle("g101", destination = null, visited = setOf("g101"), visitorGallery = null))
+        // Another gallery is the visitor's as before.
+        assertEquals("g104", VisitViewModel.shownVisitorGallery("g104", kept))
+        // A gallery that is not complete any more is not kept.
+        assertTrue(VisitViewModel.keptVisitedGalleries(kept, complete = emptySet(), visitorGallery = null).isEmpty())
+    }
+
     /**
      * The gallery the visitor is in has no fill, so its artworks and furniture show; every other
      * gallery is destination, visited or the standard colour (PM, Monday "Artwork + furniture

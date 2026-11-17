@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.2")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.50.3")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.50.2
+git -C gadkit checkout 1.50.3
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1202,7 +1202,26 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.50.2.
+No changes since 1.50.3.
+
+### [1.50.3] — 2026-11-17
+
+The behaviour of the iOS package 1.50.3. No breaking change: the source of a host app needs no change.
+
+#### Changed (iOS 1.50.3; operator, 2026-11-17: "visited" has priority over "visitor in")
+
+- **Visible:** a visited gallery stays visited when the visitor enters it again. A gallery is visited
+  when all its artworks of the journey are visited or skipped, at least one visited, once the visitor
+  is out of it. Before, a visitor who entered it again got the gallery of the visitor: no fill, no
+  name, and the artworks' markers. Now it keeps the visited fill and name, and its artworks' markers
+  stay hidden. The host app has nothing to do.
+- Field log: `gallery fills: visitor in <name> (stays visited) · …`.
+- Not changed: the gallery the visitor is in is found by its outline on the map, not by the gallery
+  geofence. A visitor at the border of the outline is out of the gallery for the map, and the markers
+  of its artworks hide then.
+- The kept state is per open journey screen: a screen opened inside a visited gallery shows it as the
+  visitor's gallery.
+- Not verified on a phone.
 
 ### [1.50.2] — 2026-11-17
 
