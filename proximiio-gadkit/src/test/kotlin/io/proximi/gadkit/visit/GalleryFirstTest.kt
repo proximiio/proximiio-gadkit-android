@@ -115,6 +115,26 @@ class GalleryFirstRoutingTest {
         assertNull(GalleryFirstRouting.gallery(outside, 3.0, MapCoordinate(0.6, 0.6), state()))
     }
 
+    /** PM, 2026-11-18: an artwork missed in a gallery the visitor left leads to the gallery again. */
+    @Test
+    fun aGalleryTheVisitorLeftIsAGalleryAheadAgain() {
+        val key = GalleryFirstRouting.Key(artwork)
+        val reached = state(reached = true)
+        assertEquals(emptySet<GalleryFirstRouting.Key>(), GalleryFirstRouting.left(inside, 3.0, 5.0, reached))
+        assertEquals(setOf(key), GalleryFirstRouting.left(outside, 3.0, 5.0, reached))
+        assertEquals(setOf(key), GalleryFirstRouting.left(inside, 1.0, 5.0, reached))
+        // 2 m outside the outline is not yet outside.
+        assertEquals(emptySet<GalleryFirstRouting.Key>(), GalleryFirstRouting.left(Coordinate(1.00002, 0.5), 3.0, 5.0, reached))
+        assertEquals(emptySet<GalleryFirstRouting.Key>(), GalleryFirstRouting.left(outside, 3.0, 5.0, state()))
+
+        val routing = GalleryFirstRouting(RecordingRouting())
+        routing.update(true, mapOf(key to destination))
+        routing.markReached(artwork)
+        assertNull(routing.gallery(artwork))
+        assertEquals(setOf(key), routing.releaseLeft(outside, 3.0, 5.0))
+        assertEquals(destination, routing.gallery(artwork))
+    }
+
     @Test
     fun theLabelIsTheFirstWordOfTheName() {
         assertEquals("G303", destination.label)

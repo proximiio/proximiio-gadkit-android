@@ -916,10 +916,21 @@ internal class VisitController(
     fun checkGalleryFirst() {
         try {
             if (!isNavigating || mutablePaused.value || navigator.detourStop != null || navigator.hasArrived) return
-            val stop = navigator.activeStop ?: return
-            val gallery = galleryRouting.gallery(stop.coordinate) ?: return
             val position = session.position.value ?: return
-            if (!gallery.gallery.contains(Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level)) return
+            val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+            // A gallery the visitor left is a gallery ahead again: an artwork they missed there gets
+            // the leg to the gallery and the gallery's name on the card (GAD PM, 2026-11-18).
+            val released = galleryRouting.releaseLeft(origin, position.floor?.level, GALLERY_LEFT_METERS)
+            val stop = navigator.activeStop ?: return
+            if (GalleryFirstRouting.Key(stop.coordinate) in released) {
+                FieldLog.log("gallery first: left ${galleryRouting.galleryOf(stop.coordinate)?.gallery?.name ?: "-"} · leg to the gallery of ${stop.title}")
+                doneJobs += scope.launch {
+                    serially { rerouting { navigator.resumeJourney() } }
+                }
+                return
+            }
+            val gallery = galleryRouting.gallery(stop.coordinate) ?: return
+            if (!gallery.gallery.contains(origin, position.floor?.level)) return
             galleryRouting.markReached(stop.coordinate)
             FieldLog.log("gallery first: in ${gallery.gallery.name} · leg to ${stop.title}")
             doneJobs += scope.launch {
@@ -1365,6 +1376,9 @@ internal class VisitController(
 
         /** The closer-artwork check runs at most this often. */
         private const val CLOSER_ARTWORK_INTERVAL_MILLIS = 5_000L
+
+        /** Metres outside a gallery's outline at which the visitor has left it ([checkGalleryFirst]). */
+        private const val GALLERY_LEFT_METERS = 5.0
 
         /**
          * Whether a route still to walk takes the floor at [level]. No route still to walk counts as

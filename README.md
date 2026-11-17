@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.51.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.51.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.51.0
+git -C gadkit checkout 1.51.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1204,7 +1204,23 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.51.0.
+No changes since 1.51.1.
+
+### [1.51.1] — 2026-11-17
+
+No breaking change: the source of a host app needs no change.
+
+#### Fixed (GAD PM, test of build 2026111706, 2026-11-17)
+
+- **Visible:** an artwork the visitor missed in a gallery, and walks back to from outside it, leads
+  to the gallery again: the leg ends at the gallery and the card names the gallery, as for every
+  other gallery ahead. Before, an artwork that had been the next stop
+  while the visitor was in its gallery kept the leg to the artwork and its own name for the rest of
+  the visit. 1.51.0 made this common, because it orders the stops again in the gallery. The visitor
+  has left a gallery when they are more than 5 m outside its outline or on another floor.
+- New field log line: `gallery first: left <gallery> · leg to the gallery of <stop>`.
+- The host app has nothing to do.
+- Not verified on a phone. iOS does not have this change yet.
 
 ### [1.51.0] — 2026-11-17
 

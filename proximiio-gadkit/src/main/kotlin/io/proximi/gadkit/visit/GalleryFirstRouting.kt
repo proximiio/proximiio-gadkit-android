@@ -85,6 +85,16 @@ internal class GalleryFirstRouting(
         synchronized(lock) { state = state.copy(reached = state.reached + Key(artwork)) }
     }
 
+    /**
+     * The visitor at [origin] left the galleries they entered: legs to the artworks of a gallery more
+     * than [meters] away, or on another floor, lead to the gallery again. Returns those artworks.
+     */
+    fun releaseLeft(origin: Coordinate, originLevel: Double?, meters: Double): Set<Key> = synchronized(lock) {
+        val left = left(origin, originLevel, meters, state)
+        if (left.isNotEmpty()) state = state.copy(reached = state.reached - left)
+        left
+    }
+
     override suspend fun route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey): ComputedRoute? =
         inner.route(origin, originFloor, destination, destinationFloor)?.let { fromOrigin(toStop(it, destination), origin) }
 
@@ -142,6 +152,16 @@ internal class GalleryFirstRouting(
             if (galleries[Key(next)]?.gallery?.contains(origin, originLevel) == true) return false
             return later.any { galleries[Key(it)]?.gallery?.contains(origin, originLevel) == true }
         }
+
+        /**
+         * The reached artworks of [state] whose gallery [origin] has left: the gallery is on another
+         * floor, or its outline is more than [meters] away. Pure; covered by tests.
+         */
+        fun left(origin: Coordinate, originLevel: Double?, meters: Double, state: State): Set<Key> =
+            state.reached.filterTo(HashSet()) { key ->
+                val gallery = state.galleries[key]?.gallery ?: return@filterTo false
+                (originLevel != null && !VenueLevel.same(originLevel, gallery.level)) || gallery.distanceTo(origin) > meters
+            }
 
         /** The gallery where a leg from [origin] to [destination] ends instead of the artwork, or `null`. Pure; covered by tests. */
         fun gallery(origin: Coordinate, originLevel: Double, destination: MapCoordinate, state: State): GalleryDestination? {
