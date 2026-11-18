@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.51.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.51.2")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.51.1
+git -C gadkit checkout 1.51.2
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -918,6 +918,7 @@ val configuration = GadConfiguration(
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
 | `ordersAtGalleryEntry` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when they enter the gallery of an artwork still to visit that is not the gallery of the current artwork, once per entry. Needs `Option.PROGRESS`. |
+| `skipsAtSwipe` | `false` | Journey list: `true` makes a swipe on an artwork ask for the skip at once (`SkipRequested`, and the dialog with `Option.SKIP_PROMPT`); the row slides back. `false`: the swipe reveals the skip button, and a tap on it asks for the skip. The TalkBack action "Skip" is the same in both. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
@@ -1204,7 +1205,18 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.51.1.
+No changes since 1.51.2.
+
+### [1.51.2] — 2026-11-18
+
+#### Added (iOS 1.51.0)
+
+- `GadSettings.skipsAtSwipe` (`false`). Journey list: `true` makes the swipe on an artwork ask for
+  the skip at once. The view sends `SkipRequested` and, with `Option.SKIP_PROMPT`, shows its dialog;
+  the row slides back. A swipe shorter than half of the skip button's width does nothing. `false`
+  is the behaviour of 1.51.1: the swipe reveals the skip button, and a tap on it asks for the skip
+  (Nagarro, 2026-11-18). No change in the host app is needed. `GadSettings` has a new field:
+  rebuild every module that uses the library against this version.
 
 ### [1.51.1] — 2026-11-17
 

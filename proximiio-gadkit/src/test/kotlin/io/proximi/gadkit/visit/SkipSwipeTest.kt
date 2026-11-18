@@ -52,4 +52,14 @@ class SkipSwipeTest {
         assertFalse(SkipSwipe.canSkip(stop(StopState.DONE)))
         assertFalse(SkipSwipe.canSkip(stop(StopState.REACHED)))
     }
+
+    @Test
+    fun aSwipeAsksForTheSkipAtOnceWhenSet() {
+        val revealing = SkipSwipe.end(offset = -60f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = true)
+        assertTrue(!revealing.isRevealed && revealing.skips)
+        val short = SkipSwipe.end(offset = -20f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = true)
+        assertTrue(!short.isRevealed && !short.skips)
+        val button = SkipSwipe.end(offset = -60f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = false)
+        assertTrue(button.isRevealed && !button.skips)
+    }
 }

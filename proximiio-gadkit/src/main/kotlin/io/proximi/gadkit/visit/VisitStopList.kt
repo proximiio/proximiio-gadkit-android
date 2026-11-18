@@ -118,6 +118,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                         isRevealed = revealedStopId == stop.id,
                         onRevealChange = { revealedStopId = if (it) stop.id else null },
                         isEnabled = allowsSkip && SkipSwipe.canSkip(stop),
+                        skipsAtSwipe = model.settings.skipsAtSwipe,
                         onSkip = {
                             revealedStopId = null
                             model.requestSkip(stop)
@@ -212,6 +213,8 @@ private fun SwipeToSkipRow(
     isRevealed: Boolean,
     onRevealChange: (Boolean) -> Unit,
     isEnabled: Boolean,
+    /** [io.proximi.gadkit.GadSettings.skipsAtSwipe]: the swipe itself asks for the skip. */
+    skipsAtSwipe: Boolean,
     onSkip: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -277,9 +280,15 @@ private fun SwipeToSkipRow(
                                 // already logical. Reversing it again made a quick swipe to the right
                                 // close the panel in Arabic (PM, Monday "Skipping in Arabic goes the
                                 // wrong way").
-                                val reveal = SkipSwipe.reveals(offset.value, velocity, revealWidth)
-                                if (reveal == isRevealed) offset.animateTo(if (reveal) -revealWidth else 0f, tween(250))
-                                onRevealChange(reveal)
+                                val end = SkipSwipe.end(offset.value, velocity, revealWidth, skipsAtSwipe)
+                                if (end.skips) {
+                                    // The row slides back while the skip is asked for.
+                                    scope.launch { offset.animateTo(0f, tween(250)) }
+                                    onSkip()
+                                } else {
+                                    if (end.isRevealed == isRevealed) offset.animateTo(if (end.isRevealed) -revealWidth else 0f, tween(250))
+                                    onRevealChange(end.isRevealed)
+                                }
                             },
                         )
                     } else {
@@ -306,6 +315,18 @@ internal object SkipSwipe {
 
     /** True when a drag that stops at [offset] with [velocity] (px/s) leaves the skip panel revealed. */
     fun reveals(offset: Float, velocity: Float, revealWidth: Float): Boolean = offset + velocity * 0.1f < -revealWidth / 2
+
+    /** How a drag ends: the skip panel stays revealed, or the swipe asks for the skip. */
+    data class End(val isRevealed: Boolean, val skips: Boolean)
+
+    /**
+     * The end of a drag that stops at [offset] with [velocity] (px/s). With [skipsAtSwipe] a drag that
+     * would reveal the panel asks for the skip and the row slides back; a shorter drag does nothing.
+     */
+    fun end(offset: Float, velocity: Float, revealWidth: Float, skipsAtSwipe: Boolean): End {
+        val revealed = reveals(offset, velocity, revealWidth)
+        return if (skipsAtSwipe && revealed) End(isRevealed = false, skips = true) else End(revealed, skips = false)
+    }
 
     /** Damped drag past the open position and past the closed position. */
     fun rubberBand(raw: Float, revealWidth: Float): Float = when {

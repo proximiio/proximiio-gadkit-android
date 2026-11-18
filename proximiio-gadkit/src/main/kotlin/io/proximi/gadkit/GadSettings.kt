@@ -286,6 +286,13 @@ public data class GadSettings(
      */
     val ordersAtGalleryEntry: Boolean = true,
     /**
+     * Journey list: `true` makes a swipe on an artwork ask for the skip at once
+     * ([ProximiMapEvent.SkipRequested], and the dialog with `ProximiMapView.Option.SKIP_PROMPT`); the
+     * row slides back. `false`: the swipe reveals the skip button, and a tap on it asks for the skip
+     * (Nagarro, 2026-11-18: a skip with fewer steps). iOS `skipsAtSwipe` (1.51.0).
+     */
+    val skipsAtSwipe: Boolean = false,
+    /**
      * The time between two uploads of the field log to the relay-api. `ProximiMap` starts the uploads
      * in `start()` with the relay base URL and app token of its `GadConfiguration`. Zero sends
      * nothing. A host app on `ProximiMapView` calls `FieldLog.startUploading` itself. iOS
