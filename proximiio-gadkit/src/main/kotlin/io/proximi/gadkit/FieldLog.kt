@@ -44,7 +44,7 @@ public object FieldLog {
     private const val TAG = "GAD"
 
     /** The version of the library, sent with each upload. iOS `FieldLog.packageVersion`. */
-    public const val PACKAGE_VERSION: String = "1.51.2"
+    public const val PACKAGE_VERSION: String = "1.56.0"
 
     /** The thread of every read and write of the file and of the place of the upload. */
     internal val writer = lazy { Executors.newSingleThreadExecutor { Thread(it, "gad-field-log").apply { isDaemon = true } } }
@@ -83,6 +83,8 @@ public object FieldLog {
         val now = OffsetDateTime.now().truncatedTo(ChronoUnit.SECONDS)
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         log("launch ${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)}) $now")
+        // The device model and the system version (iOS 1.52.0).
+        log("device ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
     }
 
     /**

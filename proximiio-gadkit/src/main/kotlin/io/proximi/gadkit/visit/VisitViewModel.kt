@@ -540,6 +540,7 @@ internal class VisitViewModel(
                 reportStopNearby(session.position.value, navigator.activeStop, guidance)
                 controller.checkLegDeviation(guidance, floorGuide.isActive)
                 controller.checkGalleryRoute(guidance, floorGuide.isActive)
+                controller.checkNearestArtworkInGallery(guidance, floorGuide.isActive)
             }
         }
         // A resumed journey reports the gallery ahead again (PM, Monday "Sending entered geofences &
@@ -744,10 +745,9 @@ internal class VisitViewModel(
     }
 
     /**
-     * The zoom of "Centre on me" and of the follow: [GadSettings.galleryFollowZoom] inside a gallery
-     * in a personalised journey, else [GadSettings.followZoom] (PM, Monday "Navigation to a gallery"
-     * and "Curated tours: zoom level", 2026-10-27). A camera that follows the visitor zooms to it; one
-     * the visitor moved stays.
+     * The zoom of "Centre on me" and of the follow: [GadSettings.galleryFollowZoom] inside a gallery,
+     * else [GadSettings.followZoom] (operator, K-39, 2026-11-19; iOS 1.56.0). A camera that follows the
+     * visitor, with or without the heading, zooms to it; one the visitor moved stays.
      */
     private fun applyFollowZoom() {
         val zoom = followZoom(inGallery = visitorGallery != null, kind = kind, settings = settings)
@@ -1689,10 +1689,10 @@ internal class VisitViewModel(
         /** "Rerouting you…" shows after this much routing. */
         private const val REROUTING_DELAY_MILLIS = 500L
 
-        /** The follow zoom: [GadSettings.galleryFollowZoom] in a gallery of a personalised journey. Pure; covered by tests. */
+        /** The follow zoom: [GadSettings.galleryFollowZoom] in a gallery, in every kind of journey since 1.56.0. Pure; covered by tests. */
         internal fun followZoom(inGallery: Boolean, kind: JourneyKind, settings: GadSettings): Double {
             val zoom = settings.galleryFollowZoom
-            return if (inGallery && kind.guidesToGalleryFirst && zoom != null) zoom else settings.followZoom
+            return if (inGallery && zoom != null) zoom else settings.followZoom
         }
 
         /** The states of a stop still to visit: a destination at such a stop makes it the next stop. */

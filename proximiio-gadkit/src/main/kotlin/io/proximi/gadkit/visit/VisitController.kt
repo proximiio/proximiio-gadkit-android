@@ -395,8 +395,7 @@ internal class VisitController(
         waitForFix(settings.lateOrderWindow.inWholeMilliseconds)
         if (session.position.value == null || navigator.hasArrived) return
         if (!navigator.journey.value.stops.all { it.state == JourneyStop.State.PENDING || it.state == JourneyStop.State.ACTIVE }) return
-        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return
-        if (proposal.isImprovement) apply(proposal)
+        visitorOrder()?.let { apply(it) }
     }
 
     /** The floor-then-gallery order from the visitor's fix, or from the first stop without a fix. */
@@ -407,8 +406,52 @@ internal class VisitController(
     /** Orders the stops still ahead from the visitor, floor by floor and gallery by gallery. */
     private suspend fun orderRemaining() {
         if (keepsOrder) return
-        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return
-        if (proposal.isImprovement) apply(proposal)
+        visitorOrder()?.let { apply(it) }
+    }
+
+    /**
+     * The order of the stops ahead from the visitor, or `null` when the order stays. The map orders
+     * them by walking time ([orderStrategy]). With [GadSettings.ordersVisitorGalleryFirst] the artworks
+     * of the gallery the visitor has been in for [GadSettings.galleryEntryOrderSeconds] go first, also
+     * when an artwork of another gallery is nearer by the route. Every order from the visitor uses it,
+     * or the next order by walking time takes the gallery's artworks back. iOS `visitorOrder` (1.52.0).
+     */
+    private suspend fun visitorOrder(): JourneyOrderProposal? {
+        val base = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return null
+        return galleryFirst(base, visitorGalleryStopIds())
+    }
+
+    /**
+     * The open artworks of the gallery the visitor has been in for
+     * [GadSettings.galleryEntryOrderSeconds] ([checkGalleryEntry] keeps the gallery). Empty with
+     * [GadSettings.ordersVisitorGalleryFirst] off.
+     */
+    private fun visitorGalleryStopIds(): Set<String> {
+        val galleryId = journeyGalleryId ?: return emptySet()
+        if (!settings.ordersVisitorGalleryFirst) return emptySet()
+        if (System.currentTimeMillis() - journeyGallerySince < settings.galleryEntryOrderSeconds.inWholeMilliseconds) return emptySet()
+        val activeId = navigator.activeStop?.id
+        return navigator.journey.value.stops
+            .filter { it.state == JourneyStop.State.PENDING || it.id == activeId }
+            .filter { galleryRouting.galleryOf(it.coordinate)?.id == galleryId }
+            .mapTo(HashSet()) { it.id }
+    }
+
+    /**
+     * For the checks that run while the visitor walks ([checkCloserArtwork], [checkGalleryRoute]): how
+     * many metres nearer to the visitor the stop [first] is than the current stop [active], in a
+     * straight line, or `null` when [first] does not take the place of [active] ([switchesStop]). The
+     * map's floor-then-gallery orders count every other order as an improvement, so two artworks at
+     * about the same distance changed places at every check (Nagarro's field test, 2026-11-18).
+     */
+    private fun nearerMeters(first: String, active: JourneyStop): Double? {
+        val position = session.position.value ?: return 0.0
+        val candidate = doneStop(first) ?: return 0.0
+        val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+        val nearer = origin.distanceTo(Coordinate(active.coordinate.latitude, active.coordinate.longitude)) -
+            origin.distanceTo(Coordinate(candidate.coordinate.latitude, candidate.coordinate.longitude))
+        val ids = visitorGalleryStopIds()
+        return if (switchesStop(nearer, first in ids && active.id !in ids, settings)) nearer else null
     }
 
     private suspend fun apply(proposal: JourneyOrderProposal) {
@@ -508,10 +551,11 @@ internal class VisitController(
         doneJobs += scope.launch {
             serially {
                 if (!isOffRouteEpisode || navigator.activeStop?.id != active.id) return@serially
-                val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return@serially
+                val proposal = visitorOrder() ?: return@serially
                 val first = proposal.order.firstOrNull()
-                if (!proposal.isImprovement || first == null || first == active.id) return@serially
-                FieldLog.log("off route: $first is nearer than ${active.title} · journey ordered again")
+                if (first == null || first == active.id) return@serially
+                val nearer = nearerMeters(first, active) ?: return@serially
+                FieldLog.log(String.format(Locale.ROOT, "off route: %s is %.1f m nearer than %s · journey ordered again", first, nearer, active.title))
                 isOffRouteEpisode = false
                 rerouting { apply(proposal) }
             }
@@ -546,10 +590,11 @@ internal class VisitController(
                 if (navigator.activeStop?.id != active.id) return@serially
                 rerouting {
                     if (managesProgress) {
-                        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy)
+                        val proposal = visitorOrder()
                         val first = proposal?.order?.firstOrNull()
-                        if (proposal != null && proposal.isImprovement && first != null && first != active.id) {
-                            FieldLog.log("gallery route: $first is nearer than ${active.title} · journey ordered again")
+                        val nearer = if (first != null && first != active.id) nearerMeters(first, active) else null
+                        if (proposal != null && first != null && nearer != null) {
+                            FieldLog.log(String.format(Locale.ROOT, "gallery route: %s is %.1f m nearer than %s · journey ordered again", first, nearer, active.title))
                             apply(proposal)
                         }
                     }
@@ -567,11 +612,19 @@ internal class VisitController(
     /** The gallery of an open stop that held the visitor at the last fix ([checkGalleryEntry]). */
     private var journeyGalleryId: String? = null
 
+    /** When the visitor's fix first lay in [journeyGalleryId], epoch milliseconds. */
+    private var journeyGallerySince = 0L
+
+    /** `false` from the entry of [journeyGalleryId] until [checkGalleryEntry] checked the order. */
+    private var isGalleryEntryChecked = true
+
     /**
-     * Called on every fix. A personalised journey whose visitor enters the gallery of an open stop
-     * that is not the gallery of the current artwork: the stops ahead are ordered again from the
-     * visitor, once per entry. No warning shows (GAD PM, field test of 2026-11-17; iOS 1.51.0). An
-     * entry while paused, during a detour or at a reached artwork orders nothing later.
+     * Called on every fix. A personalised journey whose visitor is in the gallery of an open stop for
+     * [GadSettings.galleryEntryOrderSeconds], while the current artwork is in another gallery: the
+     * stops ahead are ordered again from the visitor, the artworks of that gallery first
+     * ([GadSettings.ordersAtGalleryEntry], [GadSettings.ordersVisitorGalleryFirst]; GAD PM, field tests
+     * of 2026-11-17 and 2026-11-18). Once per entry. No warning shows. An entry while paused, during a
+     * detour or at a reached artwork is checked when that state ends (iOS 1.52.0; 1.51.0 dropped it).
      */
     fun checkGalleryEntry() {
         val position = session.position.value ?: return
@@ -582,20 +635,91 @@ internal class VisitController(
         val current = open.asSequence()
             .mapNotNull { galleryRouting.galleryOf(it.coordinate) }
             .firstOrNull { it.gallery.contains(origin, level) }
-        val previous = journeyGalleryId
-        journeyGalleryId = current?.id
-        val activeGallery = active?.let { galleryRouting.galleryOf(it.coordinate)?.id }
-        if (!ordersAtGalleryEntry(previous, current?.id, activeGallery, settings)) return
+        val now = System.currentTimeMillis()
+        if (current?.id != journeyGalleryId) {
+            journeyGalleryId = current?.id
+            journeyGallerySince = now
+            isGalleryEntryChecked = current == null
+            FieldLog.log("journey gallery: ${current?.gallery?.name ?: "-"}")
+        }
+        if (isGalleryEntryChecked || current == null || active == null) return
         if (!managesProgress || keepsOrder || !isNavigating || mutablePaused.value || navigator.detourStop != null || navigator.hasArrived) return
-        if (active == null || current == null) return
+        if (!checksGalleryEntry(now - journeyGallerySince, settings)) return
+        isGalleryEntryChecked = true
+        if (galleryRouting.galleryOf(active.coordinate)?.id == current.id) {
+            FieldLog.log("gallery entered: ${current.gallery.name} · the current artwork ${active.title} is in it · order kept")
+            return
+        }
         doneJobs += scope.launch {
             serially {
-                if (navigator.activeStop?.id != active.id) return@serially
-                val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return@serially
-                val first = proposal.order.firstOrNull()
-                if (!proposal.isImprovement || first == null || first == active.id) return@serially
-                FieldLog.log("gallery entered: ${current.gallery.name} · $first is nearer than ${active.title} · journey ordered again")
+                if (navigator.activeStop?.id != active.id || navigator.hasArrived || navigator.detourStop != null) return@serially
+                val proposal = visitorOrder()
+                val first = proposal?.order?.firstOrNull()
+                if (proposal == null || first == null || first == active.id) {
+                    FieldLog.log("gallery entered: ${current.gallery.name} · no other order from the visitor · ${active.title} stays the current artwork")
+                    return@serially
+                }
+                FieldLog.log("gallery entered: ${current.gallery.name} · $first goes before ${active.title} · journey ordered again")
                 rerouting { apply(proposal) }
+            }
+        }
+    }
+
+    /** Since when the visitor is near the geofence of the active artwork and outside it, epoch milliseconds. */
+    private var nearActiveSince: Long? = null
+
+    /** The last time [checkNearestArtworkInGallery] ran, epoch milliseconds. */
+    private var lastNearestArtworkCheck = 0L
+
+    /**
+     * Called on every guidance update. A personalised journey and the visitor in the gallery of the
+     * current artwork: when another open artwork of that gallery is
+     * [GadSettings.orderSwitchMinimumMeters] nearer to the visitor, in a straight line, it becomes the
+     * current stop ([GadSettings.ordersNearestArtworkInGalleryFirst]). It also runs for a visitor on
+     * the leg: the leg to an artwork 16.5 m away passed an open artwork 3.7 m away, and
+     * [checkGalleryRoute] runs only off the leg (GAD PM, field test of 2026-11-18; iOS 1.54.0). At most
+     * every [GadSettings.galleryRouteRefreshSeconds]. Not while paused, during a detour, on a floor
+     * without positioning or at a reached artwork.
+     */
+    fun checkNearestArtworkInGallery(guidance: RouteGuidance?, isFloorGuideActive: Boolean) {
+        if (!settings.ordersNearestArtworkInGalleryFirst || !managesProgress || keepsOrder || !isNavigating || mutablePaused.value ||
+            isFloorGuideActive || navigator.detourStop != null || navigator.hasArrived || guidance == null || guidance.hasArrived
+        ) {
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (now - lastNearestArtworkCheck < settings.galleryRouteRefreshSeconds.inWholeMilliseconds) return
+        val active = navigator.activeStop ?: return
+        val position = session.position.value ?: return
+        val gallery = galleryRouting.galleryOf(active.coordinate) ?: return
+        val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+        if (!gallery.gallery.contains(origin, position.floor?.level)) return
+        lastNearestArtworkCheck = now
+        // The current stop is active, not pending.
+        val distances = navigator.journey.value.stops
+            .filter { (it.state == JourneyStop.State.PENDING || it.id == active.id) && it.kind != JourneyStop.Kind.DETOUR }
+            .filter { galleryRouting.galleryOf(it.coordinate)?.id == gallery.id }
+            .map { it.id to origin.distanceTo(Coordinate(it.coordinate.latitude, it.coordinate.longitude)) }
+        val nearest = nearestStop(distances, active.id, settings) ?: return
+        doneJobs += scope.launch {
+            serially {
+                if (navigator.activeStop?.id != active.id || navigator.hasArrived || navigator.detourStop != null) return@serially
+                val base = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy)
+                if (base == null || base.pinnedStopIds.isNotEmpty()) {
+                    FieldLog.log("gallery route: ${nearest.first} is nearer than ${active.title} · no order from the visitor")
+                    return@serially
+                }
+                val proposal = base.copy(order = listOf(nearest.first) + base.currentOrder.filter { it != nearest.first })
+                rerouting {
+                    FieldLog.log(
+                        String.format(
+                            Locale.ROOT, "gallery route: %s is %.1f m nearer than %s in %s · it is the current stop",
+                            nearest.first, nearest.second, active.title, gallery.gallery.name,
+                        ),
+                    )
+                    apply(proposal)
+                }
+                save()
             }
         }
     }
@@ -633,9 +757,7 @@ internal class VisitController(
             serially {
                 rerouting {
                     if (reorders) {
-                        navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy)
-                            ?.takeIf { it.isImprovement }
-                            ?.let { apply(it) }
+                        visitorOrder()?.let { apply(it) }
                     }
                     navigator.resumeJourney()
                 }
@@ -790,6 +912,7 @@ internal class VisitController(
         // the visit of the active one (GAD PM, 2026-11-15).
         val upcomingId = if (navigator.hasArrived) navigator.upcomingStop?.id else null
         var isInsideUpcoming = false
+        var activeRemoteId: String? = null
         for (stop in navigator.journey.value.stops) {
             if (stop.kind == JourneyStop.Kind.DETOUR) continue
             if (stop.state != JourneyStop.State.PENDING && stop.state != JourneyStop.State.ACTIVE && stop.state != JourneyStop.State.REACHED) continue
@@ -797,7 +920,10 @@ internal class VisitController(
             val areas = artworkAreas[remoteId] ?: continue
             val stopLevel = stop.floor?.level
             if (!VenueLevel.matches(stopLevel, level)) continue
-            if (stop.id == activeId) activeDistance = areas.minOfOrNull { it.distanceTo(point) } ?: Double.POSITIVE_INFINITY
+            if (stop.id == activeId) {
+                activeDistance = areas.minOfOrNull { it.distanceTo(point) } ?: Double.POSITIVE_INFINITY
+                activeRemoteId = remoteId
+            }
             val tolerance = settings.artworkVisitedMeters
             if (areas.none { isInside(it, point, enteredGeofenceIds, tolerance) }) {
                 // The SDK counts the visitor inside, and the fix is further than the visit distance.
@@ -819,6 +945,27 @@ internal class VisitController(
                 isInsideUpcoming = true
             }
         }
+        // Near the geofence of the active artwork, outside it and in no other open artwork: the arrival
+        // after `artworkArrivalMarginSeconds` (`GadSettings.artworkArrivalMarginMeters`; iOS 1.55.0).
+        val nearRemoteId = activeRemoteId
+        if (arrivedStopId == null && !navigator.hasArrived && nearRemoteId != null && activeDistance > 0 && inside.isEmpty() &&
+            !isInsideUpcoming && activeDistance <= settings.artworkArrivalMarginMeters
+        ) {
+            val now = System.currentTimeMillis()
+            val since = nearActiveSince ?: now.also { nearActiveSince = it }
+            if (arrivesNearGeofence(activeDistance, now - since, settings)) {
+                nearActiveSince = null
+                FieldLog.log(
+                    String.format(
+                        Locale.ROOT, "artwork arrival near its geofence: %s · %.1f m outside for %d s",
+                        navigator.activeStop?.title ?: "-", activeDistance, settings.artworkArrivalMarginSeconds.inWholeSeconds,
+                    ),
+                )
+                artworkGeofenceEntered(nearRemoteId)
+            }
+        } else {
+            nearActiveSince = null
+        }
         val arrived = arrivedStopId
         if (arrived != null) {
             when {
@@ -830,7 +977,7 @@ internal class VisitController(
                 }
                 // In another open artwork and outside this one: the visitor has moved on. That artwork
                 // counts from the next fix, after the journey moved on.
-                leavesForAnotherArtwork(inside.isNotEmpty() || isInsideUpcoming, activeDistance) -> {
+                settings.visitsArtworkAtAnotherArtwork && leavesForAnotherArtwork(inside.isNotEmpty() || isInsideUpcoming, activeDistance) -> {
                     leaveArrivedArtwork("in another artwork", ArtworkVisitCause.ENTERED_ANOTHER_ARTWORK)
                     inside = mutableSetOf()
                 }
@@ -920,7 +1067,7 @@ internal class VisitController(
             val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
             // A gallery the visitor left is a gallery ahead again: an artwork they missed there gets
             // the leg to the gallery and the gallery's name on the card (GAD PM, 2026-11-18).
-            val released = galleryRouting.releaseLeft(origin, position.floor?.level, GALLERY_LEFT_METERS)
+            val released = galleryRouting.releaseLeft(origin, position.floor?.level, settings.galleryLeftMeters)
             val stop = navigator.activeStop ?: return
             if (GalleryFirstRouting.Key(stop.coordinate) in released) {
                 FieldLog.log("gallery first: left ${galleryRouting.galleryOf(stop.coordinate)?.gallery?.name ?: "-"} · leg to the gallery of ${stop.title}")
@@ -1039,9 +1186,9 @@ internal class VisitController(
         val later = navigator.journey.value.stops.filter { it.state == JourneyStop.State.PENDING && it.id != next.id }.map { it.coordinate }
         val origin = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
         if (!galleryRouting.isInGalleryOfLaterArtwork(origin, position.floor?.level, next.coordinate, later)) return
-        val proposal = navigator.proposeOrder(JourneyOrderOrigin.VISITOR, strategy = orderStrategy) ?: return
+        val proposal = visitorOrder() ?: return
         val first = proposal.order.firstOrNull()
-        if (!proposal.isImprovement || first == null || first == next.id) return
+        if (first == null || first == next.id) return
         FieldLog.log("visitor in another gallery: $first is nearer than ${next.title} · journey ordered again")
         rerouting { apply(proposal) }
     }
@@ -1326,12 +1473,55 @@ internal class VisitController(
                 sinceLastMillis >= settings.galleryRouteRefreshSeconds.inWholeMilliseconds
 
         /**
-         * Whether the stops are ordered again at this fix: the visitor is in the gallery [current] of an
-         * open stop, was not in it at the last fix ([previous]), and it is not the gallery [active] of
-         * the current artwork. iOS `ordersAtGalleryEntry` (1.51.0).
+         * Whether [checkGalleryEntry] checks the order: the setting is on and the visitor has been in
+         * the gallery for [GadSettings.galleryEntryOrderSeconds]. Pure; covered by tests. iOS
+         * `checksGalleryEntry` (1.52.0).
          */
-        fun ordersAtGalleryEntry(previous: String?, current: String?, active: String?, settings: GadSettings): Boolean =
-            settings.ordersAtGalleryEntry && current != null && current != previous && current != active
+        fun checksGalleryEntry(inGalleryMillis: Long, settings: GadSettings): Boolean =
+            settings.ordersAtGalleryEntry && inGalleryMillis >= settings.galleryEntryOrderSeconds.inWholeMilliseconds
+
+        /**
+         * [base] with the stops of [ids] first, in the order [base] gives them, or `null` when that is
+         * the order the journey has. Without [ids]: [base] when it is an improvement. A proposal with
+         * pinned stops keeps its order. Pure; covered by tests. iOS `galleryFirst` (1.52.0).
+         */
+        fun galleryFirst(base: JourneyOrderProposal, ids: Set<String>): JourneyOrderProposal? {
+            if (ids.isEmpty() || base.pinnedStopIds.isNotEmpty()) return base.takeIf { it.isImprovement }
+            val from = if (base.isImprovement) base.order else base.currentOrder
+            val order = from.filter { it in ids } + from.filter { it !in ids }
+            return if (order == base.currentOrder) null else base.copy(order = order)
+        }
+
+        /**
+         * Whether another artwork takes the place of the current stop in the checks that run while the
+         * visitor walks: it is [GadSettings.orderSwitchMinimumMeters] nearer, or it is in the visitor's
+         * gallery and the current stop is not. Pure; covered by tests. iOS `switchesStop` (1.53.0).
+         */
+        fun switchesStop(nearerMeters: Double, entersVisitorGallery: Boolean, settings: GadSettings): Boolean =
+            entersVisitorGallery || nearerMeters >= settings.orderSwitchMinimumMeters
+
+        /**
+         * The open stop of the visitor's gallery that takes the place of [active], with the metres it
+         * is nearer: the nearest of [distances] (stop id and metres from the visitor), when it is not
+         * [active] and [GadSettings.orderSwitchMinimumMeters] nearer. Pure; covered by tests. iOS
+         * `nearestStop` (1.54.0).
+         */
+        fun nearestStop(distances: List<Pair<String, Double>>, active: String, settings: GadSettings): Pair<String, Double>? {
+            val current = distances.firstOrNull { it.first == active } ?: return null
+            val nearest = distances.minByOrNull { it.second } ?: return null
+            if (nearest.first == active) return null
+            val nearer = current.second - nearest.second
+            return if (nearer >= settings.orderSwitchMinimumMeters && nearer > 0) nearest.first to nearer else null
+        }
+
+        /**
+         * Whether a visitor [distance] metres outside the geofence of the current artwork for
+         * [millis] has arrived ([GadSettings.artworkArrivalMarginMeters]; 0 turns it off). Pure;
+         * covered by tests. iOS `arrivesNearGeofence` (1.55.0).
+         */
+        fun arrivesNearGeofence(distance: Double, millis: Long, settings: GadSettings): Boolean =
+            settings.artworkArrivalMarginMeters > 0 && distance <= settings.artworkArrivalMarginMeters &&
+                millis >= settings.artworkArrivalMarginSeconds.inWholeMilliseconds
 
         /** The order strategy for [settings]. Pure; covered by tests. */
         internal fun orderStrategy(settings: GadSettings): JourneyOrderStrategy =
@@ -1376,9 +1566,6 @@ internal class VisitController(
 
         /** The closer-artwork check runs at most this often. */
         private const val CLOSER_ARTWORK_INTERVAL_MILLIS = 5_000L
-
-        /** Metres outside a gallery's outline at which the visitor has left it ([checkGalleryFirst]). */
-        private const val GALLERY_LEFT_METERS = 5.0
 
         /**
          * Whether a route still to walk takes the floor at [level]. No route still to walk counts as

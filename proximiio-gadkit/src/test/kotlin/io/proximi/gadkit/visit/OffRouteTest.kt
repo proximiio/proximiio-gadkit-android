@@ -137,16 +137,85 @@ class OffRouteTest {
         assertTrue(VisitController.refreshesGalleryRoute(8.0, 3_000, settings.copy(galleryRouteRefreshMeters = 7.0)))
     }
 
-    /** iOS 1.51.0, the cases of its test: the stops are ordered once at the entry of a journey gallery. */
+    /** iOS 1.52.0: the order at a gallery entry is checked after the visitor was in the gallery for 3 s. */
     @Test
-    fun theJourneyIsOrderedAtTheEntryOfAJourneyGallery() {
+    fun theGalleryEntryIsCheckedAfterTheDelay() {
         val settings = io.proximi.gadkit.GadSettings.STANDARD
         assertTrue(settings.ordersAtGalleryEntry)
-        assertTrue(VisitController.ordersAtGalleryEntry(previous = null, current = "g104", active = "g102", settings = settings))
-        assertTrue(VisitController.ordersAtGalleryEntry(previous = "g103", current = "g104", active = null, settings = settings))
-        assertFalse(VisitController.ordersAtGalleryEntry(previous = "g104", current = "g104", active = "g102", settings = settings))
-        assertFalse(VisitController.ordersAtGalleryEntry(previous = null, current = "g102", active = "g102", settings = settings))
-        assertFalse(VisitController.ordersAtGalleryEntry(previous = "g104", current = null, active = "g102", settings = settings))
-        assertFalse(VisitController.ordersAtGalleryEntry(previous = null, current = "g104", active = "g102", settings = settings.copy(ordersAtGalleryEntry = false)))
+        assertFalse(VisitController.checksGalleryEntry(2_900, settings))
+        assertTrue(VisitController.checksGalleryEntry(3_000, settings))
+        assertTrue(VisitController.checksGalleryEntry(0, settings.copy(galleryEntryOrderSeconds = kotlin.time.Duration.ZERO)))
+        assertFalse(VisitController.checksGalleryEntry(60_000, settings.copy(ordersAtGalleryEntry = false)))
+    }
+
+    private fun proposal(order: List<String>, current: List<String>, improves: Boolean, pinned: List<String> = emptyList()) =
+        io.proximi.map.core.JourneyOrderProposal(
+            order = order,
+            currentOrder = current,
+            pinnedStopIds = pinned,
+            currentMeters = 100.0,
+            proposedMeters = if (improves) 60.0 else 100.0,
+            liveStopId = current.firstOrNull(),
+        )
+
+    /** iOS 1.52.0, the cases of its test: the artworks of the visitor's gallery go first. */
+    @Test
+    fun theArtworksOfTheVisitorsGalleryGoFirst() {
+        val current = listOf("a104", "b101", "c104", "d101")
+        // No improvement by walking time: the journey's order, the gallery's artworks first.
+        val same = proposal(current, current, improves = false)
+        assertTrue(!same.isImprovement)
+        assertEquals(listOf("b101", "d101", "a104", "c104"), VisitController.galleryFirst(same, setOf("b101", "d101"))?.order)
+        // An improvement: the map's order, the gallery's artworks first.
+        val better = proposal(listOf("c104", "d101", "a104", "b101"), current, improves = true)
+        assertTrue(better.isImprovement)
+        assertEquals(listOf("d101", "b101", "c104", "a104"), VisitController.galleryFirst(better, setOf("b101", "d101"))?.order)
+        // The gallery's artworks are first already: nothing to apply.
+        assertEquals(null, VisitController.galleryFirst(same, setOf("a104")))
+        // The visitor is in no gallery: the map's order when it is an improvement.
+        assertEquals(null, VisitController.galleryFirst(same, emptySet()))
+        assertEquals(better, VisitController.galleryFirst(better, emptySet()))
+        // Pinned stops keep the map's order.
+        val pinned = proposal(listOf("c104", "d101", "a104", "b101"), current, improves = true, pinned = listOf("a104"))
+        assertEquals(pinned, VisitController.galleryFirst(pinned, setOf("b101", "d101")))
+    }
+
+    /** iOS 1.53.0: another artwork becomes the stop only when it is 3 m nearer, or in the visitor's gallery. */
+    @Test
+    fun anotherArtworkBecomesTheStopOnlyWhenItIsClearlyNearer() {
+        val settings = io.proximi.gadkit.GadSettings.STANDARD
+        assertEquals(3.0, settings.orderSwitchMinimumMeters)
+        assertFalse(VisitController.switchesStop(nearerMeters = 0.4, entersVisitorGallery = false, settings = settings))
+        assertFalse(VisitController.switchesStop(nearerMeters = -2.0, entersVisitorGallery = false, settings = settings))
+        assertTrue(VisitController.switchesStop(nearerMeters = 3.0, entersVisitorGallery = false, settings = settings))
+        assertTrue(VisitController.switchesStop(nearerMeters = -2.0, entersVisitorGallery = true, settings = settings))
+        assertTrue(VisitController.switchesStop(nearerMeters = 0.0, entersVisitorGallery = false, settings = settings.copy(orderSwitchMinimumMeters = 0.0)))
+    }
+
+    /** iOS 1.54.0: the nearest open artwork of the visitor's gallery becomes the stop (PM's case: 16.5 m and 3.7 m). */
+    @Test
+    fun theNearestArtworkOfTheGalleryBecomesTheStop() {
+        val settings = io.proximi.gadkit.GadSettings.STANDARD
+        assertTrue(settings.ordersNearestArtworkInGalleryFirst)
+        val nearest = VisitController.nearestStop(listOf("far" to 16.5, "near" to 3.7, "other" to 9.0), active = "far", settings = settings)
+        assertEquals("near", nearest?.first)
+        assertEquals(12.8, nearest!!.second, 0.001)
+        assertEquals(null, VisitController.nearestStop(listOf("far" to 16.5, "near" to 3.7), active = "near", settings = settings))
+        assertEquals(null, VisitController.nearestStop(listOf("far" to 6.0, "near" to 3.7), active = "far", settings = settings))
+        assertEquals(null, VisitController.nearestStop(listOf("near" to 3.7), active = "far", settings = settings))
+        assertEquals(null, VisitController.nearestStop(listOf("a" to 5.0, "b" to 5.0), active = "b", settings = settings.copy(orderSwitchMinimumMeters = 0.0)))
+    }
+
+    /** iOS 1.55.0 and 1.55.1: the arrival near the geofence is off by default; a host app can set a distance. */
+    @Test
+    fun theArrivalNearTheGeofenceIsOffByDefault() {
+        val settings = io.proximi.gadkit.GadSettings.STANDARD
+        assertEquals(0.0, settings.artworkArrivalMarginMeters)
+        assertFalse(VisitController.arrivesNearGeofence(1.0, 60_000, settings))
+        val on = settings.copy(artworkArrivalMarginMeters = 2.5)
+        assertTrue(on.artworkArrivalMarginMeters < on.artworkVisitedMeters)
+        assertFalse(VisitController.arrivesNearGeofence(2.0, 2_900, on))
+        assertTrue(VisitController.arrivesNearGeofence(2.0, 3_000, on))
+        assertFalse(VisitController.arrivesNearGeofence(2.6, 60_000, on))
     }
 }

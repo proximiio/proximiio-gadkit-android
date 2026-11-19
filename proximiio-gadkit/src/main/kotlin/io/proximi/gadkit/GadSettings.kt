@@ -177,16 +177,17 @@ public data class GadSettings(
 
     /**
      * Zoom of "Centre on me", of the first position and of the follow, in personalised and curated
-     * journeys. The follow eases to it from [startZoom] (PM, Monday "Zoom level at start +
-     * navigation", 2026-10-30).
+     * journeys, while the visitor is in no gallery. The follow eases to it from [startZoom]. 19 since
+     * 1.56.0, was 19.5 (operator, K-39, 2026-11-19).
      */
-    val followZoom: Double = 19.5,
+    val followZoom: Double = 19.0,
     /**
-     * Zoom of the follow while the visitor is in a gallery during a personalised journey, or `null`
-     * for [followZoom] (PM, Monday "Navigation to a gallery", 2026-10-27). `null` since the PM asked
-     * for one zoom in every situation (Monday "Zoom level at start + navigation", 2026-10-30).
+     * Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys, or
+     * `null` for [followZoom]. 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the
+     * visitor enters a gallery); `null` before, and personalised journeys only. Above [maximumZoom]
+     * the map stops at [maximumZoom].
      */
-    val galleryFollowZoom: Double? = null,
+    val galleryFollowZoom: Double? = 22.0,
     /**
      * The journey map shows the visitor at this zoom for [startZoomDuration] before it follows them:
      * when the journey starts, on the first fix and when the position comes back. `null` follows at
@@ -285,6 +286,60 @@ public data class GadSettings(
      * `ordersAtGalleryEntry` (1.51.0).
      */
     val ordersAtGalleryEntry: Boolean = true,
+    /**
+     * How long the visitor's position lies in a gallery before [ordersAtGalleryEntry] and
+     * [ordersVisitorGalleryFirst] count the visitor in it. A position that crosses a border for a
+     * shorter time changes no order. Zero counts the first fix. iOS `galleryEntryOrderSeconds` (1.52.0).
+     */
+    val galleryEntryOrderSeconds: Duration = 3.seconds,
+    /**
+     * Personalised journeys: `true` puts the artworks of the gallery the visitor is in first in every
+     * order from the visitor, also when an artwork of another gallery is nearer by the route. So the
+     * entry of a gallery ([ordersAtGalleryEntry]), a resume and an order off the route lead to an
+     * artwork of that gallery. `false`: the nearest artwork by the route goes first, as in 1.51.0 (GAD
+     * PM's field test and Nagarro's bug list, 2026-11-18). iOS `ordersVisitorGalleryFirst` (1.52.0).
+     */
+    val ordersVisitorGalleryFirst: Boolean = true,
+    /**
+     * `true` marks an artwork the visitor has arrived at visited when the visitor enters the geofence
+     * of another artwork of the journey and is outside its own. `false`: only [artworkVisitedMeters]
+     * and [artworkVisitedSeconds] mark it visited. iOS `visitsArtworkAtAnotherArtwork` (1.52.0).
+     */
+    val visitsArtworkAtAnotherArtwork: Boolean = true,
+    /**
+     * Personalised journeys, the checks that run while the visitor walks ([refreshesRouteInGallery]
+     * and the order off the route): another artwork becomes the current stop only when it is this
+     * many metres nearer to the visitor than the current stop, in a straight line. An artwork of the
+     * visitor's gallery takes the place of one outside it at any distance. 0 takes every other order,
+     * as before 1.53.0, also between two artworks at the same distance. iOS `orderSwitchMinimumMeters`
+     * (1.53.0).
+     */
+    val orderSwitchMinimumMeters: Double = 3.0,
+    /**
+     * Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that
+     * gallery becomes the current stop when it is [orderSwitchMinimumMeters] nearer to the visitor
+     * than the current stop, in a straight line, also for a visitor on the leg. Checked at most every
+     * [galleryRouteRefreshSeconds]. Needs `ProximiMapView.Option.PROGRESS`. `false`: the stop changes
+     * only off the leg ([refreshesRouteInGallery]), as before 1.54.0. iOS
+     * `ordersNearestArtworkInGalleryFirst` (1.54.0).
+     */
+    val ordersNearestArtworkInGalleryFirst: Boolean = true,
+    /**
+     * The visitor has arrived at the current artwork after [artworkArrivalMarginSeconds] within this
+     * many metres of its geofence, outside it and inside no geofence of another open artwork of the
+     * journey. 0 (default; GAD PM, 2026-11-18: larger geofences in the venue data instead): only a
+     * fix inside the geofence is the arrival. The visit ends beyond [artworkVisitedMeters], which must
+     * be larger. iOS `artworkArrivalMarginMeters` (1.55.0, 0 since 1.55.1).
+     */
+    val artworkArrivalMarginMeters: Double = 0.0,
+    /** How long the visitor stays within [artworkArrivalMarginMeters] before the arrival. iOS `artworkArrivalMarginSeconds`. */
+    val artworkArrivalMarginSeconds: Duration = 3.seconds,
+    /**
+     * Gallery first: an artwork that led to the artwork because the visitor was in its gallery leads
+     * to the gallery again when the visitor is more than this many metres outside the gallery's
+     * outline, or on another floor (1.51.1). iOS `galleryLeftMeters` (1.51.0).
+     */
+    val galleryLeftMeters: Double = 5.0,
     /**
      * Journey list: `true` makes a swipe on an artwork ask for the skip at once
      * ([ProximiMapEvent.SkipRequested], and the dialog with `ProximiMapView.Option.SKIP_PROMPT`); the

@@ -368,7 +368,10 @@ internal class HostedMapModel : ViewModel() {
         current = journey
         val venue = venue ?: return
         val matched = HostedJourney.of(journey, places, galleries)
-        FieldLog.log("hosted map: start · ${journey.kind.rawValue} · ${matched.journey.stops.size} of ${journey.stops.size} stops on the map")
+        FieldLog.log(
+            "hosted map: start · ${journey.kind.rawValue} · ${matched.journey.stops.size} of ${journey.stops.size} stops on the map" +
+                " · from the host app: ${count(journey, ProximiJourney.State.VISITED)} visited, ${count(journey, ProximiJourney.State.SKIPPED)} skipped",
+        )
         hosted = matched
         incoming = null
         generation += 1
@@ -390,7 +393,10 @@ internal class HostedMapModel : ViewModel() {
             show(journey)
             return
         }
-        FieldLog.log("hosted map: journey applied in place · ${matched.journey.stops.size} stops")
+        FieldLog.log(
+            "hosted map: journey applied in place · ${matched.journey.stops.size} stops" +
+                " · from the host app: ${count(journey, ProximiJourney.State.VISITED)} visited, ${count(journey, ProximiJourney.State.SKIPPED)} skipped",
+        )
         this.hosted = matched
         revision += 1
         incoming = IncomingJourney(matched.journey, revision)
@@ -412,13 +418,21 @@ internal class HostedMapModel : ViewModel() {
         current = updated
         latest = updated
         onJourneyChange(updated)
+        FieldLog.log(
+            "hosted map: journey written to the host app · ${count(updated, ProximiJourney.State.VISITED)} visited, " +
+                "${count(updated, ProximiJourney.State.SKIPPED)} skipped of ${updated.stops.size}",
+        )
         if (isReordered(shown, updated)) onEvent(ProximiMapEvent.StopOrderChanged(updated))
     }
 
     fun handle(event: VisitEvent) {
         FieldLog.log("hosted map event: $event")
-        ProximiMap.event(event, places)?.let(onEvent)
+        val mapped = ProximiMap.event(event, places) ?: return
+        if (mapped is ProximiMapEvent.NextStop) FieldLog.log("host event: nextStop ${mapped.stop.title}")
+        onEvent(mapped)
     }
+
+    private fun count(journey: ProximiJourney, state: ProximiJourney.State): Int = journey.stops.count { it.state == state }
 
     /**
      * The view left the screen. The venue data stays in memory for the next view on the same SDK and
