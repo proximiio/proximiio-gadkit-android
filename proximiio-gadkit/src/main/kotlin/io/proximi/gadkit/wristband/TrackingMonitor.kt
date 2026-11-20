@@ -53,6 +53,9 @@ internal class TrackingMonitor(
     private var wasEverAvailable = false
     private var unavailableSince: Instant? = null
     private var isPrivate = false
+
+    /** Every position provider's connection has ended ([TrackingHealth.hasEnded]). */
+    private var isEnded = false
     private val jobs = mutableListOf<Job>()
 
     fun start() {
@@ -102,13 +105,11 @@ internal class TrackingMonitor(
             }
         }
         jobs += scope.launch {
+            // The connections are read at the start and at every interval: an ended binding is
+            // known at once, also inside a privacy zone (iOS 1.65.2).
             while (true) {
+                readConnections()
                 delay(TrackingHealth.REEVALUATE_INTERVAL.toMillis())
-                reevaluate()
-                if (FieldLog.isEnabled) {
-                    val connections = sdk.positionProviderConnections().mapValues { it.value.name }
-                    FieldLog.log("connections $connections health ${health.value}")
-                }
             }
         }
     }
@@ -118,8 +119,20 @@ internal class TrackingMonitor(
         jobs.clear()
     }
 
+    /** Reads the providers' connections and evaluates the state again. */
+    private suspend fun readConnections() {
+        val connections = sdk.positionProviderConnections()
+        val ended = TrackingHealth.hasEnded(connections)
+        if (ended != isEnded) {
+            FieldLog.log("wristband binding ended: $ended")
+            isEnded = ended
+        }
+        reevaluate()
+        if (FieldLog.isEnabled) FieldLog.log("connections ${connections.mapValues { it.value.name }} health ${health.value}")
+    }
+
     private fun reevaluate() {
-        val health = TrackingHealth.evaluate(wasEverAvailable, unavailableSince, now(), settings, isPrivate)
+        val health = TrackingHealth.evaluate(wasEverAvailable, unavailableSince, now(), settings, isPrivate, isEnded)
         if (health == mutableHealth.value) return
         FieldLog.log("tracking health: $health")
         mutableHealth.value = health

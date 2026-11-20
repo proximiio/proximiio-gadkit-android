@@ -2,6 +2,7 @@ package io.proximi.gadkit.wristband
 
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.VenuePlace
+import io.proximi.sdk.positioning.engine.CustomPositionProviderConnection
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +21,20 @@ class TrackingHealthTest {
         assertEquals(TrackingHealth.LOST_PLACE, TrackingHealth.evaluate(true, now.minusSeconds(110), now))
         assertEquals(TrackingHealth.LOST_PLACE, TrackingHealth.evaluate(true, now.minusSeconds(169), now))
         assertEquals(TrackingHealth.STOPPED_RESPONDING, TrackingHealth.evaluate(true, now.minusSeconds(170), now))
+    }
+
+    /** An ended binding is "stopped responding" at once, also inside a privacy zone (iOS 1.65.2). */
+    @Test
+    fun anEndedBindingGoesBeforeThePrivacyZone() {
+        assertEquals(TrackingHealth.STOPPED_RESPONDING, TrackingHealth.evaluate(true, null, now, isPrivate = true, isEnded = true))
+        assertEquals(TrackingHealth.STOPPED_RESPONDING, TrackingHealth.evaluate(false, null, now, isEnded = true))
+        assertEquals(TrackingHealth.PRIVACY_ZONE, TrackingHealth.evaluate(true, null, now, isPrivate = true, isEnded = false))
+        val ended = CustomPositionProviderConnection.ENDED
+        val online = CustomPositionProviderConnection.ONLINE
+        assertEquals(true, TrackingHealth.hasEnded(mapOf("blueiot" to ended)))
+        assertEquals(false, TrackingHealth.hasEnded(mapOf("blueiot" to ended, "other" to online)))
+        assertEquals(false, TrackingHealth.hasEnded(mapOf("blueiot" to CustomPositionProviderConnection.OFFLINE)))
+        assertEquals(false, TrackingHealth.hasEnded(emptyMap()))
     }
 
     @Test

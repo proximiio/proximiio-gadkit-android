@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.65.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.65.2")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.65.1
+git -C gadkit checkout 1.65.2
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1223,7 +1223,21 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.65.1.
+No changes since 1.65.2.
+
+### [1.65.2] — 2026-11-20
+
+The Android port of iOS 1.65.2 (Metis T-1887). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app, and no setting is new.
+
+- Fixed: an ended wristband binding (superseded by another app or phone, unbound, or past its end
+  time) inside a privacy zone kept `TrackingHealth.PRIVACY_ZONE`, also at every later start of the
+  map: an ended binding delivers no more positions, so the SDK never reports the exit from the zone
+  (field log of 2026-11-20). The tracking health is now `STOPPED_RESPONDING` as soon as every
+  position provider's connection has ended, before the privacy zone check and without the waiting
+  time of `trackingStoppedAfter`. The host app gets `TrackingChanged(STOPPED_RESPONDING)`.
+- The connections are read when the monitor starts and every 5 s.
+- Field log: `wristband binding ended: true|false`.
 
 ### [1.65.1] — 2026-11-20
 

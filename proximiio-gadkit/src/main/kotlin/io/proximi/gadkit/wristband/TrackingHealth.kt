@@ -1,5 +1,6 @@
 package io.proximi.gadkit.wristband
 
+import io.proximi.sdk.positioning.engine.CustomPositionProviderConnection
 import java.time.Duration
 import java.time.Instant
 import io.proximi.gadkit.GadSettings
@@ -47,16 +48,28 @@ public enum class TrackingHealth {
 
         /**
          * [LOST_PLACE] after [GadSettings.trackingLostAfter] of unavailability, [STOPPED_RESPONDING]
-         * after [GadSettings.trackingStoppedAfter]; [PRIVACY_ZONE] while [isPrivate], before every
-         * other state. Pure; covered by tests.
+         * after [GadSettings.trackingStoppedAfter]; [PRIVACY_ZONE] while [isPrivate], before these.
+         * [isEnded]: the wristband binding has ended ([hasEnded]). It gives [STOPPED_RESPONDING] at
+         * once and goes before a privacy zone: an ended binding delivers no more positions, so the
+         * SDK never reports the exit from the zone (field log 2026-11-20: a binding superseded inside
+         * a zone kept [PRIVACY_ZONE] at every map start; iOS 1.65.2). Pure; covered by tests.
          */
+        /**
+         * Whether every position provider's connection has ended (superseded, unbound or past its
+         * end time). False without a provider. Pure; covered by tests. iOS `hasEnded` (1.65.2).
+         */
+        internal fun hasEnded(connections: Map<String, CustomPositionProviderConnection>): Boolean =
+            connections.isNotEmpty() && connections.values.all { it == CustomPositionProviderConnection.ENDED }
+
         internal fun evaluate(
             wasEverAvailable: Boolean,
             unavailableSince: Instant?,
             now: Instant,
             settings: GadSettings = GadSettings.STANDARD,
             isPrivate: Boolean = false,
+            isEnded: Boolean = false,
         ): TrackingHealth {
+            if (isEnded) return STOPPED_RESPONDING
             if (isPrivate) return PRIVACY_ZONE
             if (!wasEverAvailable) return WAITING
             if (unavailableSince == null) return TRACKING
