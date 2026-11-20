@@ -360,6 +360,13 @@ public data class GadSettings(
      */
     val ordersInOpenArea: Boolean = true,
     /**
+     * The journey map follows the visitor again each time they enter or leave a gallery, when a
+     * gesture left the camera free (GAD PM, Monday "map doesn't follow user", 2026-11-20). The next
+     * gesture frees the camera again. Not while the journey is paused. `false`: only "Centre on me"
+     * takes the follow again, as before 1.63.0. iOS `followsAgainAtGalleryChange` (1.63.0).
+     */
+    val followsAgainAtGalleryChange: Boolean = true,
+    /**
      * How many metres of walking the order from the visitor saves before [ordersInOpenArea] takes it.
      * A small value changes the destination at every step between two galleries. iOS
      * `openAreaOrderMinimumMeters` (1.61.1).

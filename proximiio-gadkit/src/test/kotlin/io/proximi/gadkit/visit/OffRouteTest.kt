@@ -17,6 +17,21 @@ import kotlin.time.Duration.Companion.seconds
  * warning's time, and the reports a paused journey drops (PM, Monday 2026-10-27; Nagarro, 2026-10-28).
  */
 class OffRouteTest {
+    /** A gallery change takes the follow again only for a free camera of a running journey (GAD PM, 2026-11-20; iOS 1.63.0). */
+    @Test
+    fun aGalleryChangeTakesTheFollowAgain() {
+        val settings = GadSettings()
+        val follows = { s: GadSettings, following: Boolean, paused: Boolean, guide: Boolean, position: Boolean ->
+            VisitViewModel.followsAgain(s, isFollowing = following, isPaused = paused, isFloorGuideActive = guide, hasPosition = position)
+        }
+        assertTrue(follows(settings, false, false, false, true))
+        assertFalse(follows(settings, true, false, false, true))
+        assertFalse(follows(settings, false, true, false, true))
+        assertFalse(follows(settings, false, false, true, true))
+        assertFalse(follows(settings, false, false, false, false))
+        assertFalse(follows(settings.copy(followsAgainAtGalleryChange = false), false, false, false, true))
+    }
+
     /**
      * In the open area the order from the visitor takes the place of the journey's order when it
      * saves `openAreaOrderMinimumMeters` by the route (GAD PM, 2026-11-20; iOS 1.61.1).

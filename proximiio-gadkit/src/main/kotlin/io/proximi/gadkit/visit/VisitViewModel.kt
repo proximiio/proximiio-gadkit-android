@@ -1162,11 +1162,33 @@ internal class VisitViewModel(
         }
         val galleryId = position?.let { visitorGallery(it, visitorGalleryId)?.id }
         if (placeId == visitorGalleryPlaceId && galleryId == visitorGalleryId) return
+        val galleryChanged = galleryId != visitorGalleryId
         visitorGalleryPlaceId = placeId
         visitorGalleryId = galleryId
         applyHiddenFeatures()
         refreshMapLayers()
         applyStopMarkers()
+        if (galleryChanged) followAgainAtGalleryChange()
+    }
+
+    /**
+     * The visitor entered or left a gallery: a camera a gesture left free follows them again, on
+     * their floor ([GadSettings.followsAgainAtGalleryChange]; GAD PM, Monday "map doesn't follow
+     * user", 2026-11-20: testers touched the map by accident and it stood still from then on). Not
+     * while the journey is paused, on a floor without positioning or during the start zoom. iOS
+     * `followAgainAtGalleryChange` (1.63.0).
+     */
+    private fun followAgainAtGalleryChange() {
+        val follows = followsAgain(
+            settings,
+            isFollowing = session.cameraMode.value != MapCameraFollow.Mode.FREE,
+            isPaused = controller.isPaused.value,
+            isFloorGuideActive = floorGuide.isActive,
+            hasPosition = session.position.value != null,
+        )
+        if (!follows || startZoomFollow != null) return
+        session.followMyFloor()
+        recentre(reason = if (visitorGalleryId == null) "gallery left" else "gallery entered")
     }
 
     // Floor without positioning
@@ -1804,6 +1826,19 @@ internal class VisitViewModel(
                 }
             }
         }
+
+        /**
+         * Whether a gallery change takes the follow again: the setting is on, the camera does not
+         * follow, the journey is not paused, the floor guide is not shown and a position exists.
+         * Pure; covered by tests. iOS `followsAgain` (1.63.0).
+         */
+        internal fun followsAgain(
+            settings: GadSettings,
+            isFollowing: Boolean,
+            isPaused: Boolean,
+            isFloorGuideActive: Boolean,
+            hasPosition: Boolean,
+        ): Boolean = settings.followsAgainAtGalleryChange && !isFollowing && !isPaused && !isFloorGuideActive && hasPosition
 
         internal fun isRouteDeviation(event: JourneyEvent): Boolean =
             event is JourneyEvent.LeftRoute || event is JourneyEvent.FarFromRoute ||

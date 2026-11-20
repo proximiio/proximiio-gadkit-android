@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.62.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.63.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.62.0
+git -C gadkit checkout 1.63.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -925,6 +925,7 @@ val configuration = GadConfiguration(
 | `ordersDoneStopsFirst` | `true` | `ProximiMapView` with `Option.PROGRESS`, personalised journeys: the visited and skipped stops of the journey the host app passes go before the pending ones, each group in the host app's order, and the view writes that order back. `false` keeps the host app's order. |
 | `orderSwitchMinimumMeters` | 3 m | While the visitor walks, another artwork becomes the current stop only when it is this many metres nearer in a straight line, or when it is in the visitor's gallery and the current stop is not. 0: every other order is taken. |
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer, also on the route line. Needs `Option.PROGRESS`. |
+| `followsAgainAtGalleryChange` | `true` | The journey map follows the visitor again each time they enter or leave a gallery, when a gesture left the camera free. The next gesture frees the camera again. Not while the journey is paused. `false`: only "Centre on me" takes the follow again, as before 1.63.0. |
 | `ordersInOpenArea` | `true` | Personalised journeys: while the visitor is in no gallery of the journey (the open area between the galleries), the stops ahead are ordered again from the visitor when that order starts with another artwork and saves `openAreaOrderMinimumMeters` of walking by the route. Needs `Option.PROGRESS`. `false`: outside the galleries the order changes only after a visit and after a detour, as before 1.62.0. |
 | `openAreaOrderMinimumMeters` | 15 m | How many metres of walking the order from the visitor saves before `ordersInOpenArea` takes it. |
 | `openAreaOrderSeconds` | 20 s | The shortest time between two checks of `ordersInOpenArea`. |
@@ -1220,7 +1221,23 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.62.0.
+No changes since 1.63.0.
+
+### [1.63.0] — 2026-11-20
+
+The Android port of iOS 1.63.0 (Metis T-1880). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app. Build all modules of the app against
+1.63.0: `GadSettings` has a new value, and two versions of the library in one APK crash at the first
+`GadSettings.copy`.
+
+- `GadSettings.followsAgainAtGalleryChange` (`true`). **Visible:** the journey map follows the
+  visitor again each time they enter or leave a gallery, when a gesture left the camera free (GAD
+  PM, Monday "map doesn't follow user", 2026-11-20: testers touched the map by accident and it
+  stood still from then on). The camera goes to the visitor's floor and centres as "Centre on me"
+  does. The next gesture frees the camera again. Not while the journey is paused, on a floor
+  without positioning or during the start zoom. `false`: only "Centre on me" takes the follow
+  again, as before.
+- Field log: `recentre (gallery entered)` and `recentre (gallery left)`.
 
 ### [1.62.0] — 2026-11-20
 
