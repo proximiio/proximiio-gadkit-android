@@ -1095,17 +1095,21 @@ internal class VisitViewModel(
         val position = session.position.value
         val onFloor = position?.floor?.let { VenueLevel.same(it.level, session.selectedFloor.value.level) } ?: true
         // Within CONNECTOR_END_METERS of the route's end there is no line: it would lead straight
-        // to the stop, through walls (PM review 2026-10-12). Off while SHOWS_CONNECTOR is false.
-        if (!SHOWS_CONNECTOR || guidance == null || guidance.hasArrived || guidance.remainingMeters < CONNECTOR_END_METERS ||
-            start == null || position == null || !onFloor
+        // to the stop, through walls (PM review 2026-10-12). Off without
+        // [GadSettings.connectsRouteToPosition].
+        if (!settings.connectsRouteToPosition || guidance == null || guidance.hasArrived ||
+            guidance.remainingMeters < CONNECTOR_END_METERS || start == null || position == null || !onFloor
         ) {
             layers.updateConnector(null, null)
             return
         }
-        layers.updateConnector(
-            Coordinate(position.coordinate.latitude, position.coordinate.longitude),
-            Coordinate(start.latitude, start.longitude),
-        )
+        val from = Coordinate(position.coordinate.latitude, position.coordinate.longitude)
+        val to = Coordinate(start.latitude, start.longitude)
+        if (!connectsRoute(from.distanceTo(to), settings)) {
+            layers.updateConnector(null, null)
+            return
+        }
+        layers.updateConnector(from, to)
     }
 
     /**
@@ -1848,9 +1852,11 @@ internal class VisitViewModel(
         private const val CONNECTOR_END_METERS = 2.0
 
         /**
-         * False: no connector. Its bend moved with every fix, so the route appeared to be redrawn on
-         * every fix (PM review 2026-10-12, screen recording 21-26-05), as iOS `showsConnector`.
+         * Whether the line from the visitor to the route is drawn at [meters] between them: up to
+         * [GadSettings.routeConnectorMaximumMeters]. A longer line crosses walls. Pure; covered by
+         * tests. iOS `connectsRoute` (1.65.0).
          */
-        private const val SHOWS_CONNECTOR = false
+        internal fun connectsRoute(meters: Double, settings: GadSettings): Boolean =
+            settings.connectsRouteToPosition && meters <= settings.routeConnectorMaximumMeters
     }
 }

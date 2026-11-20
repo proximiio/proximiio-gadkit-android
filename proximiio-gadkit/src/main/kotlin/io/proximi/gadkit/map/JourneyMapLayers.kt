@@ -48,7 +48,7 @@ import org.maplibre.geojson.Polygon
  *
  * - the destination gallery filled with the level colour; visited galleries with its tint.
  * - a connector from the visitor to the start of the route ahead: `#3F69FF`, 6 dp, round cap, under
- *   the route. `VisitViewModel` draws none while `SHOWS_CONNECTOR` is false.
+ *   the route. `VisitViewModel` draws it with `GadSettings.connectsRouteToPosition` (off by default).
  * - the lift or stairs of the route's next level change on the shown floor: a 30 dp red marker with
  *   a white ring and the design's glyph, above the route ([updateLevelChanger]; PM 2026-10-15,
  *   "Level changer highlighting").

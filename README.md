@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.63.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.65.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.63.0
+git -C gadkit checkout 1.65.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -905,7 +905,7 @@ val configuration = GadConfiguration(
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
 | `routeFromOriginMaximumMeters` | 15 m | A route starts where its origin projects onto the path network. The line starts at the origin, in a straight line to that point, when the origin is at most this far from it. The origin is the visitor's position when the route is computed; the segment does not move with later positions. 0: every route starts on the path. |
-| `followZoom`, `galleryFollowZoom` | 19, 21.5 | Zoom of "Centre on me" and of the follow, in personalised and curated journeys: `followZoom` outside a gallery, `galleryFollowZoom` in a gallery (`null` for `followZoom`). 19.5 and `null` before 1.56.0; 22 in a gallery in 1.56.0 and 1.58.0. |
+| `followZoom`, `galleryFollowZoom` | 19, 20 | Zoom of "Centre on me" and of the follow, in personalised and curated journeys: `followZoom` outside a gallery, `galleryFollowZoom` in a gallery (`null` for `followZoom`). 19.5 and `null` before 1.56.0; 22 in a gallery in 1.56.0 and 1.58.0. |
 | `startZoom`, `startZoomDuration` | 17, 2 s | When the journey starts, on the first fix and when the position comes back, the journey map shows the visitor at `startZoom` for `startZoomDuration`, then follows them. `null` follows at once. |
 | `minimumZoom`, `maximumZoom` | `null` | The farthest every map of the library zooms out and in (MapLibre zoom levels). `null` keeps the map library's limit. |
 | `cameraBounds` | `GadCameraBounds.GUGGENHEIM_ABU_DHABI` | The box the screen stays inside on every map of the library, for gestures and for every camera move; `null` for no limit (`MapOptions.cameraBounds`, map 6.0.0-beta.39). The default is south-west 24.53557985, 54.39348543 and north-east 24.54644005, 54.40758853 (latitude, longitude). The map stops zooming out where the box covers the view; a `minimumZoom` below that zoom is not reached. During a pinch the edge is one frame behind and the camera is put right when it comes to rest. With the heading-up map a corner of the view can show past the box. |
@@ -915,7 +915,7 @@ val configuration = GadConfiguration(
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. |
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
-| `shapesGalleryLabelsByType` | `true` | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as before 1.61.0. |
+| `shapesGalleryLabelsByType` | `false` (`true` in 1.61.0 to 1.63.0) | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as before 1.61.0. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
@@ -925,6 +925,8 @@ val configuration = GadConfiguration(
 | `ordersDoneStopsFirst` | `true` | `ProximiMapView` with `Option.PROGRESS`, personalised journeys: the visited and skipped stops of the journey the host app passes go before the pending ones, each group in the host app's order, and the view writes that order back. `false` keeps the host app's order. |
 | `orderSwitchMinimumMeters` | 3 m | While the visitor walks, another artwork becomes the current stop only when it is this many metres nearer in a straight line, or when it is in the visitor's gallery and the current stop is not. 0: every other order is taken. |
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer, also on the route line. Needs `Option.PROGRESS`. |
+| `connectsRouteToPosition` | `false` | `true` draws a line from the visitor to the nearest point of the route ahead, on the visitor's floor. No line within 2 m of the route's end, after the arrival, or further than `routeConnectorMaximumMeters` from the route. |
+| `routeConnectorMaximumMeters` | 6 m | The longest line `connectsRouteToPosition` draws. |
 | `followsAgainAtGalleryChange` | `true` | The journey map follows the visitor again each time they enter or leave a gallery, when a gesture left the camera free. The next gesture frees the camera again. Not while the journey is paused. `false`: only "Centre on me" takes the follow again, as before 1.63.0. |
 | `ordersInOpenArea` | `true` | Personalised journeys: while the visitor is in no gallery of the journey (the open area between the galleries), the stops ahead are ordered again from the visitor when that order starts with another artwork and saves `openAreaOrderMinimumMeters` of walking by the route. Needs `Option.PROGRESS`. `false`: outside the galleries the order changes only after a visit and after a detour, as before 1.62.0. |
 | `openAreaOrderMinimumMeters` | 15 m | How many metres of walking the order from the visitor saves before `ordersInOpenArea` takes it. |
@@ -932,7 +934,7 @@ val configuration = GadConfiguration(
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds`. |
 | `artworkArrivalMarginMeters`, `artworkArrivalMarginSeconds` | 0, 3 s | Above 0: the visitor has arrived at the current artwork after the time within this distance of its geofence, outside it and in no other open artwork's geofence. Keep the distance below `artworkVisitedMeters`. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork of a gallery the visitor entered leads to the gallery again when the visitor is this far outside its outline, or on another floor. |
-| `skipsAtSwipe` | `false` | Journey list: `true` makes a swipe on an artwork ask for the skip at once (`SkipRequested`, and the dialog with `Option.SKIP_PROMPT`); the row slides back. `false`: the swipe reveals the skip button, and a tap on it asks for the skip. The TalkBack action "Skip" is the same in both. |
+| `skipsAtSwipe` | `true` (`false` before 1.65.1) | Journey list: `true` makes a swipe on an artwork ask for the skip at once (`SkipRequested`, and the dialog with `Option.SKIP_PROMPT`); the row slides back. `false`: the swipe reveals the skip button, and a tap on it asks for the skip. The TalkBack action "Skip" is the same in both. |
 | `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false`: a swipe on an artwork skips nothing, sends no event and shows "Resume your journey to skip the artwork" with "Dismiss"; the same text replaces the swipe hint. `true` keeps the swipe. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
@@ -1221,7 +1223,34 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.63.0.
+No changes since 1.65.1.
+
+### [1.65.1] — 2026-11-20
+
+The Android port of iOS 1.64.0, 1.65.0 and 1.65.1 (Metis T-1883, T-1884, T-1886; decisions of the GAD
+PM on Monday, 2026-11-20). There is no Android 1.63.1, 1.64.0 or 1.65.0: iOS 1.63.1 adds lines to a
+field log Android does not write, and the map fades of iOS 1.64.0 were taken back in 1.65.0. The SDK
+and Map versions do not change (6.0.0-beta.40). Build all modules of the app against 1.65.1:
+`GadSettings` has new values, and two versions of the library in one APK crash at the first
+`GadSettings.copy`.
+
+- **BREAKING:** `GadSettings.skipsAtSwipe` is `true` (was `false`). A swipe on an artwork of the
+  journey list asks for the skip at once: the host app gets `SkipRequested` at the swipe, and with
+  `Option.SKIP_PROMPT` the dialog opens at the swipe. `GadSettings(skipsAtSwipe = false)` keeps the
+  swipe that reveals the skip button.
+- **BREAKING:** `GadSettings.galleryFollowZoom` is 20 (was 21.5). **Visible:** the map is less close
+  while the visitor is in a gallery. `followZoom` stays 19. `GadSettings(galleryFollowZoom = 21.5)`
+  keeps the zoom of 1.63.0.
+- **BREAKING:** `GadSettings.shapesGalleryLabelsByType` is `false` (was `true`). **Visible:** every
+  gallery label on the journey map is a pill again, as before 1.61.0.
+  `GadSettings(shapesGalleryLabelsByType = true)` keeps the rectangle for a thematic gallery.
+- `GadSettings.connectsRouteToPosition` (`false`) and `routeConnectorMaximumMeters` (6 m). With
+  `true` the journey map draws a line from the visitor to the nearest point of the route ahead, on
+  the visitor's floor (GAD PM, Monday "Route drawing feels off"). No line within 2 m of the route's
+  end, after the arrival, or further than 6 m from the route. Off by default: the PM parked the
+  item. Nothing changes without the setting.
+- The stop card needed no change: on Android its caption "GALLERY · <name>" takes the visitor's
+  gallery by the gallery's geofence (`Gallery.ofVisitor`) since 1.59.1.
 
 ### [1.63.0] — 2026-11-20
 

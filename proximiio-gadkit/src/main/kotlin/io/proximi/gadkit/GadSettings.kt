@@ -183,11 +183,11 @@ public data class GadSettings(
     val followZoom: Double = 19.0,
     /**
      * Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys, or
-     * `null` for [followZoom]. 21.5 since 1.59.1 (GAD PM, Monday "Zoom level", 2026-11-20: 22 is too close; iOS 1.59.0); 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the
+     * `null` for [followZoom]. 20 since 1.65.1 (GAD PM, Monday 2026-11-20; iOS 1.64.0); 21.5 since 1.59.1 (GAD PM, Monday "Zoom level", 2026-11-20: 22 is too close; iOS 1.59.0); 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the
      * visitor enters a gallery); `null` before, and personalised journeys only. Above [maximumZoom]
      * the map stops at [maximumZoom].
      */
-    val galleryFollowZoom: Double? = 21.5,
+    val galleryFollowZoom: Double? = 20.0,
     /**
      * The journey map shows the visitor at this zoom for [startZoomDuration] before it follows them:
      * when the journey starts, on the first fix and when the position comes back. `null` follows at
@@ -272,9 +272,10 @@ public data class GadSettings(
      * the museum's floor plan does: a pill for a single-artist gallery, a rectangle with square
      * corners for a thematic one (operator, 2026-11-20). The type is the title of the amenity of the
      * gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as
-     * before 1.61.0. iOS `shapesGalleryLabelsByType` (1.61.0).
+     * before 1.61.0. `false` since 1.65.1 (GAD PM, Monday 2026-11-20: every label is a pill; iOS
+     * 1.64.0). iOS `shapesGalleryLabelsByType` (1.61.0).
      */
-    val shapesGalleryLabelsByType: Boolean = true,
+    val shapesGalleryLabelsByType: Boolean = false,
     /**
      * `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is
      * marked visited while the visitor stands in another gallery than the next stop's, and that gallery
@@ -367,6 +368,20 @@ public data class GadSettings(
      */
     val followsAgainAtGalleryChange: Boolean = true,
     /**
+     * `true`: the journey map draws a line from the visitor to the nearest point of the route ahead,
+     * at every position, on the visitor's floor (GAD PM, Monday "Route drawing feels off", 2026-11-20:
+     * the route did not start at the blue dot). The route itself is not computed again. No line
+     * within 2 m of the route's end, none after the arrival, and none further than
+     * [routeConnectorMaximumMeters] from the route. `false`, the default (the PM parked the item on
+     * 2026-11-20): no line, as before 1.65.1. iOS `connectsRouteToPosition` (1.65.0, off since 1.65.1).
+     */
+    val connectsRouteToPosition: Boolean = false,
+    /**
+     * The longest line [connectsRouteToPosition] draws, in metres. Further from the route there is
+     * no line: a long one crosses walls. iOS `routeConnectorMaximumMeters` (1.65.0).
+     */
+    val routeConnectorMaximumMeters: Double = 6.0,
+    /**
      * How many metres of walking the order from the visitor saves before [ordersInOpenArea] takes it.
      * A small value changes the destination at every step between two galleries. iOS
      * `openAreaOrderMinimumMeters` (1.61.1).
@@ -397,9 +412,10 @@ public data class GadSettings(
      * Journey list: `true` makes a swipe on an artwork ask for the skip at once
      * ([ProximiMapEvent.SkipRequested], and the dialog with `ProximiMapView.Option.SKIP_PROMPT`); the
      * row slides back. `false`: the swipe reveals the skip button, and a tap on it asks for the skip
-     * (Nagarro, 2026-11-18: a skip with fewer steps). iOS `skipsAtSwipe` (1.51.0).
+     * (Nagarro, 2026-11-18: a skip with fewer steps). `true` since 1.65.1 (GAD PM and Nagarro, Monday
+     * 2026-11-20: no second step; iOS 1.64.0). iOS `skipsAtSwipe` (1.51.0).
      */
-    val skipsAtSwipe: Boolean = false,
+    val skipsAtSwipe: Boolean = true,
     /**
      * The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop").
      * `false`, the default: a swipe on an artwork skips nothing, sends no event and shows "Resume your

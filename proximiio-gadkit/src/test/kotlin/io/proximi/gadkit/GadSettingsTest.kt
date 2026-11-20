@@ -119,10 +119,10 @@ class GadSettingsTest {
     fun theFollowZoomsInInsideAGallery() {
         // iOS 1.56.0 (operator, K-39): 19 outside a gallery, 22 inside, in both kinds of journey.
         val settings = GadSettings.STANDARD
-        assertEquals(21.5, settings.galleryFollowZoom)
+        assertEquals(20.0, settings.galleryFollowZoom)
         assertEquals(19.0, VisitViewModel.followZoom(inGallery = false, kind = JourneyKind.PERSONALISED, settings = settings))
-        assertEquals(21.5, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = settings))
-        assertEquals(21.5, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = settings))
+        assertEquals(20.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = settings))
+        assertEquals(20.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.CURATED, settings = settings))
         val oneZoom = settings.copy(galleryFollowZoom = null)
         assertEquals(19.0, VisitViewModel.followZoom(inGallery = true, kind = JourneyKind.PERSONALISED, settings = oneZoom))
     }

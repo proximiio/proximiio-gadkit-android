@@ -17,6 +17,29 @@ import kotlin.time.Duration.Companion.seconds
  * warning's time, and the reports a paused journey drops (PM, Monday 2026-10-27; Nagarro, 2026-10-28).
  */
 class OffRouteTest {
+    /** The line from the blue dot to the route: up to the maximum length, and not without the setting (iOS 1.65.0, 1.65.1). */
+    @Test
+    fun theRouteConnectorHasAMaximumLength() {
+        val off = GadSettings()
+        assertFalse(off.connectsRouteToPosition)
+        assertEquals(6.0, off.routeConnectorMaximumMeters)
+        assertFalse(VisitViewModel.connectsRoute(0.5, off))
+        val on = off.copy(connectsRouteToPosition = true)
+        assertTrue(VisitViewModel.connectsRoute(0.5, on))
+        assertTrue(VisitViewModel.connectsRoute(6.0, on))
+        assertFalse(VisitViewModel.connectsRoute(6.1, on))
+    }
+
+    /** The defaults the GAD PM changed on 2026-11-20 (iOS 1.64.0). */
+    @Test
+    fun theDefaultsOfTheTwentiethOfNovember() {
+        val settings = GadSettings()
+        assertTrue(settings.skipsAtSwipe)
+        assertEquals(20.0, settings.galleryFollowZoom)
+        assertFalse(settings.shapesGalleryLabelsByType)
+        assertEquals(19.0, settings.followZoom)
+    }
+
     /** A gallery change takes the follow again only for a free camera of a running journey (GAD PM, 2026-11-20; iOS 1.63.0). */
     @Test
     fun aGalleryChangeTakesTheFollowAgain() {
