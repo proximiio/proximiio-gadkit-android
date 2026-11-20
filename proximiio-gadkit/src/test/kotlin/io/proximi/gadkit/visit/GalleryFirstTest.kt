@@ -1,6 +1,7 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.GadSettings
+import io.proximi.gadkit.designsystem.StopBadgePin
 import io.proximi.gadkit.map.GalleryFill
 import io.proximi.gadkit.map.JourneyMapLayers
 import io.proximi.gadkit.map.JourneyMapLayers.StopDot.Style as DotStyle
@@ -382,6 +383,9 @@ class GalleryPolygonTest {
         assertEquals(0xFFFFFFFF.toInt(), JourneyMapLayers.stopPinColor(isCurrent = true))
         assertEquals(0xFF2B2B2B.toInt(), JourneyMapLayers.stopPinColor(isCurrent = false))
         assertTrue(JourneyMapLayers.STOP_PIN_HEIGHT_DP < 30 / 2)
+        // The list badge of 34 dp draws the same pin, scaled from the marker of 30.
+        assertTrue(StopBadgePin.HEIGHT_DP < 34 / 2)
+        assertEquals(JourneyMapLayers.STOP_PIN_WIDTH_DP * 34 / 30, StopBadgePin.WIDTH_DP)
         assertTrue(GadSettings().showsStopIcons)
         // One image per style, in the stop markers' colours.
         assertEquals(4, JourneyMapLayers.StopDot.Style.entries.map { JourneyMapLayers.StopDot.imageName(it) }.toSet().size)

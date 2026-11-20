@@ -129,7 +129,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                             model.requestSkip(stop)
                         },
                     ) {
-                        StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id], showsNumbers = model.settings.showsStopNumbers)
+                        StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id], showsNumbers = model.settings.showsStopNumbers, showsIcons = model.settings.showsStopIcons)
                     }
                 }
             }
@@ -154,7 +154,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
  * floor; "AR" and an audio note from the artwork's `metadata`.
  */
 @Composable
-private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: VenuePlace?, showsNumbers: Boolean) {
+private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: VenuePlace?, showsNumbers: Boolean, showsIcons: Boolean) {
     val isVisited = stop.state == StopState.DONE
     val isActive = stop.state == StopState.ACTIVE || stop.state == StopState.REACHED
     val visited = stringResource(R.string.visited)
@@ -177,6 +177,7 @@ private fun StopRow(stop: JourneyStop, number: Int, isRevealed: Boolean, place: 
                 isVisited -> Emphasis.Visited
                 else -> Emphasis.Normal
             },
+            showsIcon = showsIcons,
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(stop.title, style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)

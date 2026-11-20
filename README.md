@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.59.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.60.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.59.1
+git -C gadkit checkout 1.60.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -914,7 +914,7 @@ val configuration = GadConfiguration(
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. |
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
-| `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map while `showsStopNumbers` is `false`: white in the marker of the current artwork, dark in the others. `false` shows the circles alone. |
+| `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
@@ -1216,7 +1216,22 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.59.1.
+No changes since 1.60.0.
+
+### [1.60.0] — 2026-11-20
+
+The Android port of iOS 1.60.0 (GAD PM's Monday item "Icons for personalized routes": "also on list
+view"). There is no Android 1.59.2: iOS 1.59.2 changes a line of its field log that Android does not
+write. No change is needed in the code of a host app. Build all modules of the app against 1.60.0:
+two versions of the library in one APK crash at the first `GadSettings.copy`.
+
+- Journey list. **Visible:** with `GadSettings.showsStopIcons` (`true`) and without numbers, the
+  badge of each artwork's row holds the pin of the map's stop markers: white on the red badge of
+  the current artwork and of a swiped row, dark (`#2B2B2B`) on the others. The pin is 9 × 14 dp in
+  the badge of 34 dp. `showsStopIcons = false` removes the pin from the map and from the list. The
+  host app has nothing to do.
+- **Visible:** the Arabic of "Resume your journey to skip the artwork" is the GAD PM's text
+  (`تابع رحلتك لتخطي العمل الفني`). It replaces the developer translation of 1.59.1.
 
 ### [1.59.1] — 2026-11-20
 

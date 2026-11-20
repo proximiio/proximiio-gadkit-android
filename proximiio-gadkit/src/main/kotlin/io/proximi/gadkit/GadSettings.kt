@@ -259,11 +259,12 @@ public data class GadSettings(
      */
     val showsStopNumbers: Boolean = false,
     /**
-     * `true` draws a pin in the marker of a journey artwork on the map while [showsStopNumbers] is
-     * `false`: white in the marker of the current artwork, dark in the others (RPR design; GAD PM,
+     * `true` draws a pin in the marker of a journey artwork on the map and, since 1.60.0, in the badge
+     * of its row in the journey list, while [showsStopNumbers] is `false`: white on the red circle of
+     * the current artwork, dark in the others (RPR design; GAD PM,
      * Monday "Icons for personalized routes", 2026-11-20). `false` shows the circles alone, as before
      * 1.59.1. The detour's marker, a skipped artwork and the stop dots have no pin. iOS
-     * `showsStopIcons` (1.59.0).
+     * `showsStopIcons` (1.59.0, 1.60.0).
      */
     val showsStopIcons: Boolean = true,
     /**

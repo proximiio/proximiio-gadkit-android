@@ -4,6 +4,7 @@ import io.proximi.gadkit.ProximiGadAppApi
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -17,11 +18,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import io.proximi.gadkit.map.JourneyMapLayers
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -32,9 +38,17 @@ import androidx.compose.ui.unit.sp
  * Body Medium. A pending stop is white with a 2 dp #EEEDED stroke. The next stop and a stop being
  * acted on (swiped) are filled red with a white number. A visited stop is white with a red stroke.
  * A `null` number draws the circle without a number ([io.proximi.gadkit.GadSettings.showsStopNumbers]).
+ * With [showsIcon] ([io.proximi.gadkit.GadSettings.showsStopIcons]) a circle without a number holds
+ * the pin of the map's stop markers, white on the filled circle and dark on the others (GAD PM,
+ * Monday "Icons for personalized routes", 2026-11-20; iOS 1.60.0).
  */
 @Composable
-internal fun StopNumberBadge(number: Int?, modifier: Modifier = Modifier, emphasis: Emphasis = Emphasis.Normal) {
+internal fun StopNumberBadge(
+    number: Int?,
+    modifier: Modifier = Modifier,
+    emphasis: Emphasis = Emphasis.Normal,
+    showsIcon: Boolean = false,
+) {
     Box(
         modifier
             .size(34.dp)
@@ -47,7 +61,25 @@ internal fun StopNumberBadge(number: Int?, modifier: Modifier = Modifier, emphas
             style = GadTextStyle.BodyMedium.textStyle,
             color = if (emphasis == Emphasis.Filled) Palette.white else Palette.ink,
         )
+        if (number == null && showsIcon) {
+            val context = LocalContext.current
+            val isCurrent = emphasis == Emphasis.Filled
+            val pin = remember(context, isCurrent) {
+                JourneyMapLayers.stopPinImage(context, isCurrent, StopBadgePin.WIDTH_DP, StopBadgePin.HEIGHT_DP).asImageBitmap()
+            }
+            // Decorative: the row says the artwork's title.
+            Image(pin, contentDescription = null, Modifier.size(StopBadgePin.WIDTH_DP.dp, StopBadgePin.HEIGHT_DP.dp).testTag("stopBadgePin"))
+        }
     }
+}
+
+/**
+ * The pin of the map's marker of 30 dp (8 × 12), scaled to the badge of 34 dp and rounded to whole
+ * dp, as iOS `StopNumberBadge.pinSize`.
+ */
+internal object StopBadgePin {
+    const val WIDTH_DP = 9
+    const val HEIGHT_DP = 14
 }
 
 internal enum class Emphasis { Normal, Filled, Visited }

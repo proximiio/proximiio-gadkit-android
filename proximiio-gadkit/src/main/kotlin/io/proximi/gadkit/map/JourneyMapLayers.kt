@@ -673,12 +673,18 @@ internal class JourneyMapLayers {
         /**
          * RPR's pin (`Pin.svg`, 10.33 × 15.83): a drop with a round hole, [STOP_PIN_WIDTH_DP] ×
          * [STOP_PIN_HEIGHT_DP] in a stop marker of 30 dp, 0.4 of the marker's height (GAD PM, Monday
-         * "Icons for personalized routes", 2026-11-20). iOS `stopPinImage(isCurrent:)`.
+         * "Icons for personalized routes", 2026-11-20). The badge of the journey list draws it at its
+         * own size ([widthDp], [heightDp]). iOS `stopPinImage(isCurrent:size:)`.
          */
-        fun stopPinImage(context: Context, isCurrent: Boolean): Bitmap {
+        fun stopPinImage(
+            context: Context,
+            isCurrent: Boolean,
+            widthDp: Int = STOP_PIN_WIDTH_DP,
+            heightDp: Int = STOP_PIN_HEIGHT_DP,
+        ): Bitmap {
             val density = context.resources.displayMetrics.density
-            val width = STOP_PIN_WIDTH_DP * density
-            val height = STOP_PIN_HEIGHT_DP * density
+            val width = widthDp * density
+            val height = heightDp * density
             val scale = height / 15.8333f
             val radius = 5.16667f * scale
             val centreX = width / 2f

@@ -248,8 +248,7 @@
     <string name="rerouting_you">جارٍ تغيير مسارك…</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="resume_your_journey">استأنف رحلتك</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="resume_your_journey_to_skip_the_artwork">استأنف رحلتك لتخطي العمل الفني</string>
+    <string name="resume_your_journey_to_skip_the_artwork">تابع رحلتك لتخطي العمل الفني</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="s_1_min">أقل من دقيقة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
