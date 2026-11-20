@@ -725,6 +725,55 @@ internal class VisitController(
         }
     }
 
+    /** The last time [checkOpenAreaOrder] asked the map for an order, epoch milliseconds. */
+    private var lastOpenAreaOrderCheck = 0L
+
+    /**
+     * Called on every guidance update. A personalised journey and the visitor in no gallery of the
+     * journey (the open area between the galleries): when the order of the stops ahead from the
+     * visitor starts with another artwork and saves [GadSettings.openAreaOrderMinimumMeters] of
+     * walking by the route, the journey is ordered again and leads to the nearer gallery
+     * ([GadSettings.ordersInOpenArea]; GAD PM, 2026-11-20: a visitor in front of another gallery was
+     * led on to the gallery of the current artwork until they entered one; iOS 1.61.1). At most every
+     * [GadSettings.openAreaOrderSeconds]. Not while paused, during a detour, on a floor without
+     * positioning or at a reached artwork.
+     */
+    fun checkOpenAreaOrder(guidance: RouteGuidance?, isFloorGuideActive: Boolean) {
+        if (!settings.ordersInOpenArea || !managesProgress || keepsOrder || !isNavigating || mutablePaused.value ||
+            isFloorGuideActive || navigator.detourStop != null || navigator.hasArrived || guidance == null || guidance.hasArrived ||
+            journeyGalleryId != null || session.position.value == null
+        ) {
+            return
+        }
+        val active = navigator.activeStop ?: return
+        val now = System.currentTimeMillis()
+        if (now - lastOpenAreaOrderCheck < settings.openAreaOrderSeconds.inWholeMilliseconds) return
+        lastOpenAreaOrderCheck = now
+        doneJobs += scope.launch {
+            serially {
+                if (navigator.activeStop?.id != active.id || navigator.hasArrived || navigator.detourStop != null ||
+                    journeyGalleryId != null || mutablePaused.value
+                ) {
+                    return@serially
+                }
+                val proposal = visitorOrder() ?: return@serially
+                val first = proposal.order.firstOrNull() ?: return@serially
+                if (first == active.id || !ordersInOpenArea(proposal.savedMeters, settings)) return@serially
+                // The stop may have changed while the map routed.
+                if (navigator.activeStop?.id != active.id || journeyGalleryId != null) return@serially
+                val title = doneStop(first)?.title ?: first
+                FieldLog.log(
+                    String.format(
+                        Locale.ROOT, "open area: %s goes before %s · %.1f m shorter · journey ordered again",
+                        title, active.title, proposal.savedMeters,
+                    ),
+                )
+                rerouting { apply(proposal) }
+                save()
+            }
+        }
+    }
+
     /**
      * Called on every fix. A visitor on a floor the route ahead does not take for
      * [GadSettings.wrongFloorAfter] is off the route: the warning shows, and the leg is drawn again
@@ -1529,6 +1578,14 @@ internal class VisitController(
          */
         fun switchesStop(nearerMeters: Double, entersVisitorGallery: Boolean, settings: GadSettings): Boolean =
             entersVisitorGallery || nearerMeters >= settings.orderSwitchMinimumMeters
+
+        /**
+         * Whether an order from a visitor in the open area takes the place of the journey's order:
+         * it saves [GadSettings.openAreaOrderMinimumMeters] of walking. Pure; covered by tests. iOS
+         * `ordersInOpenArea(savedMeters:settings:)` (1.61.1).
+         */
+        internal fun ordersInOpenArea(savedMeters: Double, settings: GadSettings): Boolean =
+            settings.ordersInOpenArea && savedMeters >= settings.openAreaOrderMinimumMeters
 
         /**
          * The open stop of the visitor's gallery that takes the place of [active], with the metres it

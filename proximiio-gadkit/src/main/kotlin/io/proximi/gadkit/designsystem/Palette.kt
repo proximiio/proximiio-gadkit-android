@@ -32,7 +32,7 @@ public object Palette {
     public val badgeStroke: Color = Color(0xFFEEEDED)
 
     /** Red of the active stop and the destination marker (Figma map frames). */
-    public val activeRed: Color = Color(0xFFED3731)
+    public val activeRed: Color = Color(0xFFBF3447)
 
     /** Blue of the "you are here" marker (`You_are_here.svg`). */
     public val position: Color = Color(0xFF3F69FF)

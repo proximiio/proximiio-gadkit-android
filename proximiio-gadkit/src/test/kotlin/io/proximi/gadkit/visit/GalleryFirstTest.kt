@@ -389,9 +389,9 @@ class GalleryPolygonTest {
         assertTrue(GadSettings().showsStopIcons)
         // One image per style, in the stop markers' colours.
         assertEquals(4, JourneyMapLayers.StopDot.Style.entries.map { JourneyMapLayers.StopDot.imageName(it) }.toSet().size)
-        assertEquals(Triple(0xFFED3731.toInt(), 0xFFFFFFFF.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.ACTIVE))
+        assertEquals(Triple(0xFFBF3447.toInt(), 0xFFFFFFFF.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.ACTIVE))
         assertEquals(Triple(0xFFFFFFFF.toInt(), 0xFFEEEDED.toInt(), 1f), JourneyMapLayers.stopDotColors(DotStyle.PENDING))
-        assertEquals(Triple(0xFFFFFFFF.toInt(), 0xFFED3731.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.VISITED))
+        assertEquals(Triple(0xFFFFFFFF.toInt(), 0xFFBF3447.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.VISITED))
         assertEquals(Triple(0xFFBDBDBD.toInt(), 0xFFFFFFFF.toInt(), 1f), JourneyMapLayers.stopDotColors(DotStyle.SKIPPED))
     }
 }

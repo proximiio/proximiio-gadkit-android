@@ -350,6 +350,27 @@ public data class GadSettings(
      */
     val ordersNearestArtworkInGalleryFirst: Boolean = true,
     /**
+     * Personalised journeys: while the visitor is in no gallery of the journey (the open area between
+     * the galleries), the stops ahead are ordered again from the visitor when that order starts with
+     * another artwork and saves [openAreaOrderMinimumMeters] of walking by the route. The journey then
+     * leads to the nearer gallery (GAD PM, Monday "Re-routing logic: re-route when user is in open
+     * areas to closest gallery", 2026-11-20). Needs `ProximiMapView.Option.PROGRESS`. `false`: outside
+     * the galleries the order changes only after a visit and after a detour, as before 1.62.0. iOS
+     * `ordersInOpenArea` (1.61.1).
+     */
+    val ordersInOpenArea: Boolean = true,
+    /**
+     * How many metres of walking the order from the visitor saves before [ordersInOpenArea] takes it.
+     * A small value changes the destination at every step between two galleries. iOS
+     * `openAreaOrderMinimumMeters` (1.61.1).
+     */
+    val openAreaOrderMinimumMeters: Double = 15.0,
+    /**
+     * The shortest time between two checks of [ordersInOpenArea]. Each check asks the map for an order
+     * by walking time. iOS `openAreaOrderSeconds` (1.61.1).
+     */
+    val openAreaOrderSeconds: Duration = 20.seconds,
+    /**
      * The visitor has arrived at the current artwork after [artworkArrivalMarginSeconds] within this
      * many metres of its geofence, outside it and inside no geofence of another open artwork of the
      * journey. 0 (default; GAD PM, 2026-11-18: larger geofences in the venue data instead): only a

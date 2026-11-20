@@ -34,10 +34,10 @@ import io.proximi.map.live.MapOptions
  * node 10930:60509), as iOS `MapStyle`:
  *
  * - current location `#3F69FF`
- * - path ahead: gradient `#3F69FF` → `#ED3731`, 6 dp, round cap
+ * - path ahead: gradient `#3F69FF` → `#BF3447`, 6 dp, round cap
  * - path traveled: `#3F69FF` at 30 %: the part of the computed leg behind the visitor. The leg
  *   keeps its shape until the arrival (PM review 2026-10-12).
- * - markers `#ED3731` with a `#EEEDED` stroke
+ * - markers `#BF3447` with a `#EEEDED` stroke
  *
  * The gradient runs per floor: on the floor after a lift, it starts at the lift.
  */
@@ -127,7 +127,7 @@ internal object MapStyle {
     }
 
     val location: MapColor = MapColor.hex(0x3F69FF)
-    val marker: MapColor = MapColor.hex(0xED3731)
+    val marker: MapColor = MapColor.hex(0xBF3447)
     val markerStroke: MapColor = MapColor.hex(0xEEEDED)
 
     /**

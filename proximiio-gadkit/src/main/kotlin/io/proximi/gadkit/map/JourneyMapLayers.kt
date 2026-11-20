@@ -812,7 +812,7 @@ internal class JourneyMapLayers {
         const val STOP_DOT_DP = 14
         const val PENDING_RING_COLOR = 0xFFEEEDED.toInt()
         const val SKIPPED_DOT_COLOR = 0xFFBDBDBD.toInt()
-        const val MARKER_COLOR = 0xFFED3731.toInt()
+        const val MARKER_COLOR = 0xFFBF3447.toInt()
         const val INK_COLOR = 0xFF2B2B2B.toInt()
     }
 }

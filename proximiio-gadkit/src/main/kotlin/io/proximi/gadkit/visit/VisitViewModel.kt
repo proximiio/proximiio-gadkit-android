@@ -558,6 +558,7 @@ internal class VisitViewModel(
                 controller.checkLegDeviation(guidance, floorGuide.isActive)
                 controller.checkGalleryRoute(guidance, floorGuide.isActive)
                 controller.checkNearestArtworkInGallery(guidance, floorGuide.isActive)
+                controller.checkOpenAreaOrder(guidance, floorGuide.isActive)
             }
         }
         // A resumed journey reports the gallery ahead again (PM, Monday "Sending entered geofences &

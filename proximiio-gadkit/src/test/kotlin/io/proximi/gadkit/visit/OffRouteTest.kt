@@ -17,6 +17,20 @@ import kotlin.time.Duration.Companion.seconds
  * warning's time, and the reports a paused journey drops (PM, Monday 2026-10-27; Nagarro, 2026-10-28).
  */
 class OffRouteTest {
+    /**
+     * In the open area the order from the visitor takes the place of the journey's order when it
+     * saves `openAreaOrderMinimumMeters` by the route (GAD PM, 2026-11-20; iOS 1.61.1).
+     */
+    @Test
+    fun theOpenAreaOrdersAgainWhenAnotherGalleryIsClearlyNearer() {
+        val settings = GadSettings()
+        assertTrue(VisitController.ordersInOpenArea(15.0, settings))
+        assertTrue(VisitController.ordersInOpenArea(40.0, settings))
+        assertFalse(VisitController.ordersInOpenArea(14.9, settings))
+        assertTrue(VisitController.ordersInOpenArea(6.0, settings.copy(openAreaOrderMinimumMeters = 5.0)))
+        assertFalse(VisitController.ordersInOpenArea(100.0, settings.copy(ordersInOpenArea = false)))
+    }
+
     private fun leg(level: Double, completed: Boolean = false, order: Int = 0) = RouteGeometry.Leg(
         floor = FloorKey(level),
         points = listOf(MapCoordinate(24.5, 54.4), MapCoordinate(24.5001, 54.4)),
