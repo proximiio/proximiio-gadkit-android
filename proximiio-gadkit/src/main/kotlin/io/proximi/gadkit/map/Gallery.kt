@@ -192,13 +192,35 @@ internal data class Gallery(
         internal fun containing(coordinate: Coordinate, level: Double?, galleries: List<Gallery>): Gallery? =
             galleries.firstOrNull { it.contains(coordinate, level) }
 
-        /** Fill colours per level (page 3, section `Colors`, node 10930:60509). */
+        /**
+         * The gallery of [galleries] the visitor is in. A gallery of [destinations] is tested by its
+         * geofence ([GalleryDestination.gallery]), not by the polygon the map fills: the geofence is
+         * what the visitor's entry and exit events use (GAD PM, Monday "Gallery blue colour",
+         * 2026-11-17; iOS 1.59.0). Every other gallery is tested by its own outline. When several
+         * hold the position, the one whose filled outline holds it wins, then [current], then the
+         * first. Pure; covered by tests.
+         */
+        internal fun ofVisitor(coordinate: Coordinate, level: Double?, galleries: List<Gallery>, destinations: List<GalleryDestination>, current: String?): Gallery? {
+            val geofences = HashMap<String, Gallery>()
+            for (destination in destinations) geofences.getOrPut(destination.shown.id) { destination.gallery }
+            val holding = galleries.filter { (geofences[it.id] ?: it).contains(coordinate, level) }
+            if (holding.size <= 1) return holding.firstOrNull()
+            return holding.firstOrNull { it.contains(coordinate, level) }
+                ?: holding.firstOrNull { it.id == current }
+                ?: holding.first()
+        }
+
+        /**
+         * Fill colours per level: the floor colour for the destination gallery and its 50 % shade for
+         * a visited one (RPR colour scheme; GAD PM, Monday "New colour scheme", 2026-11-20; iOS
+         * 1.59.0). Before 1.59.1: page 3, section `Colors`, node 10930:60509.
+         */
         internal fun colors(level: Double): Colors = when (level.roundedInt()) {
-            0 -> Colors(0xFF00FFB2, 0xFF80FFD9)
-            1 -> Colors(0xFF6FA6FF, 0xFFB7D3FF)
-            2 -> Colors(0xFFBB87F3, 0xFFDDC3F9)
-            3 -> Colors(0xFFFFE523, 0xFFFFF291)
-            else -> Colors(0xFFFA8352, 0xFFFDC1A8)
+            0 -> Colors(0xFF2DE09C, 0xFF96F0CE)
+            1 -> Colors(0xFF36A8FE, 0xFF9BD4FF)
+            2 -> Colors(0xFFBC5AFF, 0xFFDEADFF)
+            3 -> Colors(0xFFFED41D, 0xFFFFEA8E)
+            else -> Colors(0xFFFF7342, 0xFFFFB9A1)
         }
     }
 }

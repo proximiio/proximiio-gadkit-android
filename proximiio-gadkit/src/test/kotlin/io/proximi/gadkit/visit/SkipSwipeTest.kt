@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.R
 import kotlin.test.Test
@@ -41,6 +42,10 @@ class SkipSwipeTest {
     fun theHintNamesTheDirectionOfTheLayout() {
         assertEquals(R.string.swipe_left_to_skip_an_artwork, SkipSwipe.hint(isRtl = false))
         assertEquals(R.string.swipe_right_to_skip_an_artwork, SkipSwipe.hint(isRtl = true))
+        // A paused journey: the text of the notice replaces the hint (iOS 1.59.1).
+        assertEquals(R.string.resume_your_journey_to_skip_the_artwork, SkipSwipe.hint(isRtl = false, isSkipPaused = true))
+        assertEquals(R.string.resume_your_journey_to_skip_the_artwork, SkipSwipe.hint(isRtl = true, isSkipPaused = true))
+        assertFalse(GadSettings().skipsWhilePaused)
     }
 
     @Test

@@ -41,8 +41,49 @@ class GalleryTest {
 
     @Test
     fun levelColours() {
-        assertEquals(0xFF6FA6FF, Gallery.colors(1.0).destination)
-        assertEquals(0xFFFFF291, Gallery.colors(3.0).visited)
+        assertEquals(0xFF2DE09C, Gallery.colors(0.0).destination)
+        assertEquals(0xFF36A8FE, Gallery.colors(1.0).destination)
+        assertEquals(0xFFDEADFF, Gallery.colors(2.0).visited)
+        assertEquals(0xFFFFEA8E, Gallery.colors(3.0).visited)
+        assertEquals(0xFFFF7342, Gallery.colors(4.0).destination)
+    }
+
+    /**
+     * The visitor is in a gallery while they are in its geofence, also outside the polygon the map
+     * fills (GAD PM, Monday "Gallery blue colour", 2026-11-17; iOS 1.59.0). A gallery without a
+     * geofence uses its own outline.
+     */
+    @Test
+    fun theVisitorsGalleryIsTheOneWhoseGeofenceHoldsThem() {
+        fun ring(south: Double, west: Double, north: Double, east: Double) =
+            listOf(Coordinate(south, west), Coordinate(south, east), Coordinate(north, east), Coordinate(north, west))
+        // Polygon A: longitude 54.400 to 54.401. Its geofence reaches 54.4012.
+        val polygonA = Gallery("polygon-a", "A", 1.0, ring(24.500, 54.400, 24.501, 54.401))
+        val geofenceA = Gallery("a", "A", 1.0, ring(24.500, 54.3998, 24.501, 54.4012))
+        // Polygon B starts at 54.4011, inside the geofence of A. Its geofence is the same outline.
+        val polygonB = Gallery("polygon-b", "B", 1.0, ring(24.500, 54.4011, 24.501, 54.402))
+        val geofenceB = Gallery("b", "B", 1.0, polygonB.ring)
+        val outline = Gallery("outline", "C", 1.0, ring(24.510, 54.400, 24.511, 54.401))
+        val entry = Coordinate(24.5005, 54.4005)
+        val destinations = listOf(
+            GalleryDestination(geofenceA, entry, "poi-a", polygonA),
+            GalleryDestination(geofenceB, entry, "poi-b", polygonB),
+        )
+        val galleries = listOf(polygonA, polygonB, outline)
+        fun gallery(longitude: Double, latitude: Double = 24.5005, level: Double? = 1.0, current: String? = null) =
+            Gallery.ofVisitor(Coordinate(latitude, longitude), level, galleries, destinations, current)?.id
+        assertEquals("polygon-a", gallery(54.4005))
+        // Outside the polygon of A, inside its geofence.
+        assertEquals("polygon-a", gallery(54.40105))
+        assertEquals("polygon-a", gallery(54.3999))
+        // In the geofence of A and in the polygon of B: the polygon decides.
+        assertEquals("polygon-b", gallery(54.40115))
+        assertEquals("polygon-b", gallery(54.40115, current = "polygon-a"))
+        assertEquals("polygon-b", gallery(54.4015))
+        // Outside every geofence, on another floor, and a gallery with an outline only.
+        assertNull(gallery(54.4030))
+        assertNull(gallery(54.4005, level = 2.0))
+        assertEquals("outline", gallery(54.4005, latitude = 24.5105))
     }
 
     @Test

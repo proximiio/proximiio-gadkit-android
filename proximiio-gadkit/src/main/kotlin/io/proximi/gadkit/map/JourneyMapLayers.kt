@@ -6,6 +6,7 @@ import io.proximi.gadkit.designsystem.GadIcon
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Bitmap
@@ -92,6 +93,7 @@ internal class JourneyMapLayers {
     private var highlight: Highlight? = null
     private var galleryMarkers: List<GalleryMarker> = emptyList()
     private var stopDots: List<StopDot> = emptyList()
+    private var stopIcons: List<StopIcon> = emptyList()
     private var cones: List<VenueCone> = emptyList()
 
     /** The cones' images, drawn when their floor first shows. */
@@ -135,6 +137,18 @@ internal class JourneyMapLayers {
         }
 
         val imageName: String get() = "gad-gallery-${style.name.lowercase()}-$name"
+    }
+
+    /**
+     * The pin in the marker of a journey artwork (`VisitViewModel.stopIcons`). iOS `StopIcon` (1.59.0).
+     *
+     * @property isCurrent the current artwork: a white pin on the red marker. Else a dark pin on a
+     *   white marker.
+     */
+    data class StopIcon(val coordinate: Coordinate, val level: Double, val isCurrent: Boolean) {
+        internal companion object {
+            fun imageName(isCurrent: Boolean): String = if (isCurrent) "gad-stop-pin-current" else "gad-stop-pin"
+        }
     }
 
     /** The dot of a journey artwork that has no numbered marker (`VisitViewModel.stopDots`). iOS `StopDot`. */
@@ -185,8 +199,16 @@ internal class JourneyMapLayers {
         if (levelChanged) {
             applyLevelChanger(style)
             applyStopDots(style)
+            applyStopIcons(style)
             applyCones(style)
         }
+    }
+
+    /** The pins in the markers of the journey artworks. Does nothing when nothing changed. */
+    fun updateStopIcons(icons: List<StopIcon>) {
+        if (icons == stopIcons) return
+        stopIcons = icons
+        canvas?.style?.let(::applyStopIcons)
     }
 
     /** The dots of the journey artworks without a numbered marker. Does nothing when nothing changed. */
@@ -306,6 +328,20 @@ internal class JourneyMapLayers {
             // Above the route, below the level changers, the gallery names and the numbered markers.
             canvas.addLayer(layer, MapCanvasLayerAnchor.Below(LEVEL_CHANGER_LAYER))
         }
+        if (style.getSource(STOP_ICON_SOURCE) == null) {
+            for (isCurrent in listOf(false, true)) {
+                val name = StopIcon.imageName(isCurrent)
+                if (style.getImage(name) == null) style.addImage(name, stopPinImage(canvas.context, isCurrent))
+            }
+            style.addSource(GeoJsonSource(STOP_ICON_SOURCE))
+            val layer = SymbolLayer(STOP_ICON_LAYER, STOP_ICON_SOURCE).withProperties(
+                PropertyFactory.iconImage(Expression.get(IMAGE_PROPERTY)),
+                PropertyFactory.iconAllowOverlap(true),
+                PropertyFactory.iconIgnorePlacement(true),
+            )
+            // Over the stop markers the map library draws.
+            canvas.addLayer(layer, MapCanvasLayerAnchor.Top)
+        }
         if (style.getSource(GALLERY_SOURCE) == null) {
             style.addSource(GeoJsonSource(GALLERY_SOURCE))
             // The visited and the destination galleries over the venue's artworks, furniture and inner
@@ -355,8 +391,19 @@ internal class JourneyMapLayers {
         applyConnector(style)
         applyLevelChanger(style)
         applyStopDots(style)
+        applyStopIcons(style)
         applyCones(style)
         styleConeOutlines(style)
+    }
+
+    private fun applyStopIcons(style: Style) {
+        val source = style.getSource(STOP_ICON_SOURCE) as? GeoJsonSource ?: return
+        val features = stopIcons.filter { VenueLevel.same(it.level, level) }.map { icon ->
+            Feature.fromGeometry(Point.fromLngLat(icon.coordinate.longitude, icon.coordinate.latitude)).apply {
+                addStringProperty(IMAGE_PROPERTY, StopIcon.imageName(icon.isCurrent))
+            }
+        }
+        source.setGeoJson(FeatureCollection.fromFeatures(features))
     }
 
     private fun applyStopDots(style: Style) {
@@ -620,6 +667,36 @@ internal class JourneyMapLayers {
             return bitmap
         }
 
+        /** The colour of the pin: white for the current artwork, else `#2B2B2B`. Pure; covered by tests. */
+        fun stopPinColor(isCurrent: Boolean): Int = if (isCurrent) Color.WHITE else STOP_PIN_COLOR
+
+        /**
+         * RPR's pin (`Pin.svg`, 10.33 × 15.83): a drop with a round hole, [STOP_PIN_WIDTH_DP] ×
+         * [STOP_PIN_HEIGHT_DP] in a stop marker of 30 dp, 0.4 of the marker's height (GAD PM, Monday
+         * "Icons for personalized routes", 2026-11-20). iOS `stopPinImage(isCurrent:)`.
+         */
+        fun stopPinImage(context: Context, isCurrent: Boolean): Bitmap {
+            val density = context.resources.displayMetrics.density
+            val width = STOP_PIN_WIDTH_DP * density
+            val height = STOP_PIN_HEIGHT_DP * density
+            val scale = height / 15.8333f
+            val radius = 5.16667f * scale
+            val centreX = width / 2f
+            val shoulder = 9.08333f * scale
+            val pin = Path().apply {
+                fillType = Path.FillType.EVEN_ODD
+                moveTo(centreX - radius, radius)
+                arcTo(RectF(centreX - radius, 0f, centreX + radius, 2 * radius), 180f, 180f)
+                cubicTo(centreX + radius, shoulder, centreX, height, centreX, height)
+                cubicTo(centreX, height, centreX - radius, shoulder, centreX - radius, radius)
+                close()
+                addCircle(centreX, radius, 2f * scale, Path.Direction.CW)
+            }
+            val bitmap = Bitmap.createBitmap(width.roundToInt(), height.roundToInt(), Bitmap.Config.ARGB_8888)
+            Canvas(bitmap).drawPath(pin, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = stopPinColor(isCurrent) })
+            return bitmap
+        }
+
         private fun coneId(id: String): String = "gad-cone-$id"
 
         /** The venue style's gallery fill; the cone images go under it. */
@@ -668,6 +745,13 @@ internal class JourneyMapLayers {
             Expression.eq(Expression.get(KIND_PROPERTY), Expression.literal(kind.value))
         const val MARKER_DP = 30
         const val STOP_DOT_SOURCE = "gad-stop-dots"
+        const val STOP_ICON_SOURCE = "gad-stop-icons"
+        const val STOP_ICON_LAYER = "gad-stop-icons"
+
+        /** The size of the pin in a stop marker. iOS `stopPinSize`. */
+        const val STOP_PIN_WIDTH_DP = 8
+        const val STOP_PIN_HEIGHT_DP = 12
+        const val STOP_PIN_COLOR = 0xFF2B2B2B.toInt()
         const val STOP_DOT_LAYER = "gad-stop-dots"
 
         /** The diameter of a stop dot. iOS `stopDotDiameter`. */

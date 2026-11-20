@@ -631,6 +631,7 @@ private fun VisitSheets(model: VisitViewModel) {
     model.stopToSkip?.let { stop ->
         SkipConfirmation(stop.title, onSkip = model::confirmSkip, onKeep = model::keepStop)
     }
+    if (model.isShowingSkipPaused) SkipPausedNotice(onDismiss = model::dismissSkipPaused)
     // The off-route warning is a card on the map (CardOverlay). No tracking or wristband alerts: the
     // host app handles the wristband states (PM 2026-10-15).
     if (model.isShowingWrapUp) JourneyCompleteScreen(model.venue, onClose = model::finishVisit)

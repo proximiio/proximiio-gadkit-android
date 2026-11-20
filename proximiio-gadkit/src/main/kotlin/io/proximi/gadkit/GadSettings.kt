@@ -183,11 +183,11 @@ public data class GadSettings(
     val followZoom: Double = 19.0,
     /**
      * Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys, or
-     * `null` for [followZoom]. 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the
+     * `null` for [followZoom]. 21.5 since 1.59.1 (GAD PM, Monday "Zoom level", 2026-11-20: 22 is too close; iOS 1.59.0); 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the
      * visitor enters a gallery); `null` before, and personalised journeys only. Above [maximumZoom]
      * the map stops at [maximumZoom].
      */
-    val galleryFollowZoom: Double? = 22.0,
+    val galleryFollowZoom: Double? = 21.5,
     /**
      * The journey map shows the visitor at this zoom for [startZoomDuration] before it follows them:
      * when the journey starts, on the first fix and when the position comes back. `null` follows at
@@ -258,6 +258,14 @@ public data class GadSettings(
      * iOS `showsStopNumbers`.
      */
     val showsStopNumbers: Boolean = false,
+    /**
+     * `true` draws a pin in the marker of a journey artwork on the map while [showsStopNumbers] is
+     * `false`: white in the marker of the current artwork, dark in the others (RPR design; GAD PM,
+     * Monday "Icons for personalized routes", 2026-11-20). `false` shows the circles alone, as before
+     * 1.59.1. The detour's marker, a skipped artwork and the stop dots have no pin. iOS
+     * `showsStopIcons` (1.59.0).
+     */
+    val showsStopIcons: Boolean = true,
     /**
      * `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is
      * marked visited while the visitor stands in another gallery than the next stop's, and that gallery
@@ -355,6 +363,14 @@ public data class GadSettings(
      * (Nagarro, 2026-11-18: a skip with fewer steps). iOS `skipsAtSwipe` (1.51.0).
      */
     val skipsAtSwipe: Boolean = false,
+    /**
+     * The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop").
+     * `false`, the default: a swipe on an artwork skips nothing, sends no event and shows "Resume your
+     * journey to skip the artwork" with "Dismiss"; the text also replaces the swipe hint (GAD PM,
+     * Monday "Swipe to skip disabled when navigation is paused", 2026-11-20). `true` keeps the swipe,
+     * as before 1.59.1. iOS `skipsWhilePaused` (1.59.0, 1.59.1).
+     */
+    val skipsWhilePaused: Boolean = false,
     /**
      * The time between two uploads of the field log to the relay-api. `ProximiMap` starts the uploads
      * in `start()` with the relay base URL and app token of its `GadConfiguration`. Zero sends

@@ -340,6 +340,10 @@ internal class VisitViewModel(
     /** The stop of "Skip it?". */
     var stopToSkip by mutableStateOf<JourneyStop?>(null)
         private set
+
+    /** The notice after a swipe on an artwork while the journey is paused ([GadSettings.skipsWhilePaused]). */
+    var isShowingSkipPaused by mutableStateOf(false)
+        private set
     var isConfirmingExit by mutableStateOf(false)
         private set
     /** Journey Complete, once every stop is done or skipped. */
@@ -560,7 +564,7 @@ internal class VisitViewModel(
                     visitorLevel = position.floor?.level
                     updateNotification()
                 }
-                visitorGallery = Gallery.containing(Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level, galleries)
+                visitorGallery = visitorGallery(position, visitorGallery?.id)
                 // The map publishes guidance only on a leg with a route, so the arrival is checked on
                 // the position (field test 2026-10-19).
                 updateVisitorGallery(position)
@@ -1117,14 +1121,24 @@ internal class VisitViewModel(
             .let { it.copy(hiddenStopIds = stopsOutsideTheVisitorsGallery(controller.navigator.journey.value.stops, visitorGalleryId)) }
         if (session.journeyStopMarkerStyle != style) session.journeyStopMarkerStyle = style
         layers.updateStopDots(if (settings.showsStopDots) stopDots(controller.navigator.journey.value.stops, style.hiddenStopIds, shows) else emptyList())
+        layers.updateStopIcons(
+            if (settings.showsStopIcons && !settings.showsStopNumbers) stopIcons(controller.navigator.journey.value.stops, style.hiddenStopIds, shows) else emptyList(),
+        )
     }
+
+    /**
+     * The gallery that holds [position], by the gallery geofences ([Gallery.ofVisitor]; iOS 1.59.0).
+     * The gallery fills, the artwork markers of the visitor's gallery and the follow zoom use it.
+     */
+    private fun visitorGallery(position: VenuePosition, current: String?): Gallery? =
+        Gallery.ofVisitor(Coordinate(position.coordinate.latitude, position.coordinate.longitude), position.floor?.level, galleries, galleryDestinations, current)
 
     /** Finds the gallery the visitor is in, on every fix. */
     private fun updateVisitorGallery(position: VenuePosition?) {
         val placeId = position?.let { fix ->
             galleryDestinations.firstOrNull { it.gallery.contains(Coordinate(fix.coordinate.latitude, fix.coordinate.longitude), fix.floor?.level) }?.placeId
         }
-        val galleryId = position?.let { Gallery.containing(Coordinate(it.coordinate.latitude, it.coordinate.longitude), it.floor?.level, galleries)?.id }
+        val galleryId = position?.let { visitorGallery(it, visitorGalleryId)?.id }
         if (placeId == visitorGalleryPlaceId && galleryId == visitorGalleryId) return
         visitorGalleryPlaceId = placeId
         visitorGalleryId = galleryId
@@ -1280,9 +1294,22 @@ internal class VisitViewModel(
      * [ProximiMapView.Option.SKIP_PROMPT], else only the event.
      */
     fun requestSkip(stop: JourneyStop) {
+        // While the journey is paused the swipe shows "Resume your journey to skip the artwork" and
+        // sends no event (GAD PM, Monday "Swipe to skip disabled when navigation is paused",
+        // 2026-11-20; iOS 1.59.1).
+        if (controller.isPaused.value && !settings.skipsWhilePaused) {
+            FieldLog.log("skip refused: the journey is paused · ${stop.id}")
+            isShowingSkipPaused = true
+            return
+        }
         FieldLog.log("skip requested: ${stop.id} ${stop.state.name.lowercase()}")
         if (options.hasPrompt(ProximiMapView.Option.SKIP_PROMPT)) stopToSkip = stop
         onEvent(VisitEvent.SkipRequested(stop))
+    }
+
+    /** "Dismiss" on the notice of a paused journey. */
+    fun dismissSkipPaused() {
+        isShowingSkipPaused = false
     }
 
     fun confirmSkip() {
@@ -1570,7 +1597,7 @@ internal class VisitViewModel(
 
     private val isPresentingSomething: Boolean
         // Without prompts the off-route state shows nothing and does not hold the report back.
-        get() = lowConfidenceStop != null || stopToSkip != null || isConfirmingExit ||
+        get() = lowConfidenceStop != null || stopToSkip != null || isShowingSkipPaused || isConfirmingExit ||
             (options.hasPrompt(ProximiMapView.Option.OFF_ROUTE_PROMPT) && controller.isOffRoute.value) ||
             isShowingWrapUp || floorGuide.isActive || controller.isPaused.value
 
@@ -1678,6 +1705,21 @@ internal class VisitViewModel(
                     MapJourneyStop.State.SKIPPED -> JourneyMapLayers.StopDot.Style.SKIPPED
                 }
                 JourneyMapLayers.StopDot(Coordinate(stop.coordinate.latitude, stop.coordinate.longitude), level, style)
+            }
+
+        /**
+         * The pins in the artworks' markers ([GadSettings.showsStopIcons]): one for each marker the
+         * map draws. With [showsMarkers] false (`MapStyle.journeyStopsHidden`) only the visited
+         * artworks have a marker. A skipped artwork, an artwork in [hiddenStopIds], a detour and a
+         * stop without a floor have none (iOS 1.59.0). Pure; covered by tests.
+         */
+        internal fun stopIcons(stops: List<MapJourneyStop>, hiddenStopIds: Set<String>, showsMarkers: Boolean): List<JourneyMapLayers.StopIcon> =
+            stops.mapNotNull { stop ->
+                val level = stop.floor?.level ?: return@mapNotNull null
+                if (stop.kind == MapJourneyStop.Kind.DETOUR || stop.state == MapJourneyStop.State.SKIPPED || stop.id in hiddenStopIds) return@mapNotNull null
+                if (!showsMarkers && stop.state != MapJourneyStop.State.DONE) return@mapNotNull null
+                val isCurrent = stop.state == MapJourneyStop.State.ACTIVE || stop.state == MapJourneyStop.State.REACHED
+                JourneyMapLayers.StopIcon(Coordinate(stop.coordinate.latitude, stop.coordinate.longitude), level, isCurrent)
             }
 
         /** Whether the artworks' markers show. Pure; covered by tests. */

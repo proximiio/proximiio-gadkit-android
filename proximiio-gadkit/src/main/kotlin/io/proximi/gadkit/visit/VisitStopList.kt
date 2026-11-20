@@ -60,6 +60,7 @@ import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.designsystem.StopNumberBadge
 import io.proximi.gadkit.designsystem.glassSurface
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import io.proximi.gadkit.map.VenuePlace
@@ -82,6 +83,10 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
     val journey = model.progress.journey
     val numbers = VisitPlan.numbers(journey)
     val allowsSkip = model.kind.allowsSkip
+    // The journey is paused and `GadSettings.skipsWhilePaused` is off: a swipe asks at once, the model
+    // refuses the skip, and a text replaces the swipe hint (iOS 1.59.1).
+    val isPaused by model.controller.isPaused.collectAsStateWithLifecycle()
+    val isSkipPaused = isPaused && !model.settings.skipsWhilePaused
     // Places by id, for the artist, the badges and the gallery id of a stop.
     val places = remember(model.places) { model.places.associateBy { it.id } }
     val resources = LocalResources.current
@@ -118,7 +123,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                         isRevealed = revealedStopId == stop.id,
                         onRevealChange = { revealedStopId = if (it) stop.id else null },
                         isEnabled = allowsSkip && SkipSwipe.canSkip(stop),
-                        skipsAtSwipe = model.settings.skipsAtSwipe,
+                        skipsAtSwipe = model.settings.skipsAtSwipe || isSkipPaused,
                         onSkip = {
                             revealedStopId = null
                             model.requestSkip(stop)
@@ -134,8 +139,8 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
         if (allowsSkip && VisitPlan.artworks(journey).any(SkipSwipe::canSkip)) {
             item(key = "hint") {
                 Text(
-                    stringResource(SkipSwipe.hint(isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl)),
-                    Modifier.padding(top = 10.dp),
+                    stringResource(SkipSwipe.hint(isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl, isSkipPaused = isSkipPaused)),
+                    Modifier.padding(top = 10.dp).testTag(if (isSkipPaused) "skipPausedHint" else "skipHint"),
                     style = GadTextStyle.BodyExtraSmall.textStyle,
                     color = Palette.ink,
                 )
@@ -311,7 +316,11 @@ internal object SkipSwipe {
 
     /** The hint under the list: the row slides towards the start edge, right in a right-to-left layout. */
     @StringRes
-    fun hint(isRtl: Boolean): Int = if (isRtl) R.string.swipe_right_to_skip_an_artwork else R.string.swipe_left_to_skip_an_artwork
+    fun hint(isRtl: Boolean, isSkipPaused: Boolean = false): Int = when {
+        isSkipPaused -> R.string.resume_your_journey_to_skip_the_artwork
+        isRtl -> R.string.swipe_right_to_skip_an_artwork
+        else -> R.string.swipe_left_to_skip_an_artwork
+    }
 
     /** True when a drag that stops at [offset] with [velocity] (px/s) leaves the skip panel revealed. */
     fun reveals(offset: Float, velocity: Float, revealWidth: Float): Boolean = offset + velocity * 0.1f < -revealWidth / 2

@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.GadSettings
 import io.proximi.gadkit.map.GalleryFill
 import io.proximi.gadkit.map.JourneyMapLayers
 import io.proximi.gadkit.map.JourneyMapLayers.StopDot.Style as DotStyle
@@ -371,6 +372,17 @@ class GalleryPolygonTest {
         )
         // Numbers shown and nothing hidden: the skipped artwork only.
         assertEquals(listOf(DotStyle.SKIPPED), VisitViewModel.stopDots(stops, emptySet(), showsNumbers = true).map { it.style })
+        // The pins: one for each marker the map draws, white for the current artwork (iOS 1.59.0).
+        val icons = VisitViewModel.stopIcons(stops, setOf("pending"), showsMarkers = true)
+        assertEquals(listOf(false, true, false), icons.map { it.isCurrent })
+        assertTrue(icons.all { it.level == 1.0 })
+        // The route leads to a gallery: only the visited artworks have a marker.
+        assertEquals(listOf(false), VisitViewModel.stopIcons(stops, emptySet(), showsMarkers = false).map { it.isCurrent })
+        assertTrue(VisitViewModel.stopIcons(stops, setOf("visited"), showsMarkers = false).isEmpty())
+        assertEquals(0xFFFFFFFF.toInt(), JourneyMapLayers.stopPinColor(isCurrent = true))
+        assertEquals(0xFF2B2B2B.toInt(), JourneyMapLayers.stopPinColor(isCurrent = false))
+        assertTrue(JourneyMapLayers.STOP_PIN_HEIGHT_DP < 30 / 2)
+        assertTrue(GadSettings().showsStopIcons)
         // One image per style, in the stop markers' colours.
         assertEquals(4, JourneyMapLayers.StopDot.Style.entries.map { JourneyMapLayers.StopDot.imageName(it) }.toSet().size)
         assertEquals(Triple(0xFFED3731.toInt(), 0xFFFFFFFF.toInt(), 2f), JourneyMapLayers.stopDotColors(DotStyle.ACTIVE))

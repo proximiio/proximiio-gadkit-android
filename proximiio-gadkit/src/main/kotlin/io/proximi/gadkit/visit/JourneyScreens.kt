@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -187,6 +188,21 @@ internal fun SkipConfirmation(stop: String, onSkip: () -> Unit, onKeep: () -> Un
         SheetBody(stringResource(R.string.i_ll_remove_it_from_your_route), Modifier.padding(bottom = 20.dp))
         PrimaryButton(stringResource(R.string.skip_it), onSkip)
         TextActionButton(stringResource(R.string.keep_it), onKeep)
+    }
+}
+
+/** "Resume your journey to skip the artwork" bottom sheet, with "Dismiss" only (iOS 1.59.1). */
+@Composable
+internal fun SkipPausedNotice(onDismiss: () -> Unit) {
+    OverlaySheet(onDismiss = onDismiss, bottomPadding = 12.dp) {
+        Text(
+            stringResource(R.string.resume_your_journey_to_skip_the_artwork),
+            Modifier.asHeading().padding(bottom = 20.dp).testTag("skipPausedNotice"),
+            style = GadTextStyle.H1Bold.textStyle,
+            color = Palette.ink,
+            textAlign = TextAlign.Center,
+        )
+        PrimaryButton(stringResource(R.string.dismiss), onDismiss)
     }
 }
 

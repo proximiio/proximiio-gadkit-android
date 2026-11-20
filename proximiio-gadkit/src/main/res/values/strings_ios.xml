@@ -129,6 +129,7 @@
     <string name="ramp">ramp</string>
     <string name="rerouting_you">Rerouting you…</string>
     <string name="resume_your_journey">Resume your Journey</string>
+    <string name="resume_your_journey_to_skip_the_artwork">Resume your journey to skip the artwork</string>
     <string name="s_1_min">&lt;1 min</string>
     <string name="scan_qr_code">Scan QR code</string>
     <string name="scanning_is_not_available_on_this_device">Scanning is not available on this device.</string>
