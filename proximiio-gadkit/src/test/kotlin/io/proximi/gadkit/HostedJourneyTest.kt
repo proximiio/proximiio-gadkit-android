@@ -80,6 +80,20 @@ class HostedJourneyTest {
         assertFalse(offTheMap.canReplace(shown, JourneyKind.PERSONALISED, JourneyKind.PERSONALISED))
     }
 
+    /** The visited and skipped stops go before the pending ones; each group keeps its order (GAD PM, 2026-11-19). */
+    @Test
+    fun doneStopsGoBeforeThePendingOnes() {
+        val journey = ProximiJourney(
+            stops = listOf(stop("a"), stop("b"), stop("c", ProximiJourney.State.VISITED), stop("d"), stop("e", ProximiJourney.State.SKIPPED)),
+        )
+        val ordered = journey.withDoneStopsFirst()
+        assertEquals(listOf("c", "e", "a", "b", "d"), ordered.stops.map { it.id })
+        assertEquals(ProximiJourney.State.VISITED, ordered.stops[0].state)
+        assertEquals(ProximiJourney.State.SKIPPED, ordered.stops[1].state)
+        assertEquals(ordered, ordered.withDoneStopsFirst())
+        assertTrue(GadSettings().ordersDoneStopsFirst)
+    }
+
     @Test
     fun aJourneyCanBeStoredAsJson() {
         val journey = ProximiJourney(JourneyKind.CURATED, listOf(stop("GAD.1", ProximiJourney.State.VISITED), stop("b")))

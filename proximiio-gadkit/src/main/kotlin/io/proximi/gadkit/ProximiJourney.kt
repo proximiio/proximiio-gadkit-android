@@ -52,6 +52,13 @@ public data class ProximiJourney(
         SKIPPED("skipped"),
     }
 
+    /**
+     * The journey with its visited and skipped stops before the pending ones. Each group keeps its
+     * order ([GadSettings.ordersDoneStopsFirst]). Pure; covered by tests.
+     */
+    internal fun withDoneStopsFirst(): ProximiJourney =
+        copy(stops = stops.filter { it.state != State.PENDING } + stops.filter { it.state == State.PENDING })
+
     /** The journey as JSON, the format of iOS `ProximiJourney: Codable`: `{"kind": …, "stops": [{"id": …, "state": …}]}`. */
     public fun toJson(): String = JsonObject(
         mapOf(

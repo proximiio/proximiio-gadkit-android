@@ -9,6 +9,7 @@ import io.proximi.map.live.ProximiioMapSession
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sqrt
 
 /**
  * The map after an amenity is picked in the menu (PM, Monday "When selecting an amenity from the
@@ -19,6 +20,36 @@ import kotlin.math.max
  */
 internal object PlaceFraming {
     private const val METRES_PER_DEGREE = 111_320.0
+
+    /**
+     * The centre of each group of points and its distance in metres from the median centre of all
+     * groups. Pure; covered by tests.
+     */
+    fun distancesFromTheMedianCentre(groups: List<List<Coordinate>>): List<Double> {
+        if (groups.isEmpty()) return emptyList()
+        val centres = groups.map { points ->
+            val count = max(points.size, 1)
+            Coordinate(points.sumOf { it.latitude } / count, points.sumOf { it.longitude } / count)
+        }
+        fun median(values: List<Double>) = values.sorted()[values.size / 2]
+        val latitude = median(centres.map { it.latitude })
+        val longitude = median(centres.map { it.longitude })
+        return centres.map { centre ->
+            val north = (centre.latitude - latitude) * METRES_PER_DEGREE
+            val east = (centre.longitude - longitude) * METRES_PER_DEGREE * cos(latitude * PI / 180)
+            sqrt(north * north + east * east)
+        }
+    }
+
+    /**
+     * [groups] without those whose centre is more than [maximumMeters] from the median centre of all
+     * of them. `null` keeps every group. A frame of the museum leaves out a space that lies far from
+     * the building (GAD PM, on site, 2026-11-19). Pure; covered by tests.
+     */
+    fun nearTheMedianCentre(groups: List<List<Coordinate>>, maximumMeters: Double?): List<List<Coordinate>> {
+        if (maximumMeters == null) return groups
+        return groups.zip(distancesFromTheMedianCentre(groups)).filter { it.second <= maximumMeters }.map { it.first }
+    }
 
     /**
      * The area that holds [points], grown about its centre to at least [minimumMeters] wide and high.

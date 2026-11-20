@@ -280,7 +280,17 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         withContext(Dispatchers.Main.immediate) {
             // The lowest floor with a gallery, framed on the whole museum.
             show(catalog.spaces.minOfOrNull { it.level } ?: catalog.levels.firstOrNull() ?: 0.0)
-            PlaceFraming.bounds(catalog.spaces.flatMap { it.framedPoints }, minimumMeters = 60.0)?.let { bounds ->
+            // Without the spaces far from the building (GAD PM, on site, 2026-11-19; iOS 1.58.0).
+            val outlines = catalog.spaces.map { it.framedPoints }
+            val maximum = settings.exploreFramingMaximumMeters
+            val framed = PlaceFraming.nearTheMedianCentre(outlines, maximum)
+            val distances = PlaceFraming.distancesFromTheMedianCentre(outlines)
+            val far = catalog.spaces.zip(distances).filter { maximum != null && it.second > maximum }.map { "${it.first.title} ${it.second.toInt()} m" }
+            FieldLog.log(
+                "explore frame: ${framed.size} of ${outlines.size} spaces · farthest ${(distances.maxOrNull() ?: 0.0).toInt()} m" +
+                    if (far.isEmpty()) "" else " · left out: " + far.joinToString(", "),
+            )
+            PlaceFraming.bounds(framed.flatten(), minimumMeters = 60.0)?.let { bounds ->
                 session.camera.fitBounds(bounds, insets, animated = false)
             }
         }

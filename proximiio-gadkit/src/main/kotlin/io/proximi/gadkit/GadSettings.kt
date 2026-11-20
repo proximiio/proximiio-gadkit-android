@@ -301,6 +301,14 @@ public data class GadSettings(
      */
     val ordersVisitorGalleryFirst: Boolean = true,
     /**
+     * `ProximiMapView` with `Option.PROGRESS`, personalised journeys: `true` puts the visited and
+     * skipped stops of the journey the host app passes before the pending ones, each group in the host
+     * app's order, and the view writes that order back. A host app that stores the states but passes
+     * its first order after a restart showed a visited artwork behind open ones in the list (GAD PM,
+     * on site, 2026-11-19). `false` keeps the host app's order. iOS `ordersDoneStopsFirst` (1.57.0).
+     */
+    val ordersDoneStopsFirst: Boolean = true,
+    /**
      * `true` marks an artwork the visitor has arrived at visited when the visitor enters the geofence
      * of another artwork of the journey and is outside its own. `false`: only [artworkVisitedMeters]
      * and [artworkVisitedSeconds] mark it visited. iOS `visitsArtworkAtAnotherArtwork` (1.52.0).
@@ -457,6 +465,13 @@ public data class GadSettings(
      * menu, so a near amenity does not zoom the map in further than this.
      */
     val amenityFramingMinimumMeters: Double = 40.0,
+    /**
+     * The Explore Museum map opens on the spaces whose centre is at most this far from the median
+     * centre of all spaces, so a space far from the building does not make the museum small on the
+     * screen (GAD PM, on site, 2026-11-19). `null` frames every space, as before 1.58.0. iOS
+     * `exploreFramingMaximumMeters` (1.58.0).
+     */
+    val exploreFramingMaximumMeters: Double? = 150.0,
 
     // Gallery first
 

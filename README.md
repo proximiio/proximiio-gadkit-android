@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.56.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.58.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.56.0
+git -C gadkit checkout 1.58.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -920,6 +920,7 @@ val configuration = GadConfiguration(
 | `ordersAtGalleryEntry` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when they enter the gallery of an artwork still to visit that is not the gallery of the current artwork, once per entry. Needs `Option.PROGRESS`. |
 | `galleryEntryOrderSeconds` | 3 s | How long the position lies in a gallery before `ordersAtGalleryEntry` and `ordersVisitorGalleryFirst` count the visitor in it. Zero counts the first fix. |
 | `ordersVisitorGalleryFirst` | `true` | Personalised journeys: every order from the visitor puts the open artworks of the visitor's gallery first, also when an artwork of another gallery is nearer by the route. |
+| `ordersDoneStopsFirst` | `true` | `ProximiMapView` with `Option.PROGRESS`, personalised journeys: the visited and skipped stops of the journey the host app passes go before the pending ones, each group in the host app's order, and the view writes that order back. `false` keeps the host app's order. |
 | `orderSwitchMinimumMeters` | 3 m | While the visitor walks, another artwork becomes the current stop only when it is this many metres nearer in a straight line, or when it is in the visitor's gallery and the current stop is not. 0: every other order is taken. |
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer, also on the route line. Needs `Option.PROGRESS`. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds`. |
@@ -930,6 +931,7 @@ val configuration = GadConfiguration(
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
+| `exploreFramingMaximumMeters` | 150 m | The Explore Museum map opens on the spaces whose centre is at most this far from the median centre of all spaces. `null` frames every space. |
 | `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Time of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
 | `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
@@ -1212,7 +1214,38 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.56.0.
+No changes since 1.58.0.
+
+### [1.58.0] — 2026-11-20
+
+The Android port of iOS 1.57.0 and 1.58.0. There is no Android 1.57.0. No breaking change: the
+source of a host app needs no change. `GadSettings` has new fields: rebuild every module that uses
+the library against this version.
+
+#### Added (iOS 1.58.0; GAD PM, on site, 2026-11-19)
+
+- `GadSettings.exploreFramingMaximumMeters` (150 m). **Visible:** the Explore Museum map opens on
+  the spaces near the building. A space whose centre is more than this far from the median centre
+  of all spaces is left out of the first frame, so the museum fills the screen and sits in its
+  centre. `null` frames every space, as before. Field log line
+  `explore frame: <framed> of <all> spaces · farthest <m> m · left out: <title> <m> m, …`.
+
+#### Added (iOS 1.57.0; GAD PM, on site, 2026-11-19)
+
+- `GadSettings.ordersDoneStopsFirst` (`true`). **Visible:** `ProximiMapView` with `Option.PROGRESS`,
+  personalised journeys: the view takes the states of the journey the host app passes and puts the
+  visited and skipped stops before the pending ones, each group in the host app's order. It writes
+  that order to `onJourneyChange` and sends `StopOrderChanged`. Before, a host app that stored the
+  states and passed its first order after a restart got a visited artwork behind open ones in the
+  journey list. `false` keeps the host app's order. Field log line
+  `hosted map: visited and skipped stops moved before the pending ones`.
+
+#### Not changed
+
+- iOS 1.57.0 fixed the zoom of a journey opened inside a gallery, and iOS 1.58.0 moved the follow
+  zoom from the gallery geofence events to the gallery outline that holds the position. Android
+  1.56.0 already takes the gallery of the follow zoom from the outline on every fix, so both hold
+  since 1.56.0.
 
 ### [1.56.0] — 2026-11-19
 

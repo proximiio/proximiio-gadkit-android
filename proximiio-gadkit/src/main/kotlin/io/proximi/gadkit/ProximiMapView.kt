@@ -367,7 +367,7 @@ internal class HostedMapModel : ViewModel() {
     private fun show(journey: ProximiJourney) {
         current = journey
         val venue = venue ?: return
-        val matched = HostedJourney.of(journey, places, galleries)
+        val matched = HostedJourney.of(ordered(journey), places, galleries)
         FieldLog.log(
             "hosted map: start · ${journey.kind.rawValue} · ${matched.journey.stops.size} of ${journey.stops.size} stops on the map" +
                 " · from the host app: ${count(journey, ProximiJourney.State.VISITED)} visited, ${count(journey, ProximiJourney.State.SKIPPED)} skipped",
@@ -379,6 +379,18 @@ internal class HostedMapModel : ViewModel() {
     }
 
     /**
+     * The host app's journey with the visited and skipped stops first, for a personalised journey
+     * with [ProximiMapView.Option.PROGRESS] ([GadSettings.ordersDoneStopsFirst]). Else the journey as
+     * passed.
+     */
+    private fun ordered(journey: ProximiJourney): ProximiJourney {
+        if (journey.kind != JourneyKind.PERSONALISED || ProximiMapView.Option.PROGRESS !in options || !settings.ordersDoneStopsFirst) return journey
+        val ordered = journey.withDoneStopsFirst()
+        if (ordered != journey) FieldLog.log("hosted map: visited and skipped stops moved before the pending ones")
+        return ordered
+    }
+
+    /**
      * The host app's journey changed. The open screen applies a value the view did not write in
      * place; one it cannot apply starts the screen again.
      */
@@ -386,7 +398,7 @@ internal class HostedMapModel : ViewModel() {
         latest = journey
         if (venue == null || journey == current) return
         current = journey
-        val matched = HostedJourney.of(journey, places, galleries)
+        val matched = HostedJourney.of(ordered(journey), places, galleries)
         val hosted = hosted
         val loaded = loaded
         if (hosted == null || loaded == null || !matched.canReplace(hosted, journey.kind, loaded.kind)) {
