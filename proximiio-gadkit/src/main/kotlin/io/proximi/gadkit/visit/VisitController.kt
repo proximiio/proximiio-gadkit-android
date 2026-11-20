@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 import kotlin.time.Duration
@@ -805,6 +806,30 @@ internal class VisitController(
     }
 
     /** Runs [body] with [isRerouting] on. */
+    /** Whether the view model holds the navigator's `LegChanged` and `JourneyFinished` ([LegEventGate]). */
+    val holdsLegEvents: Boolean get() = legHolds > 0
+    private var legHolds = 0
+
+    /** Called when [holdsLegEvents] turns `false`: the view model hands the held events on. */
+    var onLegEventsReleased: (() -> Unit)? = null
+
+    /**
+     * Runs [body] with [holdsLegEvents] on: a step that marks an artwork visited, reports it and
+     * orders the stops ahead again. The host app gets `ArtworkVisited` first and one `NextStop`
+     * (iOS 1.61.0).
+     */
+    private suspend fun holdingLegEvents(body: suspend () -> Unit) {
+        legHolds += 1
+        try {
+            body()
+            // The view model's collector takes the events the navigator sent last.
+            yield()
+        } finally {
+            legHolds -= 1
+            if (legHolds == 0) onLegEventsReleased?.invoke()
+        }
+    }
+
     private suspend fun <T> rerouting(body: suspend () -> T): T {
         reroutes += 1
         mutableRerouting.value = true
@@ -1111,7 +1136,7 @@ internal class VisitController(
                     if (navigator.journey.value.stops.firstOrNull { it.id == stopId }?.state != JourneyStop.State.PENDING) return@serially
                     FieldLog.log("artwork visited out of order: $stopId")
                     val activeStopId = navigator.activeStop?.id
-                    rerouting {
+                    holdingLegEvents { rerouting {
                         // The artwork moves before the stops still to visit: the numbers follow the
                         // visit order. The navigator walks to it for a moment.
                         mutablePassingStopId.value = stopId
@@ -1132,7 +1157,7 @@ internal class VisitController(
                             FieldLog.log("leg to $activeStopId drawn again from the visitor")
                             navigator.resumeJourney()
                         }
-                    }
+                    } }
                     save()
                 } finally {
                     markingOutOfOrder.remove(stopId)
@@ -1156,17 +1181,19 @@ internal class VisitController(
                 if (navigator.activeStop?.id != stopId) return@serially
                 // Reported here, not by [reportReachedStopDone] on the leg change.
                 if (reachedStopId == stopId) reachedStopId = null
-                val changed = navigator.markDone(stopId)
-                save()
-                if (changed) doneStop(stopId)?.let { onArtworkVisited?.invoke(it, cause) }
-                if (!changed) return@serially
-                if (outOfOrderArrivedId == stopId) {
-                    // Entered out of order: the stops ahead are ordered from the visitor, as they
-                    // were at the entry before 1.48.0.
-                    outOfOrderArrivedId = null
-                    rerouting { orderRemaining() }
-                } else {
-                    orderFromTheVisitorsGallery()
+                holdingLegEvents {
+                    val changed = navigator.markDone(stopId)
+                    save()
+                    if (changed) doneStop(stopId)?.let { onArtworkVisited?.invoke(it, cause) }
+                    if (!changed) return@holdingLegEvents
+                    if (outOfOrderArrivedId == stopId) {
+                        // Entered out of order: the stops ahead are ordered from the visitor, as they
+                        // were at the entry before 1.48.0.
+                        outOfOrderArrivedId = null
+                        rerouting { orderRemaining() }
+                    } else {
+                        orderFromTheVisitorsGallery()
+                    }
                 }
             }
         }
@@ -1299,12 +1326,15 @@ internal class VisitController(
         val marked = target.stops.filter { it.kind != StopKind.DETOUR && it.state == StopState.DONE && it.id !in done }.map { it.id }
         // Reported below, not by [reportReachedStopDone] on the leg change.
         if (reachedStopId != null && reachedStopId in marked) reachedStopId = null
-        val taken = navigator.update(to = target.toMap())
-        for (id in marked) {
-            val stop = doneStop(id) ?: continue
-            if (stop.state != JourneyStop.State.DONE) continue
-            FieldLog.log("artwork visited (the host app): $id")
-            onArtworkVisited?.invoke(stop, ArtworkVisitCause.APP)
+        var taken = false
+        holdingLegEvents {
+            taken = navigator.update(to = target.toMap())
+            for (id in marked) {
+                val stop = doneStop(id) ?: continue
+                if (stop.state != JourneyStop.State.DONE) continue
+                FieldLog.log("artwork visited (the host app): $id")
+                onArtworkVisited?.invoke(stop, ArtworkVisitCause.APP)
+            }
         }
         FieldLog.log("journey applied · ${target.stops.size} stops · ${if (taken) "taken" else "not taken: two stops with one id"}")
     }

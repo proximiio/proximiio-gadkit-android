@@ -794,6 +794,7 @@ public class ProximiMap(
          * get. The navigator's own `StopSkipped` is not repeated: the visitor's confirmation sends it.
          * Pure; covered by tests.
          */
+        @Suppress("DEPRECATION")
         fun event(event: VisitEvent, places: List<VenuePlace>): ProximiMapEvent? {
             fun gallery(placeId: String): ProximiGallery? {
                 val poi = GalleryNearbyDetector.gallery(placeId, places) ?: return null

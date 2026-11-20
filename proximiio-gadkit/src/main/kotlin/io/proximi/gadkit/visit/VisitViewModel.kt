@@ -305,6 +305,9 @@ internal class VisitViewModel(
     /** The galleries of gallery first (`Gallery.destinations`). */
     private var galleryDestinations: List<GalleryDestination> = emptyList()
 
+    /** The shape of each gallery's name label, by the id of the gallery's POI ([GadSettings.shapesGalleryLabelsByType]). */
+    private var galleryShapes: Map<String, JourneyMapLayers.GalleryMarker.Shape> = emptyMap()
+
     /** The lifts and stairs, for the way back from a floor without positioning. */
     private var levelChangerPlaces: List<LevelChangerPlace> = emptyList()
 
@@ -440,11 +443,21 @@ internal class VisitViewModel(
             recentre(withHeading = true, reason = "floor without positioning left")
             onEvent(VisitEvent.FloorWithoutPositioningLeft(change.level))
         }
+        // `ArtworkVisited` reaches the host app before `NextStop` and `JourneyFinished`, and a step
+        // that orders the stops again gives one `NextStop` ([LegEventGate], iOS 1.61.0).
+        val gate = LegEventGate()
+        controller.onLegEventsReleased = {
+            for (event in gate.release()) {
+                FieldLog.log("journey event handed on after the visit: $event")
+                onEvent(VisitEvent.Journey(event))
+            }
+        }
         scope.launch {
-            controller.navigator.events.collect { event ->
+            controller.navigator.events.collect { received ->
                 // The navigator walks to an artwork visited out of order for a moment.
-                if (event is JourneyEvent.LegChanged && event.to.id == controller.passingStopId.value) return@collect
-                if (controller.isPaused.value && isRouteDeviation(event)) return@collect
+                if (received is JourneyEvent.LegChanged && received.to.id == controller.passingStopId.value) return@collect
+                if (controller.isPaused.value && isRouteDeviation(received)) return@collect
+                val event = gate.receive(received, isHolding = controller.holdsLegEvents).firstOrNull() ?: return@collect
                 onEvent(VisitEvent.Journey(event))
                 if (event is JourneyEvent.DetourEnded && routedDestination?.placeId == (event.stop.poiId ?: event.stop.id)) clearDestination()
                 // A second "Add a stop" ends the first detour and starts another.
@@ -799,6 +812,13 @@ internal class VisitViewModel(
             VenuePlace.galleryEntranceIds(allPlaces, settings.galleryEntranceAmenityId)
         val destinations = venue.galleryDestinations(places)
         galleryDestinations = destinations.values.toList()
+        val amenityTitles = amenities.mapNotNull { amenity -> amenity.title?.let { amenity.id to it } }.toMap()
+        galleryShapes = galleryLabelShapes(galleryDestinations, allPlaces, amenityTitles)
+        val untyped = galleryDestinations.filter { it.placeId !in galleryShapes }.map { it.gallery.name }.sorted()
+        if (untyped.isNotEmpty()) FieldLog.log("gallery labels: no type, drawn as a pill · ${untyped.joinToString()}")
+        val rectangles = galleryDestinations.filter { galleryShapes[it.placeId] == JourneyMapLayers.GalleryMarker.Shape.RECTANGLE }
+            .map { it.gallery.name }.sorted()
+        FieldLog.log("gallery labels: rectangle (thematic) · ${rectangles.joinToString()}")
         applyHiddenFeatures()
         controller.setGalleryFirst(kind.guidesToGalleryFirst, places, destinations)
         galleries = venue.galleries(language)
@@ -1058,7 +1078,8 @@ internal class VisitViewModel(
                 visitedGalleries.any(isGallery) -> JourneyMapLayers.GalleryMarker.Style.VISITED
                 else -> JourneyMapLayers.GalleryMarker.Style.STANDARD
             }
-            JourneyMapLayers.GalleryMarker(destination.entry, destination.gallery.level, destination.gallery.name, style)
+            val shape = galleryShapes[destination.placeId]?.takeIf { settings.shapesGalleryLabelsByType } ?: JourneyMapLayers.GalleryMarker.Shape.PILL
+            JourneyMapLayers.GalleryMarker(destination.entry, destination.gallery.level, destination.gallery.name, style, shape)
         }
     }
 
@@ -1765,6 +1786,24 @@ internal class VisitViewModel(
             detour ?: active ?: journey.stops.firstOrNull { it.state in OPEN_STATES }
 
         /** The navigator's off-route events, not reported while the journey is paused. Pure; covered by tests. */
+        /**
+         * The label shape of each gallery with a known type, by the id of the gallery's POI: the
+         * type is the title of the POI's amenity. Pure; covered by tests.
+         */
+        internal fun galleryLabelShapes(
+            destinations: List<GalleryDestination>,
+            places: List<VenuePlace>,
+            amenityTitles: Map<String, String>,
+        ): Map<String, JourneyMapLayers.GalleryMarker.Shape> {
+            val amenityIds = buildMap { places.forEach { place -> place.amenityId?.let { putIfAbsent(place.id, it) } } }
+            return buildMap {
+                destinations.forEach { destination ->
+                    val shape = JourneyMapLayers.GalleryMarker.Shape.of(amenityIds[destination.placeId]?.let { amenityTitles[it] })
+                    if (shape != null) putIfAbsent(destination.placeId, shape)
+                }
+            }
+        }
+
         internal fun isRouteDeviation(event: JourneyEvent): Boolean =
             event is JourneyEvent.LeftRoute || event is JourneyEvent.FarFromRoute ||
                 event is JourneyEvent.OffRouteTooLong || event == JourneyEvent.ReturnedToRoute

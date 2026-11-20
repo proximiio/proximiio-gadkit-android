@@ -3,6 +3,7 @@ package io.proximi.gadkit.map
 import kotlin.math.roundToInt
 import org.maplibre.android.style.layers.SymbolLayer
 import io.proximi.gadkit.designsystem.GadIcon
+import io.proximi.gadkit.explore.ExploreItem
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import android.graphics.Paint
@@ -125,8 +126,50 @@ internal class JourneyMapLayers {
         }
     }
 
-    /** A gallery's title at its POI. [name] is the POI's title, such as "G303 Language". */
-    data class GalleryMarker(val coordinate: Coordinate, val level: Double, val name: String, val style: Style) {
+    /**
+     * A gallery's title at its POI. [name] is the POI's title, such as "G303 Language". [shape] is
+     * the outline of the label, by the type of the gallery.
+     */
+    data class GalleryMarker(
+        val coordinate: Coordinate,
+        val level: Double,
+        val name: String,
+        val style: Style,
+        val shape: Shape = Shape.PILL,
+    ) {
+        /**
+         * The outline of the label, as on the museum's floor plan (operator, 2026-11-20, Metis
+         * K-42; iOS 1.61.0): a pill for a single-artist gallery, a rectangle for a thematic one. A new outline
+         * is one more case here and in [cornerRadius].
+         */
+        enum class Shape {
+            /** Fully rounded ends: a single-artist gallery, and a gallery of an unknown type. */
+            PILL,
+
+            /** Square corners: a thematic gallery. */
+            RECTANGLE,
+            ;
+
+            /** The corner radius of a label [height] px high whose outline is [inset] px inside the image. */
+            fun cornerRadius(height: Int, inset: Float): Float = when (this) {
+                PILL -> height / 2f - inset
+                RECTANGLE -> 0f
+            }
+
+            companion object {
+                /**
+                 * The shape for a gallery's [category], the title of its POI's amenity, by the rule
+                 * of `ExploreItem.symbol`: "single" in it is a pill, "thematic" a rectangle. `null`
+                 * for any other title and for no title. Pure; covered by tests.
+                 */
+                fun of(category: String?): Shape? = when (ExploreItem.symbol(category)) {
+                    ExploreItem.Symbol.PALETTE -> PILL
+                    ExploreItem.Symbol.GRID -> RECTANGLE
+                    else -> null
+                }
+            }
+        }
+
         enum class Style {
             /** The gallery a leg leads to first (gallery first). */
             DESTINATION,
@@ -136,7 +179,7 @@ internal class JourneyMapLayers {
             STANDARD,
         }
 
-        val imageName: String get() = "gad-gallery-${style.name.lowercase()}-$name"
+        val imageName: String get() = "gad-gallery-${style.name.lowercase()}-${shape.name.lowercase()}-$name"
     }
 
     /**
@@ -509,7 +552,7 @@ internal class JourneyMapLayers {
             if (!VenueLevel.same(marker.level, level)) continue
             val name = marker.imageName
             if (style.getImage(name) == null && context != null) {
-                style.addImage(name, galleryMarkerImage(context, marker.name, marker.style))
+                style.addImage(name, galleryMarkerImage(context, marker.name, marker.style, marker.shape))
             }
             val kind = if (marker.style == GalleryMarker.Style.DESTINATION) PointKind.DESTINATION_NAME else PointKind.GALLERY_NAME
             features += point(marker.coordinate, name, sort = if (marker.style == GalleryMarker.Style.VISITED) 0 else 1, kind = kind)
@@ -603,11 +646,16 @@ internal class JourneyMapLayers {
         }
 
         /**
-         * A gallery's title in a 30 dp pill, its middle on the POI (PM, Monday "Gallery numbers in
+         * A gallery's title in a 30 dp label of its [shape], its middle on the POI (PM, Monday "Gallery numbers in
          * gallery navigation", 2026-10-28): the destination red with a white border and white text, a
          * visited gallery white with a red outline, the others white with a black outline.
          */
-        fun galleryMarkerImage(context: Context, name: String, style: GalleryMarker.Style): Bitmap {
+        fun galleryMarkerImage(
+            context: Context,
+            name: String,
+            style: GalleryMarker.Style,
+            shape: GalleryMarker.Shape = GalleryMarker.Shape.PILL,
+        ): Bitmap {
             val density = context.resources.displayMetrics.density
             val (fill, outline, outlineDp, textColor) = when (style) {
                 GalleryMarker.Style.DESTINATION -> PillColors(MARKER_COLOR, Color.WHITE, 2f, Color.WHITE)
@@ -626,7 +674,7 @@ internal class JourneyMapLayers {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val pill = RectF(density, density, width - density, height - density)
-            val corner = height / 2f - density
+            val corner = shape.cornerRadius(height, density)
             canvas.drawRoundRect(pill, corner, corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill })
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = outline

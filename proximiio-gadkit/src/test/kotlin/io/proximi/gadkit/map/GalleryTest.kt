@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.gadkit.map.JourneyMapLayers.GalleryMarker.Shape
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.visit.VisitPlan
 import io.proximi.sdk.core.model.ProximiioAmenity
@@ -234,5 +235,55 @@ class LevelChangerPlaceTest {
             JourneyMapLayers.GalleryMarker(Coordinate(0.0, 0.0), 3.0, "G303 Language", style).imageName
         }
         assertEquals(3, names.toSet().size)
+    }
+
+    /** The label's shape by the gallery's type, as on the museum's floor plan (Metis K-42). */
+    @Test
+    fun galleryLabelShapeFollowsTheTypeOfTheGallery() {
+        assertEquals(Shape.PILL, Shape.of("Single-Artist Gallery"))
+        assertEquals(Shape.PILL, Shape.of("single artist gallery"))
+        assertEquals(Shape.RECTANGLE, Shape.of("Thematic Gallery"))
+        assertEquals(Shape.RECTANGLE, Shape.of("THEMATIC GALLERY"))
+    }
+
+    /** A gallery without a known type has no shape of its own; the map keeps the pill. */
+    @Test
+    fun galleryOfAnUnknownTypeHasNoShape() {
+        assertEquals(null, Shape.of(null))
+        assertEquals(null, Shape.of(""))
+        assertEquals(null, Shape.of("Cone"))
+        assertEquals(null, Shape.of("Learning & Engagement"))
+        assertEquals(Shape.PILL, JourneyMapLayers.GalleryMarker(Coordinate(0.0, 0.0), 1.0, "G101", JourneyMapLayers.GalleryMarker.Style.STANDARD).shape)
+    }
+
+    /** A gallery's shape comes from the amenity of its POI; a gallery without a known type has none. */
+    @Test
+    fun galleryLabelShapesByThePoisAmenity() {
+        val ring = listOf(Coordinate(0.0, 0.0), Coordinate(0.0, 1.0), Coordinate(1.0, 1.0))
+        val destination = { id: String -> GalleryDestination(Gallery(id, "G $id", 1.0, ring), Coordinate(0.5, 0.5), placeId = "poi-$id") }
+        val shapes = io.proximi.gadkit.visit.VisitViewModel.galleryLabelShapes(
+            destinations = listOf(destination("101"), destination("102"), destination("405")),
+            places = listOf("poi-101" to "org:thematic", "poi-102" to "org:single", "poi-405" to "org:other").map { (id, amenity) ->
+                VenuePlace(id = id, title = id, coordinate = Coordinate(0.5, 0.5), level = 1.0, amenityId = amenity)
+            },
+            amenityTitles = mapOf("org:thematic" to "Thematic Gallery", "org:single" to "Single Artist Gallery", "org:other" to "Performance"),
+        )
+        assertEquals(mapOf("poi-101" to Shape.RECTANGLE, "poi-102" to Shape.PILL), shapes)
+    }
+
+    /** The pill has fully rounded ends, the rectangle square corners. */
+    @Test
+    fun galleryLabelCornersByShape() {
+        assertEquals(42f, Shape.PILL.cornerRadius(height = 90, inset = 3f))
+        assertEquals(0f, Shape.RECTANGLE.cornerRadius(height = 90, inset = 3f))
+    }
+
+    /** Each shape has its own style image, so a pill is not reused for a rectangle of the same name. */
+    @Test
+    fun eachGalleryShapeHasItsOwnImage() {
+        val names = Shape.entries.map { shape ->
+            JourneyMapLayers.GalleryMarker(Coordinate(0.0, 0.0), 1.0, "G101", JourneyMapLayers.GalleryMarker.Style.STANDARD, shape).imageName
+        }
+        assertEquals(2, names.toSet().size)
     }
 }

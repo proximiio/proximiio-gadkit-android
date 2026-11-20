@@ -250,12 +250,14 @@ public sealed interface ProximiMapEvent {
      * cause but [ArtworkVisitCause.OUT_OF_ORDER] and [ArtworkVisitCause.APP]. Removed in a later
      * release.
      */
+    @Deprecated("Use ArtworkVisited.")
     public data class ArtworkReached(public val stop: ProximiStop) : ProximiMapEvent
 
     /**
      * Use [ArtworkVisited] with the cause [ArtworkVisitCause.OUT_OF_ORDER]. Sent after it. Removed
      * in a later release.
      */
+    @Deprecated("Use ArtworkVisited with the cause OUT_OF_ORDER.")
     public data class ArtworkVisitedOutOfOrder(public val stop: ProximiStop) : ProximiMapEvent
 
     /**

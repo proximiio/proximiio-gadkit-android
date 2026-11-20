@@ -85,6 +85,7 @@ class ProximiMapTest {
         )
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun visitEventsBecomeHostEventsWithTheArtworkId() {
         val mapped = ProximiStop(id = "poi-a", title = "poi-a", artworkId = "GAD.2010.00033", level = 1)

@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.60.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.61.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.60.0
+git -C gadkit checkout 1.61.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -838,9 +838,9 @@ lists:
 | `PositionUncertain(stop)` | `ProximiMapView` without `PROMPTS`: the position is uncertain near the active stop, where the prompt would ask "Probably at …". At most once per `locationQuestionQuietPeriod`. |
 | `StopPlaceDeleted(stop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. See "Venue data changes". |
 | `ArtworkArrived(stop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it and the fix is within `artworkVisitedMeters` of its border: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence it becomes the active stop (`NextStop`), then this event comes, and `ArtworkVisited` follows when the visitor leaves it; with `visitsOutOfOrderAtEntry` it comes just before its `ArtworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `GeofenceEntered` arrives at the enter. |
-| `ArtworkVisited(stop, cause)` | An artwork of the journey is visited: its stop is done. Sent for every `ArtworkVisitCause`: `LEFT` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `ENTERED_ANOTHER_ARTWORK` (a fix outside the artwork's geofence and in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `ADVANCE_DELAY` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `OUT_OF_ORDER` (personalised journeys: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `JOURNEY_MOVED_ON` (a detour ended or the visitor chose another stop while at the artwork) and `APP` (the host app set the stop to `VISITED` in the journey of `ProximiMapView`). The host app does not set the stop to `VISITED` again for this event. For one artwork the order is `ArtworkArrived`, `ArtworkVisited`, then `NextStop`, `StopOrderChanged` or `JourneyFinished`. The SDK's `GeofenceExited` of the artwork does not move the journey. |
-| `ArtworkReached(stop)` | Use `ArtworkVisited`. Sent after `ArtworkVisited` for every cause but `OUT_OF_ORDER` and `APP`. Removed in a later release. |
-| `ArtworkVisitedOutOfOrder(stop)` | Use `ArtworkVisited` with the cause `OUT_OF_ORDER`. Sent after it. Removed in a later release. |
+| `ArtworkVisited(stop, cause)` | An artwork of the journey is visited: its stop is done. Sent for every `ArtworkVisitCause`: `LEFT` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `ENTERED_ANOTHER_ARTWORK` (a fix outside the artwork's geofence and in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `ADVANCE_DELAY` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `OUT_OF_ORDER` (personalised journeys: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `JOURNEY_MOVED_ON` (a detour ended or the visitor chose another stop while at the artwork) and `APP` (the host app set the stop to `VISITED` in the journey of `ProximiMapView`). The host app does not set the stop to `VISITED` again for this event. For one artwork the order is `ArtworkArrived`, `ArtworkVisited`, then `NextStop`, `StopOrderChanged` or `JourneyFinished`. Since 1.61.0 the library holds `NextStop` and `JourneyFinished` until it has sent `ArtworkVisited` and ordered the stops ahead, and sends one `NextStop` for the stop the visitor walks to then; no `NextStop` follows when that stop did not change (an artwork visited out of order). The cause `JOURNEY_MOVED_ON` is the exception: it follows the `NextStop` that moved the journey on. The SDK's `GeofenceExited` of the artwork does not move the journey. |
+| `ArtworkReached(stop)` | Deprecated (`@Deprecated` since 1.61.0): use `ArtworkVisited`. Sent after `ArtworkVisited` for every cause but `OUT_OF_ORDER` and `APP`. Removed in a later release. |
+| `ArtworkVisitedOutOfOrder(stop)` | Deprecated (`@Deprecated` since 1.61.0): use `ArtworkVisited` with the cause `OUT_OF_ORDER`. Sent after it. Removed in a later release. |
 | `SkipRequested`, `StopSkipped`, `SkipCancelled` (`stop`) | A swipe on a stop in the list (or its "Skip" TalkBack action), "Skip it", "Keep it". `SkipUndone` is deprecated and not sent: the list has no "Undo skip". |
 | `AmenitySelected(stop)` | An amenity picked on the map. A card shows it with "Go here"; the amenity gets the red marker with its white icon, and the map shows the visitor and the amenity (on another floor: the amenity's floor around it). |
 | `DetourStarted(stop)`, `DetourEnded(stop, completed)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
@@ -915,6 +915,7 @@ val configuration = GadConfiguration(
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. |
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
+| `shapesGalleryLabelsByType` | `true` | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as before 1.61.0. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
@@ -1216,7 +1217,37 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.60.0.
+No changes since 1.61.0.
+
+### [1.61.0] — 2026-11-20
+
+The Android port of iOS 1.61.0 (Metis T-1876, T-1871, T-1870, K-42). The SDK and Map versions do not
+change (6.0.0-beta.40). Build all modules of the app against 1.61.0: `GadSettings` has a new value,
+and two versions of the library in one APK crash at the first `GadSettings.copy`.
+
+- **BREAKING (only with warnings as errors):** `ProximiMapEvent.ArtworkReached` and
+  `ProximiMapEvent.ArtworkVisitedOutOfOrder` carry `@Deprecated`. Host code that names them gets a
+  deprecation warning, and a build error when warnings are treated as errors (`allWarningsAsErrors`).
+  Match `ArtworkVisited` in their place, or add `@Suppress("DEPRECATION")`. The library still sends
+  both after `ArtworkVisited`.
+- Event order: `ArtworkVisited` reaches the host app before the `NextStop` or `JourneyFinished` of
+  the same step. Before, the navigator's event could come first.
+- One `NextStop` follows a visit, for the stop the visitor walks to after the library has ordered
+  the stops ahead. Before, two `NextStop` came within 20 ms, the first for the next stop of the old
+  order.
+- No `NextStop` follows a visit that leaves the stop walked to unchanged (an artwork visited out of
+  order). Before, a `NextStop` for the same stop came.
+- The cause `JOURNEY_MOVED_ON` keeps its order: the `NextStop` that moved the journey on comes
+  first.
+- `GadSettings.shapesGalleryLabelsByType` (`true`). **Visible:** the label with a gallery's name on
+  the journey map has the shape of the gallery's type, as on the museum's floor plan: a pill for a
+  single-artist gallery, a rectangle with square corners for a thematic one. The type is the title
+  of the amenity of the gallery's POI ("single" or "thematic" in it). A gallery of no known type
+  keeps the pill. Size, colours and the red and white states do not change. The cones keep the pill.
+  `false` draws every label as a pill, as before.
+- Field log: `journey event handed on after the visit: <event>` for each held event;
+  `gallery labels: rectangle (thematic) · <names>` and, when there are any,
+  `gallery labels: no type, drawn as a pill · <names>` at each venue data load.
 
 ### [1.60.0] — 2026-11-20
 
