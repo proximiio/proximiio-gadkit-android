@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.65.2")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.66.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.65.2
+git -C gadkit checkout 1.66.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1223,7 +1223,26 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.65.2.
+No changes since 1.66.1.
+
+### [1.66.1] — 2026-11-21
+
+The Android port of iOS 1.66.1 (Metis T-1898). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app, and no setting is new. Android has
+no 1.65.3 and no 1.66.0: the field log of Android already drops a line when a write fails
+(T-1889), and iOS 1.66.0 only pins a new iOS map (T-1895).
+
+- **Visible:** a gallery seen in part is one section of the journey list. Before, the list drew a
+  header at every change of gallery between neighbouring rows. When a journey map starts with a
+  stored journey, the visited stops are before the stops still to visit, and a gallery seen in
+  part had two headers: one above its visited artworks and one above the others (Nagarro, video
+  of 2026-11-20 15:32 UTC). Now (`VisitPlan.listRows`):
+  - The stops still to visit keep their order. A gallery the route enters twice still gets two
+    headers.
+  - A visited stop goes to the top of the first run of its gallery that has a stop to visit.
+  - Visited stops of a gallery without a stop to visit are one run per gallery, before the runs
+    with stops to visit.
+  - A list without sections (curated tour) keeps its order.
 
 ### [1.65.2] — 2026-11-20
 

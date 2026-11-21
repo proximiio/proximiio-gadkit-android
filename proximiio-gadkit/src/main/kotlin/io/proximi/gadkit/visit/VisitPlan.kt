@@ -96,20 +96,53 @@ internal object VisitPlan {
     }
 
     /**
-     * The journey list in visit order, one flat list: a header before each run of consecutive
-     * stops with the same section, for example a gallery. A gallery visited twice gets two
-     * headers, so the list keeps the visit order. A run without a section has no header. A
-     * header's id follows the first stop of its run, so rows keep their identity when the order
+     * The journey list, one flat list: a header before each run of stops with the same section,
+     * for example a gallery. A run without a section has no header.
+     *
+     * The stops still to visit keep their order: a gallery the route enters twice gets two
+     * headers. A visited stop ([StopState.DONE]) goes to the top of the first run of its section
+     * that has a stop to visit, so a gallery seen in part is one section. Visited stops of a
+     * section without a stop to visit are one run per section, before the runs with stops to
+     * visit. Before 1.66.1 the visited stops kept their place, and a gallery seen in part had two
+     * headers once the visited stops moved before the others (Nagarro, video of 2026-11-20
+     * 15:32 UTC; iOS 1.66.1).
+     *
+     * A header's id follows the first stop of its run, so rows keep their identity when the order
      * changes (PM 2026-10-15: the list showed rows of an older order). Pure; covered by tests.
      */
     internal fun listRows(stops: List<JourneyStop>, sectionOf: (JourneyStop) -> String?): List<ListRow> {
-        val rows = mutableListOf<ListRow>()
-        var current: String? = null
-        stops.forEachIndexed { index, stop ->
+        class Run(val section: String?, val stops: MutableList<JourneyStop>)
+
+        val openRuns = mutableListOf<Run>()
+        val visited = mutableListOf<Pair<JourneyStop, String?>>()
+        for (stop in stops) {
             val section = sectionOf(stop)
-            if (section != null && (index == 0 || section != current)) rows += ListRow.Header("header-${stop.id}", section)
-            current = section
-            rows += ListRow.Stop(stop)
+            val last = openRuns.lastOrNull()
+            when {
+                stop.state == StopState.DONE -> visited += stop to section
+                last != null && last.section == section -> last.stops += stop
+                else -> openRuns += Run(section, mutableListOf(stop))
+            }
+        }
+        val visitedRuns = mutableListOf<Run>()
+        val visitedOfOpenRun = mutableMapOf<Int, MutableList<JourneyStop>>()
+        for ((stop, section) in visited) {
+            val open = if (section == null) -1 else openRuns.indexOfFirst { it.section == section }
+            val run = visitedRuns.firstOrNull { it.section == section }
+            when {
+                open >= 0 -> visitedOfOpenRun.getOrPut(open) { mutableListOf() } += stop
+                run != null -> run.stops += stop
+                else -> visitedRuns += Run(section, mutableListOf(stop))
+            }
+        }
+        val runs = visitedRuns + openRuns.mapIndexed { index, run ->
+            Run(run.section, (visitedOfOpenRun[index].orEmpty() + run.stops).toMutableList())
+        }
+        val rows = mutableListOf<ListRow>()
+        for (run in runs) {
+            val first = run.stops.firstOrNull()
+            if (run.section != null && first != null) rows += ListRow.Header("header-${first.id}", run.section)
+            run.stops.forEach { rows += ListRow.Stop(it) }
         }
         return rows
     }

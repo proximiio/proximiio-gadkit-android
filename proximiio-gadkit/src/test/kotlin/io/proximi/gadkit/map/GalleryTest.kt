@@ -2,6 +2,7 @@ package io.proximi.gadkit.map
 
 import io.proximi.gadkit.map.JourneyMapLayers.GalleryMarker.Shape
 import io.proximi.gadkit.Coordinate
+import io.proximi.gadkit.visit.StopState
 import io.proximi.gadkit.visit.VisitPlan
 import io.proximi.sdk.core.model.ProximiioAmenity
 import kotlin.test.Test
@@ -95,6 +96,47 @@ class GalleryTest {
         val rows = VisitPlan.listRows(stops) { section[it.id] }
         assertEquals(listOf("header-a", "a", "b", "header-c", "c", "header-d", "d", "e"), rows.map { it.id })
         assertEquals(listOf("G1", "G2", "G1"), rows.filterIsInstance<VisitPlan.ListRow.Header>().map { it.title })
+    }
+
+    /**
+     * Nagarro, 2026-11-20 15:32 UTC: three of five artworks of gallery 101 and both of 104 were
+     * visited, the visited stops were before the others, and 101 had two headers (iOS 1.66.1).
+     */
+    @Test
+    fun aGallerySeenInPartIsOneSection() {
+        val ids = listOf("moon", "stations", "andy", "sangre", "untitled", "retrospective", "salon", "ama")
+        val places = ids.map { VenuePlace(id = it, title = it, coordinate = Coordinate(24.5, 54.4), level = 1.0) }
+        val stops = VisitPlan.journey(ids, places).stops.mapIndexed { index, stop ->
+            when {
+                index < 5 -> stop.copy(state = StopState.DONE)
+                index == 5 -> stop.copy(state = StopState.ACTIVE)
+                else -> stop
+            }
+        }
+        val section = mapOf(
+            "moon" to "101", "stations" to "101", "andy" to "101", "sangre" to "104", "untitled" to "104",
+            "retrospective" to "101", "salon" to "101", "ama" to "102",
+        )
+        val rows = VisitPlan.listRows(stops) { section[it.id] }
+        assertEquals(
+            listOf(
+                "header-sangre", "sangre", "untitled",
+                "header-moon", "moon", "stations", "andy", "retrospective", "salon",
+                "header-ama", "ama",
+            ),
+            rows.map { it.id },
+        )
+    }
+
+    @Test
+    fun visitedStopsWithoutASectionStayBeforeTheOthers() {
+        val ids = listOf("a", "b", "c")
+        val places = ids.map { VenuePlace(id = it, title = it, coordinate = Coordinate(24.5, 54.4), level = 1.0) }
+        val stops = VisitPlan.journey(ids, places).stops.mapIndexed { index, stop ->
+            if (index == 0) stop.copy(state = StopState.DONE) else stop
+        }
+        // A curated tour: no sections.
+        assertEquals(ids, VisitPlan.listRows(stops) { null }.map { it.id })
     }
 
     @Test
