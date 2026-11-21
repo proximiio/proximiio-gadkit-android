@@ -100,10 +100,11 @@ class GalleryTest {
 
     /**
      * Nagarro, 2026-11-20 15:32 UTC: three of five artworks of gallery 101 and both of 104 were
-     * visited, the visited stops were before the others, and 101 had two headers (iOS 1.66.1).
+     * visited, the visited stops were before the others, and 101 had two headers. The PM keeps
+     * this: a gallery visited twice has two headers (2026-11-21; iOS 1.66.2).
      */
     @Test
-    fun aGallerySeenInPartIsOneSection() {
+    fun aGalleryVisitedTwiceHasTwoHeaders() {
         val ids = listOf("moon", "stations", "andy", "sangre", "untitled", "retrospective", "salon", "ama")
         val places = ids.map { VenuePlace(id = it, title = it, coordinate = Coordinate(24.5, 54.4), level = 1.0) }
         val stops = VisitPlan.journey(ids, places).stops.mapIndexed { index, stop ->
@@ -120,8 +121,9 @@ class GalleryTest {
         val rows = VisitPlan.listRows(stops) { section[it.id] }
         assertEquals(
             listOf(
+                "header-moon", "moon", "stations", "andy",
                 "header-sangre", "sangre", "untitled",
-                "header-moon", "moon", "stations", "andy", "retrospective", "salon",
+                "header-retrospective", "retrospective", "salon",
                 "header-ama", "ama",
             ),
             rows.map { it.id },

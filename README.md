@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.66.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.66.2")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.66.1
+git -C gadkit checkout 1.66.2
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1223,7 +1223,18 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.66.1.
+No changes since 1.66.2.
+
+### [1.66.2] — 2026-11-21
+
+The Android port of iOS 1.66.2 (Metis T-1899). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app, and no setting is new.
+
+- **Visible:** the section headers of the journey list are as in 1.65.2 again: a header before
+  each run of neighbouring rows of one gallery. A gallery that the visitor sees twice has two
+  headers, also when the visited stops are before the stops still to visit. This is the
+  behaviour agreed with the GAD PM (2026-11-21). The change of 1.66.1 is taken back.
+- **Do not use 1.66.1.** It was on Maven for less than one hour.
 
 ### [1.66.1] — 2026-11-21
 
