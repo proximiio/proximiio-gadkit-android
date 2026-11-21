@@ -100,6 +100,22 @@ class FieldLogUploadTest {
         assertContentEquals(fresh, state.nextChunk(fresh, 100)?.data)
     }
 
+    /**
+     * Production hosts, 2026-11-21: Cloudflare answers some requests with 403 and
+     * `cf-mitigated: challenge`. The uploads stay on (iOS 1.66.3).
+     */
+    @Test
+    fun aProxyChallengeIsNotTheRelaysRefusal() {
+        assertEquals(true, FieldLogUploader.isProxyChallenge("challenge", "text/html; charset=UTF-8"))
+        assertEquals(true, FieldLogUploader.isProxyChallenge(null, "Text/HTML"))
+        assertEquals(false, FieldLogUploader.isProxyChallenge(null, "application/json"))
+        assertEquals(false, FieldLogUploader.isProxyChallenge(null, null))
+        assertEquals(false, FieldLogUploader.isProxyChallenge("", null))
+        assertEquals(FieldLogUploader.Outcome.RETRY, FieldLogUploader.outcome(403, isProxyChallenge = true))
+        assertEquals(FieldLogUploader.Outcome.RETRY, FieldLogUploader.outcome(401, isProxyChallenge = true))
+        assertEquals(FieldLogUploader.Outcome.REFUSED, FieldLogUploader.outcome(403, isProxyChallenge = false))
+    }
+
     @Test
     fun theRelaysAnswerDecidesTheNextStep() {
         assertEquals(FieldLogUploader.Outcome.STORED, FieldLogUploader.outcome(204))

@@ -44,7 +44,7 @@ public object FieldLog {
     private const val TAG = "GAD"
 
     /** The version of the library, sent with each upload. iOS `FieldLog.packageVersion`. */
-    public const val PACKAGE_VERSION: String = "1.66.2"
+    public const val PACKAGE_VERSION: String = "1.66.3"
 
     /** The thread of every read and write of the file and of the place of the upload. */
     internal val writer = lazy { Executors.newSingleThreadExecutor { Thread(it, "gad-field-log").apply { isDaemon = true } } }

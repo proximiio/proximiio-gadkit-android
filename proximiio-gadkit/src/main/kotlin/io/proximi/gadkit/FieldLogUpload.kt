@@ -218,13 +218,15 @@ internal object FieldLogUploader {
                 val chunk = withContext(writer) {
                     state.nextChunk(runCatching { file.readBytes() }.getOrDefault(ByteArray(0)), limit)
                 } ?: return
-                val status = try {
+                val answer = try {
                     post(target, headers(target.context, chunk.sequence, target.appToken, state.install()), chunk.data)
                 } catch (error: Exception) {
                     FieldLog.log("log upload: ${chunk.sequence} failed: ${error.message ?: error.javaClass.simpleName}")
                     return
                 }
-                when (outcome(status)) {
+                val status = answer.status
+                val isChallenge = isProxyChallenge(answer.mitigated, answer.contentType)
+                when (outcome(status, isChallenge)) {
                     Outcome.STORED -> {
                         withContext(writer) { state.accepted(chunk.data.size) }
                         stored += 1
@@ -242,7 +244,7 @@ internal object FieldLogUploader {
                         return
                     }
                     Outcome.RETRY -> {
-                        FieldLog.log("log upload: ${chunk.sequence} answered $status")
+                        FieldLog.log("log upload: ${chunk.sequence} answered $status${if (isChallenge) " · proxy challenge, not the relay" else ""}")
                         return
                     }
                 }
@@ -253,7 +255,10 @@ internal object FieldLogUploader {
         }
     }
 
-    private fun post(target: Target, headers: Map<String, String>, body: ByteArray): Int {
+    /** The status of an answer and the two header fields that tell a proxy's answer from the relay's. */
+    private class Answer(val status: Int, val mitigated: String?, val contentType: String?)
+
+    private fun post(target: Target, headers: Map<String, String>, body: ByteArray): Answer {
         val connection = target.url.toURL().openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
@@ -264,19 +269,32 @@ internal object FieldLogUploader {
             headers.forEach { (field, value) -> connection.setRequestProperty(field, value) }
             connection.setFixedLengthStreamingMode(body.size)
             connection.outputStream.use { it.write(body) }
-            return connection.responseCode
+            return Answer(connection.responseCode, connection.getHeaderField("cf-mitigated"), connection.contentType)
         } finally {
             connection.disconnect()
         }
     }
 
-    /** What the app does with the relay's answer. 409: the relay already holds this sequence number. */
-    fun outcome(status: Int): Outcome = when (status) {
+    /**
+     * What the app does with the relay's answer. 409: the relay already holds this sequence
+     * number. A 401 or 403 of a proxy in front of the relay is not the relay's answer: the chunk is
+     * sent again at the next upload and the uploads stay on (iOS 1.66.3). Pure; covered by tests.
+     */
+    fun outcome(status: Int, isProxyChallenge: Boolean = false): Outcome = when (status) {
         in 200..299, 409 -> Outcome.STORED
         413 -> Outcome.TOO_LARGE
-        401, 403 -> Outcome.REFUSED
+        401, 403 -> if (isProxyChallenge) Outcome.RETRY else Outcome.REFUSED
         else -> Outcome.RETRY
     }
+
+    /**
+     * True when the answer comes from a proxy in front of the relay, not from the relay: it carries
+     * the header `cf-mitigated` (Cloudflare managed challenge) or an HTML body. The relay answers
+     * with JSON. Seen on the production hosts, 2026-11-21 (Metis T-1900, T-1901): HTTP 403 with
+     * `cf-mitigated: challenge` on part of the requests. Pure; covered by tests.
+     */
+    fun isProxyChallenge(mitigated: String?, contentType: String?): Boolean =
+        !mitigated.isNullOrEmpty() || contentType?.lowercase()?.startsWith("text/html") == true
 
     /** The headers of an upload. The app token goes to the relay only, as on `GET /v1/meta`. */
     fun headers(context: Context, sequence: Long, appToken: String, install: String): Map<String, String> {

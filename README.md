@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.66.2")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.66.3")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.66.2
+git -C gadkit checkout 1.66.3
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1223,7 +1223,23 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.66.2.
+No changes since 1.66.3.
+
+### [1.66.3] — 2026-11-21
+
+The Android port of iOS 1.66.3 (Metis T-1904). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app, and no setting is new.
+
+- Fixed: the field log uploader ended the uploads until the next start on HTTP 401 or 403. The
+  production hosts are behind Cloudflare, which answers part of the requests with a managed
+  challenge: HTTP 403, header `cf-mitigated: challenge`, an HTML body. Such an answer is now
+  handled as a retry: the same chunk goes again at the next upload, and the uploads stay on.
+  - An answer counts as the proxy's when it has a non-empty `cf-mitigated` header, or a
+    `Content-Type` that starts with `text/html`.
+  - A 401 or 403 of the relay itself still ends the uploads until the next start.
+- Field log: `log upload: <seq> answered 403 · proxy challenge, not the relay`.
+- Only the field log uploads change. The requests of the SDK and the map are not part of this
+  library.
 
 ### [1.66.2] — 2026-11-21
 
