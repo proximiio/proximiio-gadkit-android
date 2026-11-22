@@ -9,10 +9,13 @@ internal enum class GadIcon(@param:DrawableRes val glyph: Int, @param:DrawableRe
     Compass(R.drawable.icon_compass, null),
     Elevator(R.drawable.icon_elevator, R.drawable.icon_elevator_marker),
     Info(R.drawable.icon_info, R.drawable.icon_info_marker),
-    MaleToilet(R.drawable.icon_male_toilet, R.drawable.icon_male_toilet_marker),
-    FemaleToilet(R.drawable.icon_female_toilet, R.drawable.icon_female_toilet_marker),
     PrayerRoom(R.drawable.icon_prayer_room, R.drawable.icon_prayer_room_marker),
+    Restaurant(R.drawable.icon_restaurant, R.drawable.icon_restaurant_marker),
     Search(R.drawable.icon_search, null),
     Shop(R.drawable.icon_shop, R.drawable.icon_shop_marker),
     Stairs(R.drawable.icon_stairs, R.drawable.icon_stairs_marker),
+    Theatre(R.drawable.icon_theatre, R.drawable.icon_theatre_marker),
+
+    /** The women's and the men's restroom: one icon (PM, 2026-11-22). */
+    Toilet(R.drawable.icon_toilet, R.drawable.icon_toilet_marker),
 }

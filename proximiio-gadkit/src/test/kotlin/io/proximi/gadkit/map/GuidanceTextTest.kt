@@ -53,9 +53,9 @@ class AmenityKindTest {
         place(title, amenity = "a-cafe", level = level, lat = lat, placeId = placeId).copy(amenityKind = AmenityKind.CAFE)
 
     @Test
-    fun restroomsAreNotConfused() {
-        assertEquals(AmenityKind.WOMENS_RESTROOM, AmenityKind.kind("a1", "Women's Restroom"))
-        assertEquals(AmenityKind.MENS_RESTROOM, AmenityKind.kind("a2", "Men's Restroom"))
+    fun restroomsAreOneKind() {
+        assertEquals(AmenityKind.RESTROOM, AmenityKind.kind("a1", "Women's Restroom"))
+        assertEquals(AmenityKind.RESTROOM, AmenityKind.kind("a2", "Men's Restroom"))
         assertNull(AmenityKind.kind("a3", "Womens restroom visited"))
     }
 

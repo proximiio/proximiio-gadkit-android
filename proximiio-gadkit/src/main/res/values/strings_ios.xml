@@ -77,7 +77,6 @@
     <string name="looks_like_you_ve_left_your_route">Looks like you’ve left your route</string>
     <string name="map">Map</string>
     <string name="map_legend">Map legend</string>
-    <string name="men_s_restroom">Men’s restroom</string>
     <string name="museum">Museum</string>
     <!-- no Arabic in the iOS catalog yet: Arabic shows the English -->
     <string name="museum_map_2" tools:ignore="MissingTranslation">Museum map</string>
@@ -128,6 +127,7 @@
     <string name="probably_at">PROBABLY AT</string>
     <string name="ramp">ramp</string>
     <string name="rerouting_you">Rerouting you…</string>
+    <string name="restaurant">Restaurant</string>
     <string name="resume_your_journey">Resume your Journey</string>
     <string name="resume_your_journey_to_skip_the_artwork">Resume your journey to skip the artwork</string>
     <string name="s_1_min">&lt;1 min</string>
@@ -162,6 +162,7 @@
     <string name="the_wristband_session_has_ended_connect_the">The wristband session has ended. Connect the wristband again.</string>
     <string name="the_wristband_stopped_reporting_please_ask_the">The wristband stopped reporting. Please ask the staff.</string>
     <string name="the_wristband_was_returned_thank_you_for">The wristband was returned. Thank you for your visit.</string>
+    <string name="theatre">Theatre</string>
     <string name="this_is_not_a_wristband_code_check">This is not a wristband code. Check the code printed on the wristband.</string>
     <string name="this_phone_reports_a_simulated_location_turn">This phone reports a simulated location. Turn it off, or ask at the reception desk.</string>
     <string name="this_usually_takes_a_few_seconds">This usually takes a few seconds.</string>
@@ -172,6 +173,7 @@
     <string name="to_take_over_this_wristband_allow_location">To take over this wristband, allow location for this app in Settings, or ask at the reception desk.</string>
     <string name="to_take_over_this_wristband_be_inside">To take over this wristband, be inside the museum with location enabled, or ask at the reception desk.</string>
     <string name="to_take_over_this_wristband_turn_on">To take over this wristband, turn on Precise Location for this app in Settings, or ask at the reception desk.</string>
+    <string name="toilet">Toilet</string>
     <string name="too_many_attempts_try_again_in_a">Too many attempts. Try again in a moment.</string>
     <plurals name="too_many_attempts_try_again_in_n">
         <item quantity="one">Too many attempts. Try again in %d second.</item>
@@ -183,7 +185,6 @@
     <string name="visited">Visited</string>
     <string name="waiting_for_your_position">Waiting for your position.</string>
     <string name="we_couldn_t_connect">We couldn’t connect</string>
-    <string name="women_s_restroom">Women’s restroom</string>
     <string name="wristband">Wristband</string>
     <string name="wristband_code">Wristband code</string>
     <string name="wristband_x">Wristband %s</string>

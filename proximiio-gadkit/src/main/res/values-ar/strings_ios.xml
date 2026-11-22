@@ -145,8 +145,6 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="map_legend">مفتاح الخريطة</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="men_s_restroom">دورة مياه الرجال</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="museum">المتحف</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="museum_shop">متجر المتحف</string>
@@ -247,6 +245,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="rerouting_you">جارٍ تغيير مسارك…</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="restaurant">المطعم</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="resume_your_journey">استأنف رحلتك</string>
     <string name="resume_your_journey_to_skip_the_artwork">تابع رحلتك لتخطي العمل الفني</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -309,6 +309,8 @@
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="the_wristband_was_returned_thank_you_for">تمت إعادة السوار. شكرًا لزيارتك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="theatre">المسرح</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="this_is_not_a_wristband_code_check">هذا ليس رمز سوار. تحقق من الرمز المطبوع على السوار.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="this_phone_reports_a_simulated_location_turn">يُبلغ هذا الهاتف عن موقع مُحاكى. أوقف المحاكاة، أو اسأل في مكتب الاستقبال.</string>
@@ -328,6 +330,8 @@
     <string name="to_take_over_this_wristband_be_inside">لنقل هذا السوار إلى هاتفك، كن داخل المتحف مع تفعيل خدمة الموقع، أو اسأل في مكتب الاستقبال.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="to_take_over_this_wristband_turn_on">لنقل هذا السوار إلى هاتفك، فعّل الموقع الدقيق لهذا التطبيق من الإعدادات، أو اسأل في مكتب الاستقبال.</string>
+    <!-- needs_review: developer translation, the client reviews it before release -->
+    <string name="toilet">دورة المياه</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="too_many_attempts_try_again_in_a">محاولات كثيرة جدًا. حاول مجددًا بعد قليل.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
@@ -351,8 +355,6 @@
     <string name="waiting_for_your_position">في انتظار تحديد موقعك.</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="we_couldn_t_connect">لم نتمكن من ربط</string>
-    <!-- needs_review: developer translation, the client reviews it before release -->
-    <string name="women_s_restroom">دورة مياه النساء</string>
     <!-- needs_review: developer translation, the client reviews it before release -->
     <string name="wristband">تم ربط</string>
     <!-- needs_review: developer translation, the client reviews it before release -->

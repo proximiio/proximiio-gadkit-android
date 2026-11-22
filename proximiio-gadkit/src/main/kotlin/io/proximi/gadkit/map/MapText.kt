@@ -37,9 +37,10 @@ private val strings: Map<String, Int> = mapOf(
     "guidance_level_changer_escalator" to R.string.escalator,
     "guidance_level_changer_stairs" to R.string.stairs_2,
     "guidance_level_changer_ramp" to R.string.ramp,
-    "amenity_womens_restroom" to R.string.women_s_restroom,
-    "amenity_mens_restroom" to R.string.men_s_restroom,
+    "amenity_toilet" to R.string.toilet,
     "amenity_cafe" to R.string.caf,
+    "amenity_restaurant" to R.string.restaurant,
+    "amenity_theatre" to R.string.theatre,
     "amenity_help_desk" to R.string.help_desk,
     "amenity_prayer_room" to R.string.prayer_room,
     "amenity_stairs" to R.string.stairs,
@@ -125,9 +126,10 @@ internal val GuidanceSymbol.drawable: Int
 /** The design icon of an amenity kind (iOS `GADIcon`). */
 internal val AmenityKind.gadIcon: GadIcon
     get() = when (this) {
-        AmenityKind.WOMENS_RESTROOM -> GadIcon.FemaleToilet
-        AmenityKind.MENS_RESTROOM -> GadIcon.MaleToilet
+        AmenityKind.RESTROOM -> GadIcon.Toilet
         AmenityKind.CAFE -> GadIcon.Cafe
+        AmenityKind.RESTAURANT -> GadIcon.Restaurant
+        AmenityKind.THEATRE -> GadIcon.Theatre
         AmenityKind.HELP_DESK -> GadIcon.Info
         AmenityKind.PRAYER_ROOM -> GadIcon.PrayerRoom
         AmenityKind.STAIRS -> GadIcon.Stairs

@@ -65,7 +65,7 @@ class AmenityListingTest {
             ),
         )
         assertEquals(
-            listOf(AmenityKind.WOMENS_RESTROOM, AmenityKind.MENS_RESTROOM, AmenityKind.CAFE, AmenityKind.PRAYER_ROOM, AmenityKind.MUSEUM_SHOP),
+            listOf(AmenityKind.RESTROOM, AmenityKind.CAFE, AmenityKind.PRAYER_ROOM, AmenityKind.MUSEUM_SHOP),
             listing.shortcuts(places),
         )
     }
@@ -117,7 +117,7 @@ class AmenityListingTest {
         val shortcuts = AmenityListing.search(amenities).searchShortcuts(all, amenities, language = "en")
         assertEquals(
             listOf<AmenityShortcut>(
-                AmenityShortcut.Kind(AmenityKind.WOMENS_RESTROOM),
+                AmenityShortcut.Kind(AmenityKind.RESTROOM),
                 AmenityShortcut.Kind(AmenityKind.MUSEUM_SHOP),
                 AmenityShortcut.Amenity("a-learning", "Learning & Engagement", null),
                 AmenityShortcut.Amenity("a-gallery", "Single Artist Gallery", null),

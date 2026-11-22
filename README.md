@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.66.3")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.67.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.66.3
+git -C gadkit checkout 1.67.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -781,15 +781,15 @@ not follow.
     Gallery") and the description.
   - Highlights: the artworks that list the "Highlight" amenity in `included_amenities`, with
     `metadata.artist_name` and the gallery.
-  - Amenities: restrooms, café, help desk, prayer room and shop, by level, then by the amenity's
+  - Amenities: toilets, café, restaurant, help desk, prayer room, shop and theatre, by level, then by the amenity's
     `metadata.facilities_order`. Stairs and lifts are not listed. See "Amenity lists".
   - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
     holds the DCT office.
 - The map legend has two columns. Facilities: the amenities the museum's POIs use, other than
   artworks, with "Elevator" and "Stairs" when the venue has lifts or staircases. Galleries: the
   amenities of the spaces and the amenities named "… Gallery", "… Exhibition" or "Learning …".
-- A row, a card and the legend show the library's icon of a restroom, café, help desk, prayer room,
-  shop, lift or stairs, else the icon of the POI's amenity in the venue data (the icon the map draws),
+- A row, a card and the legend show the library's icon of a toilet, café, restaurant, help desk,
+  prayer room, shop, theatre, lift or stairs, else the icon of the POI's amenity in the venue data (the icon the map draws),
   else a symbol for the gallery's category.
 - A row, or a tap on a gallery or a listed POI on the map, shows its level and a card with its icon,
   title, lines and level. With a gallery's card open, the other galleries are lighter. An amenity gets
@@ -802,7 +802,8 @@ position, search and routes.
 
 ### Amenity lists
 
-A place is of an amenity kind (restroom, café, help desk, prayer room, shop, stairs, lift) by its
+A place is of an amenity kind (toilet, café, restaurant, help desk, prayer room, shop, theatre,
+stairs, lift) by its
 amenity: the amenity's title names the kind. The POI's own title is never matched, so the artwork
 "Endless Prayers XIII" is no prayer room. The amenity's optional `metadata` chooses and orders the
 lists:
@@ -813,7 +814,7 @@ lists:
 | `in_facilities`, `facilities_order` | The Explore Museum Amenities list (within a level) and the legend's facilities. A lift or stairs entry ranks as the amenity titled "elevator" or "staircase". |
 
 - When an amenity has the flag `true` (or "true"), the list shows only the amenities with the flag
-  true. Without one, the list shows its own choice (for the search: women's and men's restroom, café,
+  true. Without one, the list shows its own choice (for the search: toilet, café,
   help desk, prayer room, museum shop) without the amenities whose flag is `false`.
 - The order is a number or a numeric string, lowest first. An amenity without an order comes after
   the ordered ones, in the list's own order. The legend's galleries keep the data's order.
@@ -1223,7 +1224,32 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.66.3.
+No changes since 1.67.0.
+
+### [1.67.0] — 2026-11-22
+
+The Android port of iOS 1.67.0 (Metis T-1911). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app, and no setting is new. Android has
+no 1.66.4: that iOS version starts a map again that was started on a locked iPhone (iOS data
+protection), which Android does not have (T-1908).
+
+- **Visible:** the amenity icons of the GAD PM's set of 2026-11-22.
+  - New drawings for the toilet, the elevator, the stairs and the prayer room.
+  - Two new kinds with an icon: Restaurant (the amenity's title has "restaurant") and Theatre
+    ("theatre" or "theater"). They are in the legend and on the map. They are a search shortcut
+    only when the venue data sets `in_search` on their amenity.
+  - The café, help desk and museum shop icons do not change. The gallery icons come from the venue
+    data as before.
+  - Sizes as before: a 16 dp glyph and a 30 dp marker (white circle, stroke `#EEEDED`, glyph
+    `#2B2B2B`); each drawing is 13 dp on its longer side, in the centre. The numbers are those of
+    the iOS files.
+- **Visible:** the women's and the men's restroom are one kind, "Toilet" (Arabic `دورة المياه`,
+  needs review), with one icon. An amenity is of the kind when its id or title has `restroom`,
+  `toilet`, `women`, `female`, `ladies`, `men's`, `mens` or `gents`. The search has one "Toilet"
+  shortcut, which leads to the nearest place of the kind. The strings "Women’s restroom" and
+  "Men’s restroom" and the two old icons are removed.
+- The order of the kinds: toilet, café, restaurant, help desk, prayer room, stairs, elevator,
+  museum shop, theatre. Built-in shortcuts: toilet, café, help desk, prayer room, museum shop.
 
 ### [1.66.3] — 2026-11-21
 

@@ -13,9 +13,12 @@ class AmenityIconTest {
     @Test
     fun gadAmenitiesMapToTheirKinds() {
         val cases = listOf(
-            "Women's Restroom" to AmenityKind.WOMENS_RESTROOM,
-            "Men's Restroom" to AmenityKind.MENS_RESTROOM,
+            "Women's Restroom" to AmenityKind.RESTROOM,
+            "Men's Restroom" to AmenityKind.RESTROOM,
+            "Toilet" to AmenityKind.RESTROOM,
             "Cafe" to AmenityKind.CAFE,
+            "Restaurant" to AmenityKind.RESTAURANT,
+            "Theatre" to AmenityKind.THEATRE,
             "Helpdesk" to AmenityKind.HELP_DESK,
             "Prayer Room" to AmenityKind.PRAYER_ROOM,
             "Staircase" to AmenityKind.STAIRS,
@@ -38,11 +41,17 @@ class AmenityIconTest {
     @Test
     fun amenityMarkersAreWhiteCirclesWithDarkGlyphs() {
         val markers = File("src/main/res/drawable").listFiles { file -> file.name.endsWith("_marker.xml") }.orEmpty()
-        assertEquals(8, markers.size)
+        // One marker per kind: the women's and the men's restroom share one since iOS 1.67.0.
+        assertEquals(AmenityKind.entries.size, markers.size)
         for (marker in markers) {
-            val fills = Regex("android:fillColor=\"([^\"]+)\"").findAll(marker.readText()).map { it.groupValues[1] }.toList()
+            val text = marker.readText()
+            val fills = Regex("android:fillColor=\"([^\"]+)\"").findAll(text).map { it.groupValues[1] }.toList()
             assertEquals("#FFFFFFFF", fills.first(), marker.name)
             assertTrue(fills.drop(1).all { it == "#FF2B2B2B" }, marker.name)
+            // The design's size: a 30 dp marker and a 16 dp glyph (iOS `everyAmenityIconHasTheDesignsSize`).
+            assertTrue(text.contains("android:width=\"30dp\"") && text.contains("android:viewportWidth=\"30\""), marker.name)
+            val glyph = File(marker.parentFile, marker.name.replace("_marker.xml", ".xml")).readText()
+            assertTrue(glyph.contains("android:width=\"16dp\"") && glyph.contains("android:viewportWidth=\"16\""), marker.name)
         }
     }
 

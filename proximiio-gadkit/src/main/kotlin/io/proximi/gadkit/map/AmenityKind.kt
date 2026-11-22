@@ -5,10 +5,11 @@ import io.proximi.gadkit.Coordinate
 
 /**
  * The amenity shortcuts and legend of the map (Figma "MAP Functionality Approach 02",
- * node 10889:116263): Women's restroom, Men's restroom, Café, Help Desk, Prayer Room,
- * Stairs, Elevator, Museum Shop.
+ * node 10889:116263): Toilet, Café, Restaurant, Help Desk, Prayer Room, Stairs, Elevator,
+ * Museum Shop, Theatre. The women's and the men's restroom are one kind with one icon since the
+ * PM's icon set of 2026-11-22 (iOS 1.67.0).
  *
- * An amenity has a kind when its title names it ("Prayer Room", "Women's Restroom"). A place matches
+ * An amenity has a kind when its title names it ("Prayer Room", "Toilet"). A place matches
  * a kind by its amenity ([VenuePlace.amenityKind]), not by its own title: the prayer room shortcut
  * led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend views",
  * 2026-10-28).
@@ -22,14 +23,14 @@ internal enum class AmenityKind(
     /** Lower-case fragments matched against the amenity id and the title. */
     private val keywords: List<String>,
 ) {
-    /** "Women’s restroom". */
-    WOMENS_RESTROOM("amenity_womens_restroom", "femaleToilet", listOf("women", "female", "ladies")),
-
-    /** "Men’s restroom". */
-    MENS_RESTROOM("amenity_mens_restroom", "maleToilet", listOf("men's", "mens", "male", "gents")),
+    /** "Toilet": the women's and the men's restroom, one icon (PM, 2026-11-22). */
+    RESTROOM("amenity_toilet", "toilet", listOf("restroom", "toilet", "women", "female", "ladies", "men's", "mens", "gents")),
 
     /** "Café". */
     CAFE("amenity_cafe", "cafe", listOf("cafe", "café", "coffee")),
+
+    /** "Restaurant". */
+    RESTAURANT("amenity_restaurant", "restaurant", listOf("restaurant")),
 
     /** "Help Desk". */
     HELP_DESK("amenity_help_desk", "info", listOf("help", "welcome desk", "information", "info")),
@@ -45,17 +46,16 @@ internal enum class AmenityKind(
 
     /** "Museum Shop". */
     MUSEUM_SHOP("amenity_museum_shop", "shop", listOf("shop", "store")),
+
+    /** "Theatre". */
+    THEATRE("amenity_theatre", "theatre", listOf("theatre", "theater")),
     ;
 
     /** Whether the place's amenity is of this kind. */
     internal fun matches(place: VenuePlace): Boolean = place.amenityKind == this
 
     /** [text] is the lower-case amenity id and title. */
-    private fun matches(text: String): Boolean {
-        val hit = keywords.any { text.contains(it) }
-        // "women's restroom" contains "men's"; exclude it.
-        return if (this == MENS_RESTROOM) hit && !WOMENS_RESTROOM.matches(text) else hit
-    }
+    private fun matches(text: String): Boolean = keywords.any { text.contains(it) }
 
     /**
      * The nearest place of this kind in the venue of the nearest one (`place_id`). In that venue,
@@ -82,7 +82,10 @@ internal enum class AmenityKind(
             return entries.firstOrNull { it.matches(text) }
         }
 
-        /** Shortcuts shown as chips on the map. Stairs and Elevator are legend entries only. */
-        internal val SHORTCUTS: List<AmenityKind> = listOf(WOMENS_RESTROOM, MENS_RESTROOM, CAFE, HELP_DESK, PRAYER_ROOM, MUSEUM_SHOP)
+        /**
+         * Shortcuts shown as chips on the map. The other kinds are a shortcut only when the data
+         * flags their amenity (`in_search`).
+         */
+        internal val SHORTCUTS: List<AmenityKind> = listOf(RESTROOM, CAFE, HELP_DESK, PRAYER_ROOM, MUSEUM_SHOP)
     }
 }
