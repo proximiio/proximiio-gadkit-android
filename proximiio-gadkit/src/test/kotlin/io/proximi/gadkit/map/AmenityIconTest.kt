@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.sdk.core.model.ProximiioAmenity
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,6 +11,36 @@ import kotlin.test.assertTrue
  * Android graphics; the UI tests cover it.
  */
 class AmenityIconTest {
+    /**
+     * A kind takes the icon of its one amenity with a place. Two amenities of a kind (the women's
+     * and the men's restroom) leave the bundled glyph; so does an amenity no place uses (the "Cafe"
+     * of another category) and one without an icon. iOS `aKindTakesTheIconOfItsOnlyUsedAmenity`.
+     */
+    @Test
+    fun aKindTakesTheIconOfItsOnlyUsedAmenity() {
+        val amenities = listOf(
+            ProximiioAmenity(id = "a-cafe", title = "Cafe"), ProximiioAmenity(id = "a-cafe-other", title = "Cafe"),
+            ProximiioAmenity(id = "a-women", title = "Women's Restroom"), ProximiioAmenity(id = "a-men", title = "Men's Restroom"),
+            ProximiioAmenity(id = "a-prayer", title = "Prayer Room"), ProximiioAmenity(id = "a-stairs", title = "Staircase"),
+            ProximiioAmenity(id = "a-gallery", title = "Thematic Gallery"),
+        )
+        val ids = VenueGlyphs.amenityIds(
+            amenities,
+            used = setOf("a-cafe", "a-women", "a-men", "a-prayer", "a-stairs", "a-gallery"),
+            withIcon = setOf("a-cafe", "a-cafe-other", "a-women", "a-men", "a-stairs", "a-gallery"),
+        )
+        assertEquals(mapOf(AmenityKind.CAFE to "a-cafe", AmenityKind.STAIRS to "a-stairs"), ids)
+    }
+
+    /** iOS `aGlyphKeepsItsProportions`. */
+    @Test
+    fun aGlyphKeepsItsProportions() {
+        val box = VenueGlyphs.Box(7f, 7f, 16f, 16f)
+        assertEquals(box, VenueGlyphs.aspectFit(120f, 120f, box))
+        assertEquals(VenueGlyphs.Box(7f, 11f, 16f, 8f), VenueGlyphs.aspectFit(120f, 60f, box))
+        assertEquals(box, VenueGlyphs.aspectFit(0f, 0f, box))
+    }
+
     @Test
     fun gadAmenitiesMapToTheirKinds() {
         val cases = listOf(

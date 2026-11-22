@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.gadkit.designsystem.GadIcon
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
@@ -440,11 +441,25 @@ internal fun AmenityShortcut.title(): String = when (this) {
     is AmenityShortcut.Amenity -> title
 }
 
-/** The design's icon of a kind, else the amenity's icon from the data; nothing without one. 16 dp. */
+/**
+ * The glyph of an amenity kind's [icon], in ink: the venue data's glyph ([VenueGlyphs]), else the
+ * bundled one. iOS `GADIcon.image` (1.68.0).
+ */
+@Composable
+internal fun KindIcon(icon: GadIcon, modifier: Modifier = Modifier, size: Int = 24, tint: Color = Palette.ink) {
+    val glyph = VenueGlyphs.glyph(icon)
+    if (glyph != null) {
+        Icon(glyph.asImageBitmap(), contentDescription = null, modifier.size(size.dp), tint = tint)
+    } else {
+        Icon(painterResource(icon.glyph), contentDescription = null, modifier.size(size.dp), tint = tint)
+    }
+}
+
+/** The glyph of a kind ([KindIcon]), else the amenity's icon from the data; nothing without one. 16 dp. */
 @Composable
 internal fun AmenityShortcutIcon(shortcut: AmenityShortcut) {
     when (shortcut) {
-        is AmenityShortcut.Kind -> MapIcon(shortcut.kind.gadIcon.glyph, size = 16)
+        is AmenityShortcut.Kind -> KindIcon(shortcut.kind.gadIcon, size = 16)
         is AmenityShortcut.Amenity -> shortcut.icon?.let { Image(it, contentDescription = null, Modifier.size(16.dp), contentScale = ContentScale.Fit) }
     }
 }

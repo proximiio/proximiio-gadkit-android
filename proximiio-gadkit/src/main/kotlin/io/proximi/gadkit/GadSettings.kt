@@ -277,6 +277,16 @@ public data class GadSettings(
      */
     val shapesGalleryLabelsByType: Boolean = false,
     /**
+     * `true` draws the amenity kinds the library knows (toilet, café, restaurant, help desk, prayer
+     * room, stairs, lift, museum shop, theatre) with the icon of their amenity in the venue data, so
+     * the icons are edited in the Proximi portal (GAD PM, 2026-11-22). The icon is a dark glyph on a
+     * transparent square; the library tints it and, on the maps, draws it in the white circle marker.
+     * The bundled glyph is drawn when the amenity has no icon, and in lists and chips when two
+     * amenities of one kind have a place. `false` draws the bundled glyphs everywhere, as up to
+     * 1.67.0. iOS `usesVenueAmenityIcons` (1.68.0).
+     */
+    val usesVenueAmenityIcons: Boolean = true,
+    /**
      * `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is
      * marked visited while the visitor stands in another gallery than the next stop's, and that gallery
      * has an artwork still to visit (GAD PM, Monday "Re-routing going from gallery 104 to 102",

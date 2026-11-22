@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.VenueGlyphs
 import io.proximi.gadkit.map.venueFeatures
 import io.proximi.gadkit.map.VenueCone
 import io.proximi.gadkit.map.galleryDestinations
@@ -181,7 +182,7 @@ internal class VisitViewModel(
     val settings = venue.settings
 
     val session = ProximiioMapSession(venue.sdk, application, MapStyle.options(language, routeMarkers = false, settings = settings))
-        .also { MapStyle.useAmenityIcons(it, application) }
+        .also { MapStyle.useAmenityIcons(it, application, venueIcons = settings.usesVenueAmenityIcons) }
     val controller = VisitController(
         session,
         journey,
@@ -799,13 +800,16 @@ internal class VisitViewModel(
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
         }
         amenityIcons = icons.mapValues { it.value.asImageBitmap() }
+        val levelChangers = venue.levelChangers()
+        // The glyphs of the amenity kinds from the venue data (iOS 1.68.0).
+        val usedAmenities = (allPlaces.mapNotNull { it.amenityId } + levelChangers.mapNotNull { it.amenityId }).toSet()
+        if (VenueGlyphs.update(amenities, usedAmenities, icons, settings.usesVenueAmenityIcons)) layers.kindGlyphsChanged()
         searchShortcuts = AmenityListing.search(amenities).searchShortcuts(places, amenities, amenityIcons, language)
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }
         controller.artworkAreas = venue.artworkAreas()
         // The journey map shows artworks only as the numbered stop markers. Amenities, galleries
         // and level changers stay (PM review 2026-10-12). [layers] draws the level changers on
         // every floor they serve.
-        val levelChangers = venue.levelChangers()
         layers.updateLevelChangers(levelChangers, LevelChangerPlace.amenityIcons(amenities, icons))
         layers.updateCones(VenueCone.all(venue.venueFeatures()))
         levelChangerPlaces = levelChangers

@@ -1,5 +1,7 @@
 package io.proximi.gadkit.explore
 
+import io.proximi.gadkit.map.KindIcon
+import io.proximi.gadkit.map.VenueGlyphs
 import io.proximi.gadkit.map.LevelChangerPlace
 import io.proximi.gadkit.map.VenueCone
 import androidx.compose.foundation.Canvas
@@ -178,7 +180,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     val settings = remember { venue.settings }
     val created = rememberProximiioMapSession(venue.sdk, MapStyle.exploreOptions(language, settings))
     // The amenity icons, once per session, before the map registers the venue's icons.
-    val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context, galleryIcons = true) } }
+    val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context, galleryIcons = true, venueIcons = settings.usesVenueAmenityIcons) } }
     SideEffect { if (session.options.language != language) session.options = session.options.copy(language = language) }
 
     val layers = remember { JourneyMapLayers() }
@@ -224,6 +226,11 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         }
         val categories = amenities.mapNotNull { amenity -> amenity.title?.let { amenity.id to it } }.toMap()
         val levelChangers = venue.levelChangers()
+        // The glyphs of the amenity kinds from the venue data (iOS 1.68.0).
+        val usedAmenities = (allPlaces.mapNotNull { it.amenityId } + levelChangers.mapNotNull { it.amenityId }).toSet()
+        if (VenueGlyphs.update(amenities, usedAmenities, amenityIcons.mapValues { it.value.asAndroidBitmap() }, venue.settings.usesVenueAmenityIcons)) {
+            layers.kindGlyphsChanged()
+        }
         val changerTypes = levelChangers.map { it.featureType }.toSet()
         val changerTitles = mapOf("elevator" to R.string.elevator, "staircase" to R.string.stairs)
             .filterKeys { it in changerTypes }
@@ -707,7 +714,7 @@ private fun LegendGlyph(entry: ExploreLegendEntry, icons: Map<String, ImageBitma
     val icon = icons[entry.amenityId]
     Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
         when {
-            kind != null -> MapIcon(kind.gadIcon.glyph, size = 22)
+            kind != null -> KindIcon(kind.gadIcon, size = 22)
             icon != null -> Image(icon, contentDescription = null, Modifier.fillMaxSize(), filterQuality = FilterQuality.High)
             else -> MapIcon(symbolIcon(ExploreItem.symbol(entry.title)), size = 24)
         }
@@ -825,7 +832,7 @@ private fun ExploreIcon(item: ExploreItem, icons: Map<String, ImageBitmap>) {
     ) {
         val kind = item.kind
         when {
-            kind is ExploreItem.Kind.Amenity -> MapIcon(kind.kind.gadIcon.glyph, size = 22)
+            kind is ExploreItem.Kind.Amenity -> KindIcon(kind.kind.gadIcon, size = 22)
             // The data's icon is a 30 px marker, a white circle with the glyph: it fills the circle.
             icon != null -> Image(icon, contentDescription = null, Modifier.fillMaxSize(), filterQuality = FilterQuality.High)
             else -> MapIcon(symbolIcon(ExploreItem.symbol(item.category)), size = 18)

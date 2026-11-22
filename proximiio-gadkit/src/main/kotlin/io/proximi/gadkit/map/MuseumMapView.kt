@@ -99,7 +99,7 @@ internal fun MuseumMapView(
     val settings = remember { venue.settings }
     val created = rememberProximiioMapSession(venue.sdk, MapStyle.options(language, settings = settings))
     // The amenity icons, once per session, before the map registers the venue's icons.
-    val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context) } }
+    val session = remember(created) { created.also { MapStyle.useAmenityIcons(it, context, venueIcons = settings.usesVenueAmenityIcons) } }
     LaunchedEffect(session) { MapDiagnostics.follow(session, "museum", this) }
     // The grey dot in a privacy zone (`MapStyle.heldPosition`), as on the journey map (iOS 1.45.0).
     LaunchedEffect(session) {
@@ -257,10 +257,14 @@ internal fun MuseumMapView(
         val icons = withContext(Dispatchers.Default) {
             amenities.mapNotNull { amenity -> amenity.icon?.let(AmenityIcon::rasterImage)?.let { amenity.id to it } }.toMap()
         }
+        val allPlaces = venue.places(language)
+        // The glyphs of the amenity kinds from the venue data (iOS 1.68.0).
+        val usedAmenities = (allPlaces.mapNotNull { it.amenityId } + levelChangers.mapNotNull { it.amenityId }).toSet()
+        if (VenueGlyphs.update(amenities, usedAmenities, icons, settings.usesVenueAmenityIcons)) layers.kindGlyphsChanged()
         layers.updateLevelChangers(levelChangers, LevelChangerPlace.amenityIcons(amenities, icons))
         layers.updateCones(VenueCone.all(venue.venueFeatures()))
         // Nor the gallery entrances (iOS 1.43.0).
-        val entrances = VenuePlace.galleryEntranceIds(venue.places(language), settings.galleryEntranceAmenityId)
+        val entrances = VenuePlace.galleryEntranceIds(allPlaces, settings.galleryEntranceAmenityId)
         session.hiddenFeatureIds = levelChangers.map { it.id }.toSet() + entrances
     }
     if (debug?.galleryFills != true) {
@@ -407,7 +411,7 @@ internal fun MuseumMapView(
                         icon = {
                             val kind = AmenityKind.entries.firstOrNull { it.matches(routed) }
                             if (kind != null) {
-                                MapIcon(kind.gadIcon.glyph, size = 22)
+                                KindIcon(kind.gadIcon, size = 22)
                             } else {
                                 MapIcon((coreGuidance?.let(GuidanceText::symbol) ?: GuidanceSymbol.STRAIGHT).drawable, size = 16)
                             }

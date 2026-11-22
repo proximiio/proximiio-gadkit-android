@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.map.KindIcon
 import io.proximi.gadkit.map.MapHandleArea
 import io.proximi.gadkit.designsystem.GlassStrength
 import io.proximi.gadkit.designsystem.glassSurface
@@ -592,7 +593,7 @@ private fun VisitCard(model: VisitViewModel) {
                 ?.let { ahead -> model.places.firstOrNull { it.id == ahead.placeId }?.amenityId }
                 ?.let { model.amenityIcons[it] }
             when {
-                levelChange != null -> MapIcon(if (levelChange.featureType == "elevator") GadIcon.Elevator.glyph else GadIcon.Stairs.glyph, size = 20)
+                levelChange != null -> KindIcon(if (levelChange.featureType == "elevator") GadIcon.Elevator else GadIcon.Stairs, size = 20)
                 state == VisitCardState.Starting -> MapIcon(R.drawable.ic_map_straight, size = 16)
                 state == VisitCardState.Finished -> MapIcon(R.drawable.ic_checkmark, size = 16)
                 model.settings.showsStopNumbers && number != null && VisitCardText.showsStopNumber(state, galleryAhead) -> Text("$number", style = GadTextStyle.BodyMedium.textStyle, color = Palette.ink)

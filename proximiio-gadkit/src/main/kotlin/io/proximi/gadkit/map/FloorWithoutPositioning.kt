@@ -329,7 +329,7 @@ internal fun FloorChangeView(change: FloorWithoutPositioningGuide.Change, onTap:
                     Modifier.size(140.dp).background(Palette.white, CircleShape).border(1.5.dp, Palette.badgeStroke, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(painterResource(icon.glyph), contentDescription = null, modifier = Modifier.size(64.dp), tint = Palette.position)
+                    KindIcon(icon, size = 64, tint = Palette.position)
                 }
             }
             Text(

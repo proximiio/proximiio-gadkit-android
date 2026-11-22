@@ -318,18 +318,36 @@ internal class JourneyMapLayers {
 
     // Style
 
-    private fun install(canvas: ProximiioMapCanvas, style: Style) {
+    /**
+     * The venue data's glyphs of the amenity kinds changed ([VenueGlyphs]): the map images made from
+     * them are registered again.
+     */
+    fun kindGlyphsChanged() {
+        val canvas = canvas ?: return
+        val style = canvas.style ?: return
+        registerKindGlyphs(canvas.context, style, replace = true)
+    }
+
+    /**
+     * Registers the images made from the glyphs of the amenity kinds: the lift and stairs markers and
+     * the red markers. At the style load, and with [replace] when the glyphs change.
+     */
+    private fun registerKindGlyphs(context: Context, style: Style, replace: Boolean) {
         for (type in LevelChangerPlace.FEATURE_TYPES) {
             val name = LevelChanger(Coordinate(0.0, 0.0), 0.0, type).imageName
-            if (style.getImage(name) == null) levelChangerImage(canvas.context, type)?.let { style.addImage(name, it) }
+            if (replace || style.getImage(name) == null) levelChangerImage(context, type)?.let { style.addImage(name, it) }
             val standard = LevelChanger.standardImageName(type)
-            if (style.getImage(standard) == null) standardLevelChangerImage(canvas.context, type)?.let { style.addImage(standard, it) }
+            if (replace || style.getImage(standard) == null) standardLevelChangerImage(context, type)?.let { style.addImage(standard, it) }
         }
-        addChangerAmenityIcons(canvas.context, style)
         for (icon in AmenityKind.entries.map { it.gadIcon }.toSet()) {
             val name = Highlight.imageName(icon)
-            if (style.getImage(name) == null) redMarker(canvas.context, icon)?.let { style.addImage(name, it) }
+            if (replace || style.getImage(name) == null) redMarker(context, icon)?.let { style.addImage(name, it) }
         }
+    }
+
+    private fun install(canvas: ProximiioMapCanvas, style: Style) {
+        registerKindGlyphs(canvas.context, style, replace = false)
+        addChangerAmenityIcons(canvas.context, style)
         if (style.getSource(LEVEL_CHANGER_SOURCE) == null) {
             style.addSource(GeoJsonSource(LEVEL_CHANGER_SOURCE))
             val layer = SymbolLayer(LEVEL_CHANGER_LAYER, LEVEL_CHANGER_SOURCE).withFilter(kindFilter(PointKind.CHANGER)).withProperties(
@@ -579,8 +597,10 @@ internal class JourneyMapLayers {
 
     /** The 30 dp amenity marker of a level changer that is not on the route ([MapStyle.amenityImage]). */
     private fun standardLevelChangerImage(context: Context, featureType: String): Bitmap? {
-        val marker = icon(featureType).marker ?: return null
+        val icon = icon(featureType)
+        val marker = icon.marker ?: return null
         val size = (MARKER_DP * context.resources.displayMetrics.density).roundToInt()
+        VenueGlyphs.glyph(icon)?.let { return VenueGlyphs.marker(it, size) }
         return ContextCompat.getDrawable(context, marker)?.toBitmap(size, size)
     }
 
@@ -589,8 +609,8 @@ internal class JourneyMapLayers {
 
     /** 30 dp: a red circle with a white 2 dp ring and the white glyph of [icon] in its middle 18 dp. */
     private fun redMarker(context: Context, icon: GadIcon): Bitmap? {
-        val glyph = icon.glyph
-        val drawable = ContextCompat.getDrawable(context, glyph)?.mutate() ?: return null
+        val venueGlyph = VenueGlyphs.glyph(icon)
+        val drawable = if (venueGlyph == null) ContextCompat.getDrawable(context, icon.glyph)?.mutate() ?: return null else null
         val density = context.resources.displayMetrics.density
         val size = (MARKER_DP * density).roundToInt()
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -604,9 +624,15 @@ internal class JourneyMapLayers {
         paint.color = Color.WHITE
         canvas.drawCircle(size / 2f, size / 2f, radius - density, paint)
         val inset = (6 * density).roundToInt()
-        drawable.setBounds(inset, inset, size - inset, size - inset)
-        drawable.setTint(Color.WHITE)
-        drawable.draw(canvas)
+        if (venueGlyph != null) {
+            val side = (size - 2 * inset).toFloat()
+            val box = VenueGlyphs.aspectFit(venueGlyph.width.toFloat(), venueGlyph.height.toFloat(), VenueGlyphs.Box(inset.toFloat(), inset.toFloat(), side, side))
+            VenueGlyphs.drawGlyph(canvas, venueGlyph, box, Color.WHITE)
+        } else if (drawable != null) {
+            drawable.setBounds(inset, inset, size - inset, size - inset)
+            drawable.setTint(Color.WHITE)
+            drawable.draw(canvas)
+        }
         return bitmap
     }
 

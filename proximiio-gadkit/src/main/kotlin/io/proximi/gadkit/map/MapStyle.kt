@@ -46,12 +46,12 @@ internal object MapStyle {
      * Draws amenities with the design's icons ([amenityImage]); with [galleryIcons] the icons of the
      * Explore Museum map ([exploreAmenityImage]). Set it before the session loads the venue.
      */
-    fun useAmenityIcons(session: ProximiioMapSession, context: Context, galleryIcons: Boolean = false) {
+    fun useAmenityIcons(session: ProximiioMapSession, context: Context, galleryIcons: Boolean = false, venueIcons: Boolean = true) {
         val appContext = context.applicationContext
         session.amenityImageDecoder = if (galleryIcons) {
-            { exploreAmenityImage(it, appContext) }
+            { exploreAmenityImage(it, appContext, venueIcons) }
         } else {
-            { amenityImage(it, appContext) }
+            { amenityImage(it, appContext, venueIcons) }
         }
     }
 
@@ -61,24 +61,24 @@ internal object MapStyle {
      * then gives the same size here and in MapTap: 120 px at 0.2 is 24 dp (PM, 2026-10-27: the
      * gallery icons were 8 pt at 0.2 on iOS, with the icon at the screen's density).
      *
-     * A kind the design draws ([AmenityKind]) gets its marker (PM 2026-10-14, "Amenity icons larger")
-     * at the size of the data's icon it replaces. Other amenities, such as artworks and galleries, keep
-     * their icon.
+     * A kind the design draws ([AmenityKind]) gets the design's marker (PM 2026-10-14, "Amenity icons
+     * larger") at the size of the data's icon: the white circle around the amenity's own icon (PM,
+     * 2026-11-22: the icons are edited in the portal). Without a data icon, or with [venueIcons] false
+     * (`GadSettings.usesVenueAmenityIcons`), the circle holds the bundled glyph. Other amenities, such
+     * as artworks and galleries, keep their icon.
      */
-    fun amenityImage(amenity: ProximiioAmenity, context: Context): Bitmap? {
+    fun amenityImage(amenity: ProximiioAmenity, context: Context, venueIcons: Boolean = true): Bitmap? {
         val icon = dataIcon(amenity)
-        val marker = AmenityKind.kind(amenity.id, amenity.title)?.gadIcon?.marker
-        if (marker != null) {
-            val drawable = ContextCompat.getDrawable(context, marker)
-            if (drawable != null) {
-                val (width, height) = styleIconSize(icon?.width, icon?.height)
-                return render(context, width, height) { canvas, density ->
-                    drawable.setBounds(0, 0, (width * density).roundToInt(), (height * density).roundToInt())
-                    drawable.draw(canvas)
-                }
-            }
+        val marker = AmenityKind.kind(amenity.id, amenity.title)?.gadIcon?.marker ?: return icon
+        val (width, height) = styleIconSize(icon?.width, icon?.height)
+        if (venueIcons && icon != null) {
+            return render(context, width, height) { canvas, density -> VenueGlyphs.drawMarker(canvas, icon, width * density, height * density) }
         }
-        return icon
+        val drawable = ContextCompat.getDrawable(context, marker) ?: return icon
+        return render(context, width, height) { canvas, density ->
+            drawable.setBounds(0, 0, (width * density).roundToInt(), (height * density).roundToInt())
+            drawable.draw(canvas)
+        }
     }
 
     /**
@@ -87,8 +87,8 @@ internal object MapStyle {
      * museum view: default map view", 2026-10-26). The circle has the data icon's size in dp, as
      * [amenityImage]. A kind the design draws gets its marker.
      */
-    fun exploreAmenityImage(amenity: ProximiioAmenity, context: Context): Bitmap? {
-        if (AmenityKind.kind(amenity.id, amenity.title) != null) return amenityImage(amenity, context)
+    fun exploreAmenityImage(amenity: ProximiioAmenity, context: Context, venueIcons: Boolean = true): Bitmap? {
+        if (AmenityKind.kind(amenity.id, amenity.title) != null) return amenityImage(amenity, context, venueIcons)
         val icon = dataIcon(amenity) ?: return null
         val side = maxOf(icon.width, icon.height)
         return render(context, side, side) { canvas, density ->

@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.67.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.68.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.67.0
+git -C gadkit checkout 1.68.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -788,8 +788,9 @@ not follow.
 - The map legend has two columns. Facilities: the amenities the museum's POIs use, other than
   artworks, with "Elevator" and "Stairs" when the venue has lifts or staircases. Galleries: the
   amenities of the spaces and the amenities named "… Gallery", "… Exhibition" or "Learning …".
-- A row, a card and the legend show the library's icon of a toilet, café, restaurant, help desk,
-  prayer room, shop, theatre, lift or stairs, else the icon of the POI's amenity in the venue data (the icon the map draws),
+- A row, a card and the legend show the icon of a toilet, café, restaurant, help desk,
+  prayer room, shop, theatre, lift or stairs (the kind's icon from the venue data, tinted; else the
+  library's glyph; `GadSettings.usesVenueAmenityIcons`), else the icon of the POI's amenity in the venue data (the icon the map draws),
   else a symbol for the gallery's category.
 - A row, or a tap on a gallery or a listed POI on the map, shows its level and a card with its icon,
   title, lines and level. With a gallery's card open, the other galleries are lighter. An amenity gets
@@ -917,6 +918,7 @@ val configuration = GadConfiguration(
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
 | `shapesGalleryLabelsByType` | `false` (`true` in 1.61.0 to 1.63.0) | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as before 1.61.0. |
+| `usesVenueAmenityIcons` | `true` | Draws the amenity kinds (toilet, café, restaurant, help desk, prayer room, stairs, lift, museum shop, theatre) with the icon of their amenity in the venue data, tinted, and on the maps in the white circle marker. The bundled glyph is drawn when the amenity has no icon, and in lists and chips when two amenities of one kind have a place. `false` draws the bundled glyphs, as up to 1.67.0. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
@@ -1224,7 +1226,33 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.67.0.
+No changes since 1.68.0.
+
+### [1.68.0] — 2026-11-22
+
+The Android port of iOS 1.68.0 (Metis T-1916). The SDK and Map versions do not change
+(6.0.0-beta.40). No change is needed in the code of a host app.
+
+- **Visible:** the icons of the amenity kinds come from the venue data, so they are edited in the
+  Proximi portal (GAD PM, 2026-11-22). The kinds are toilet, café, restaurant, help desk, prayer
+  room, stairs, lift, museum shop and theatre. Up to 1.67.0 the library drew its bundled glyph for
+  them and did not use the amenity's icon.
+  - On the maps a POI of a kind has the design's marker, a white circle, around the icon of its own
+    amenity. The marker has the size of the data icon, as before; the icon fills 16/30 of it.
+  - In the search chips, the lists, the map legend, the stop card, the red marker of a picked
+    amenity and the lift and stairs markers, a kind has the icon of its amenity, tinted. The
+    library takes the one amenity of the kind that a POI or a level changer uses.
+  - The bundled glyph is drawn when the amenity has no icon. In the chips, lists and legend it is
+    also drawn when two amenities of one kind have a POI, as the women's and the men's restroom:
+    the bundled "Toilet" glyph stays until the data has one amenity for it.
+  - The data icon is a dark glyph on a transparent square, without a circle of its own (120 × 120
+    px in the GAD data, the glyph about 100 px). An icon with its own circle or background is drawn
+    as it is inside the marker and looks wrong.
+  - Until the new icons are in the portal, the kinds show the portal's current icons, not the
+    bundled set of 1.67.0.
+- `GadSettings.usesVenueAmenityIcons` (default `true`). `false` draws the bundled glyphs, as up to
+  1.67.0.
+- Not ported: the glyph in the marker of a detour stop stays the bundled one.
 
 ### [1.67.0] — 2026-11-22
 
