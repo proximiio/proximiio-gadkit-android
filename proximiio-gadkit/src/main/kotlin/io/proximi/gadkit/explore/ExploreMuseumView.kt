@@ -2,6 +2,7 @@ package io.proximi.gadkit.explore
 
 import io.proximi.gadkit.map.KindIcon
 import io.proximi.gadkit.map.VenueGlyphs
+import io.proximi.gadkit.map.VenueTitles
 import io.proximi.gadkit.map.LevelChangerPlace
 import io.proximi.gadkit.map.VenueCone
 import androidx.compose.foundation.Canvas
@@ -228,6 +229,8 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
         val levelChangers = venue.levelChangers()
         // The glyphs of the amenity kinds from the venue data (iOS 1.68.0).
         val usedAmenities = (allPlaces.mapNotNull { it.amenityId } + levelChangers.mapNotNull { it.amenityId }).toSet()
+        // The names of the amenity kinds from the venue data (iOS 1.70.0).
+        VenueTitles.update(amenities, usedAmenities, venue.settings.usesVenueAmenityTitles, venue.settings.venueDataLanguage)
         if (VenueGlyphs.update(amenities, usedAmenities, amenityIcons.mapValues { it.value.asAndroidBitmap() }, venue.settings.usesVenueAmenityIcons)) {
             layers.kindGlyphsChanged()
         }

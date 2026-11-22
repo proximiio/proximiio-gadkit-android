@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.69.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.70.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.69.0
+git -C gadkit checkout 1.70.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -919,6 +919,8 @@ val configuration = GadConfiguration(
 | `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
 | `shapesGalleryLabelsByType` | `false` (`true` in 1.61.0 to 1.63.0) | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as before 1.61.0. |
 | `usesVenueAmenityIcons` | `true` | Draws the amenity kinds (toilet, café, restaurant, help desk, prayer room, stairs, lift, museum shop, theatre) with the icon of their amenity in the venue data, tinted, and on the maps in the white circle marker. The bundled glyph is drawn when the amenity has no icon, and in lists and chips when two amenities of one kind have a place. `false` draws the bundled glyphs, as up to 1.67.0. |
+| `usesVenueAmenityTitles` | `true` | Names the amenity kinds (toilet, café, restaurant, help desk, prayer room, stairs, lift, museum shop, theatre) with the title of their amenity in the venue data, in the app language (`title_i18n`). The library's text is shown when the data has no title in the app language, and when two amenities of one kind have a place. `false` shows the library's texts, as up to 1.69.0. |
+| `venueDataLanguage` | `"en"` | The language of the untagged `title` of an amenity. The untagged title names a kind only in this language. An empty string never uses it. |
 | `wristbandTransport` | `AUTOMATIC` | The transport of the wristband positions for the binding the library creates: `AUTOMATIC` (WebSocket first, Server-Sent Events when a WebSocket cannot be opened), `WEB_SOCKET` or `SERVER_SENT_EVENTS` (as up to 1.68.0). A host app with its own `BlueiotWristbandBinding` sets `BlueiotBindingConfiguration.transport` itself. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
@@ -1227,7 +1229,29 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.69.0.
+No changes since 1.70.0.
+
+### [1.70.0] — 2026-11-22
+
+The Android port of iOS 1.70.0 (Metis T-1924). The SDK and Map versions do not change (SDK
+6.0.0-beta.41, Map 6.0.0-beta.40). No change is needed in the code of a host app.
+
+- **Visible:** the amenity kinds the library knows (toilet, café, restaurant, help desk, prayer
+  room, stairs, lift, museum shop, theatre) are named with the title of their amenity in the venue
+  data, in the app language, in the search shortcuts and the amenity chips over the maps. The names
+  are edited in the Proximi portal. Before, a kind always showed the library's own text, so an
+  amenity renamed "Accessible Toilet" still showed "Toilet".
+  - The title of a language is the amenity's `title_i18n[language]` (the exact code, then the base
+    language). The untagged `title` counts only for `GadSettings.venueDataLanguage` (default
+    `"en"`): an Arabic app shows the library's Arabic text until the amenity has `title_i18n.ar`.
+  - The library's text stays when the data has no title in the app language, and when two
+    amenities of one kind have a place (a women's and a men's restroom), as for the icons of
+    1.68.0.
+  - An amenity of no known kind is unchanged: it shows `ProximiioAmenity.title(language)`, which
+    falls back to the untagged `title`.
+- `GadSettings.usesVenueAmenityTitles` (default `true`). `false` shows the library's texts, as up
+  to 1.69.0.
+- `GadSettings.venueDataLanguage` (default `"en"`).
 
 ### [1.69.0] — 2026-11-22
 

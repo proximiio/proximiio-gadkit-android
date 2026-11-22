@@ -260,6 +260,8 @@ internal fun MuseumMapView(
         val allPlaces = venue.places(language)
         // The glyphs of the amenity kinds from the venue data (iOS 1.68.0).
         val usedAmenities = (allPlaces.mapNotNull { it.amenityId } + levelChangers.mapNotNull { it.amenityId }).toSet()
+        // The names of the amenity kinds from the venue data (iOS 1.70.0).
+        VenueTitles.update(amenities, usedAmenities, settings.usesVenueAmenityTitles, settings.venueDataLanguage)
         if (VenueGlyphs.update(amenities, usedAmenities, icons, settings.usesVenueAmenityIcons)) layers.kindGlyphsChanged()
         layers.updateLevelChangers(levelChangers, LevelChangerPlace.amenityIcons(amenities, icons))
         layers.updateCones(VenueCone.all(venue.venueFeatures()))

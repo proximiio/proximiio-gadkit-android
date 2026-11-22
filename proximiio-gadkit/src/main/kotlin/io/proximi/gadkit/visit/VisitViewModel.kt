@@ -1,6 +1,7 @@
 package io.proximi.gadkit.visit
 
 import io.proximi.gadkit.map.VenueGlyphs
+import io.proximi.gadkit.map.VenueTitles
 import io.proximi.gadkit.map.venueFeatures
 import io.proximi.gadkit.map.VenueCone
 import io.proximi.gadkit.map.galleryDestinations
@@ -803,6 +804,8 @@ internal class VisitViewModel(
         val levelChangers = venue.levelChangers()
         // The glyphs of the amenity kinds from the venue data (iOS 1.68.0).
         val usedAmenities = (allPlaces.mapNotNull { it.amenityId } + levelChangers.mapNotNull { it.amenityId }).toSet()
+        // The names of the amenity kinds from the venue data (iOS 1.70.0).
+        VenueTitles.update(amenities, usedAmenities, settings.usesVenueAmenityTitles, settings.venueDataLanguage)
         if (VenueGlyphs.update(amenities, usedAmenities, icons, settings.usesVenueAmenityIcons)) layers.kindGlyphsChanged()
         searchShortcuts = AmenityListing.search(amenities).searchShortcuts(places, amenities, amenityIcons, language)
         controller.artworkRemoteIds = buildMap { places.forEach { place -> place.remoteId?.let { putIfAbsent(place.id, it) } } }

@@ -287,6 +287,22 @@ public data class GadSettings(
      */
     val usesVenueAmenityIcons: Boolean = true,
     /**
+     * The amenity kinds the library knows are named with the title of their amenity in the venue
+     * data, in the app language, so the names are edited in the Proximi portal (operator,
+     * 2026-11-22). The title of a language is the amenity's `title_i18n[language]`. The library's
+     * own text is shown when the data has no title in the app language, and when two amenities of
+     * one kind have a place. `false` shows the library's texts everywhere, as up to 1.69.0.
+     * iOS `usesVenueAmenityTitles` (1.70.0).
+     */
+    val usesVenueAmenityTitles: Boolean = true,
+    /**
+     * The language of the untagged `title` of an amenity in the venue data. The untagged title
+     * names a kind only in this language: with `"en"`, an Arabic app shows the library's Arabic
+     * text until the amenity has `title_i18n.ar`. An empty string never uses the untagged title.
+     * iOS `venueDataLanguage` (1.70.0).
+     */
+    val venueDataLanguage: String = "en",
+    /**
      * The transport of the wristband positions for the binding the library creates (`ProximiMap`).
      * [GadWristbandTransport.AUTOMATIC] since 1.69.0: on the DCT production installation the
      * client's Azure Application Gateway buffers Server-Sent Events, the positions came in bursts

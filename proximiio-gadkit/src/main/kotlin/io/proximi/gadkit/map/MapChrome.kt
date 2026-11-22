@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.pointerInput
@@ -430,9 +431,15 @@ internal fun CardCloseButton(contentDescription: String, onClick: () -> Unit) {
     }
 }
 
-/** The visitor-facing name of an amenity kind. */
+/**
+ * The visitor-facing name of an amenity kind: the title of the kind's amenity in the venue data, in
+ * the app language ([VenueTitles]); else the library's text.
+ */
 @Composable
-internal fun AmenityKind.title(): String = UiText.Resource(titleKey).mapText()
+internal fun AmenityKind.title(): String {
+    val language = MapLanguage.forAppLanguage(LocalConfiguration.current.locales[0]?.language)
+    return VenueTitles.title(this, language) ?: UiText.Resource(titleKey).mapText()
+}
 
 /** The design's title of a kind, else the amenity's title from the data. */
 @Composable
