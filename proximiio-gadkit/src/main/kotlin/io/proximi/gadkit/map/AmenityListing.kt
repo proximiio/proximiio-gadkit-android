@@ -76,7 +76,8 @@ internal class AmenityListing private constructor(
             for (amenity in amenities) {
                 if (amenity.id in kinds || amenity.id !in placed) continue
                 val rank = rank(amenity.id) ?: continue
-                val title = amenity.title(language) ?: amenity.title ?: amenity.id
+                val title = VenueTitles.title(VenueTitles.translations(amenity), language)
+                    ?: amenity.title(language) ?: amenity.title ?: amenity.id
                 ranked += AmenityShortcut.Amenity(amenity.id, title, icons[amenity.id]) to rank
             }
         }

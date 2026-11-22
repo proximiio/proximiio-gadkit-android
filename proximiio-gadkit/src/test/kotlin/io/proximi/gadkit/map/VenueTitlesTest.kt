@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.sdk.core.model.JsonValue
 import io.proximi.sdk.core.model.ProximiioAmenity
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,5 +61,38 @@ class VenueTitlesTest {
         assertNull(VenueTitles.title(AmenityKind.CAFE, "en"))
         VenueTitles.update(listOf(toilet), setOf("a-toilet"), enabled = false, untaggedLanguage = "en")
         assertNull(VenueTitles.title(AmenityKind.RESTROOM, "en"))
+    }
+
+    /** `metadata.title_i18n` names the kind in the languages `title_i18n` does not have (iOS 1.71.0). */
+    @Test
+    fun theMetadataTranslationsCountAfterTitleI18n() {
+        val metadata = JsonValue.Object(
+            mapOf(
+                "in_search" to JsonValue.String("true"),
+                "title_i18n" to JsonValue.Object(
+                    mapOf(
+                        "ar" to JsonValue.String("غرفة الصلاة"),
+                        "en" to JsonValue.String("Prayer room (metadata)"),
+                        "fr" to JsonValue.Number(1.0),
+                        "de" to JsonValue.String(" "),
+                    ),
+                ),
+            ),
+        )
+        val prayer = ProximiioAmenity(
+            id = "a-prayer", title = "Prayer Room", category = null, icon = null, details = null, metadata = metadata,
+            titleTranslations = mapOf("en" to "Prayer Room"),
+        )
+        val titles = VenueTitles.titles(prayer, untaggedLanguage = "en")
+        assertEquals("غرفة الصلاة", VenueTitles.title(titles, "ar"))
+        assertEquals("Prayer Room", VenueTitles.title(titles, "en"))
+        assertNull(VenueTitles.title(titles, "fr"))
+        assertNull(VenueTitles.title(titles, "de"))
+        // Metadata without the key, or with another shape, adds nothing.
+        val plain = ProximiioAmenity(
+            id = "a", title = "Shop", category = null, icon = null, details = null,
+            metadata = JsonValue.Object(mapOf("title_i18n" to JsonValue.String("x"))), titleTranslations = emptyMap(),
+        )
+        assertTrue(VenueTitles.translations(plain).isEmpty())
     }
 }

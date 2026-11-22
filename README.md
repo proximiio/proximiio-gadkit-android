@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.70.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.71.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.70.0
+git -C gadkit checkout 1.71.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -836,7 +836,7 @@ lists:
 | `JourneyChanged(journey)` | A new, planned, edited or deleted (`null`) journey, and the progress after the journey screen closed. |
 | `NextStop(stop)` | The route leads to this stop now. |
 | `StopNearby(stop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The library posts no notification for it. |
-| `GalleryNearby(gallery, stop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityId` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. It is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
+| `GalleryNearby(gallery, stop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityId` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. It is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`, after the visitor has been inside for `otherGalleryNearbySeconds` (by default `galleryEntryOrderSeconds`). Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
 | `PositionUncertain(stop)` | `ProximiMapView` without `PROMPTS`: the position is uncertain near the active stop, where the prompt would ask "Probably at …". At most once per `locationQuestionQuietPeriod`. |
 | `StopPlaceDeleted(stop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. See "Venue data changes". |
 | `ArtworkArrived(stop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it and the fix is within `artworkVisitedMeters` of its border: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence it becomes the active stop (`NextStop`), then this event comes, and `ArtworkVisited` follows when the visitor leaves it; with `visitsOutOfOrderAtEntry` it comes just before its `ArtworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `GeofenceEntered` arrives at the enter. |
@@ -927,6 +927,7 @@ val configuration = GadConfiguration(
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
 | `ordersAtGalleryEntry` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when they enter the gallery of an artwork still to visit that is not the gallery of the current artwork, once per entry. Needs `Option.PROGRESS`. |
 | `galleryEntryOrderSeconds` | 3 s | How long the position lies in a gallery before `ordersAtGalleryEntry` and `ordersVisitorGalleryFirst` count the visitor in it. Zero counts the first fix. |
+| `otherGalleryNearbySeconds` | `null` | How long the position lies in a gallery that is not the gallery of the current artwork before `GalleryNearby` reports it. `null` takes `galleryEntryOrderSeconds`, the position that orders the journey again. Zero reports on the first position inside, as before 1.71.0. |
 | `ordersVisitorGalleryFirst` | `true` | Personalised journeys: every order from the visitor puts the open artworks of the visitor's gallery first, also when an artwork of another gallery is nearer by the route. |
 | `ordersDoneStopsFirst` | `true` | `ProximiMapView` with `Option.PROGRESS`, personalised journeys: the visited and skipped stops of the journey the host app passes go before the pending ones, each group in the host app's order, and the view writes that order back. `false` keeps the host app's order. |
 | `orderSwitchMinimumMeters` | 3 m | While the visitor walks, another artwork becomes the current stop only when it is this many metres nearer in a straight line, or when it is in the visitor's gallery and the current stop is not. 0: every other order is taken. |
@@ -941,6 +942,7 @@ val configuration = GadConfiguration(
 | `artworkArrivalMarginMeters`, `artworkArrivalMarginSeconds` | 0, 3 s | Above 0: the visitor has arrived at the current artwork after the time within this distance of its geofence, outside it and in no other open artwork's geofence. Keep the distance below `artworkVisitedMeters`. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork of a gallery the visitor entered leads to the gallery again when the visitor is this far outside its outline, or on another floor. |
 | `skipsAtSwipe` | `true` (`false` before 1.65.1) | Journey list: `true` makes a swipe on an artwork ask for the skip at once (`SkipRequested`, and the dialog with `Option.SKIP_PROMPT`); the row slides back. `false`: the swipe reveals the skip button, and a tap on it asks for the skip. The TalkBack action "Skip" is the same in both. |
+| `skipsAtSwipeBothWays` | `true` | With `skipsAtSwipe`: a swipe towards either edge asks for the skip. `false`: only a swipe towards the start edge, as before 1.71.0. |
 | `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false`: a swipe on an artwork skips nothing, sends no event and shows "Resume your journey to skip the artwork" with "Dismiss"; the same text replaces the swipe hint. `true` keeps the swipe. |
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
@@ -1229,7 +1231,52 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.70.0.
+No changes since 1.71.0.
+
+### [1.71.0] — 2026-11-22
+
+The Android port of iOS 1.71.0 (Metis T-1931, T-1928, T-1924). The SDK and Map versions do not
+change (SDK 6.0.0-beta.41, Map 6.0.0-beta.40). Build all modules of the app against 1.71.0:
+`GadSettings` has two new values.
+
+- **BREAKING:** `ProximiMap.start()` checks the `GadConfiguration` before the SDK starts and throws
+  `ProximiMapException.StartFailed` for a value the SDK cannot start with. Its `reason` names the
+  value, in English, for the developer; it holds no token. The values: an API base URL without a
+  host (`api.example.com` without `https://`), an API or relay-api base URL that is not https
+  (http is accepted for localhost), an empty token, a token with a space or a line break. **A
+  relay-api base URL over http to another host than localhost started before 1.71.0 and does not
+  start now.** The other values failed before too, later and with the SDK's text.
+- `GadConfiguration.validate()` runs the same check and throws a `GadConfigurationException`
+  (`UrlWithoutHost`, `UrlNotHttps`, `EmptyToken`, `TokenWithWhitespace`). A host app that creates
+  the SDK or the wristband binding itself checks its values with
+  `GadConfiguration.validate(configuration: ProximiioConfiguration)` and
+  `GadConfiguration.validate(configuration: BlueiotBindingConfiguration)` before it creates them:
+
+  ```kotlin
+  try {
+      GadConfiguration.validate(configuration)
+  } catch (error: GadConfigurationException) {
+      // error.message: The API base URL "api.example.com" has no host. …
+  }
+  ```
+
+- **Visible:** `ProximiMapEvent.GalleryNearby` for a gallery that is not the gallery of the current
+  artwork (the visitor walked into another gallery that holds an artwork still to visit) is sent
+  after the visitor has been inside for `GadSettings.otherGalleryNearbySeconds`. The default
+  `null` takes `galleryEntryOrderSeconds` (3 s), so the event comes on the position that orders the
+  journey again and sends `NextStop`. Before, the event came on the first position inside the
+  outline: a visitor at a gallery's edge got the event and no new route (sandbox test, 2026-11-22:
+  52 s between the two). `otherGalleryNearbySeconds = Duration.ZERO` keeps the behaviour of 1.70.0.
+  The gallery of the current artwork is reported as before, without a delay.
+- **Visible:** the journey list: with `GadSettings.skipsAtSwipe`, a swipe towards either edge asks
+  for the skip (`GadSettings.skipsAtSwipeBothWays`, default `true`). Before, only a swipe towards
+  the start edge did; a swipe the other way did nothing. `false` keeps the one direction.
+- **Visible:** "Leave this artwork out?": 14 dp more space between "Skip it" and "Keep it".
+- The name of an amenity is also read from `metadata.title_i18n` (an object of language code to
+  text, for example `{"ar": "…"}`), for the languages the amenity's `title_i18n` does not have.
+  This applies to the amenity kinds of 1.70.0 and to the other search shortcuts. Language codes
+  are read in lower case with `-` for `_`; blank values and values that are no text are left out.
+- Not verified on a phone.
 
 ### [1.70.0] — 2026-11-22
 

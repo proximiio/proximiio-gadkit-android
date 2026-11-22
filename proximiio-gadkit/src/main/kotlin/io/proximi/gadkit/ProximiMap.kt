@@ -261,6 +261,15 @@ public class ProximiMap(
 
     private suspend fun performStart() {
         val startedAt = System.nanoTime()
+        // A value the SDK cannot start with fails the start here, with a text that names it (iOS 1.71.0).
+        try {
+            configuration.validate()
+        } catch (error: GadConfigurationException) {
+            FieldLog.log("map: start failed · configuration: ${error.message}")
+            val failure = ProximiMapException.StartFailed(text(R.string.i_couldn_t_get_things_started_check), error.message.orEmpty())
+            mutableStatus.value = Status.Failed(failure)
+            throw failure
+        }
         mutableStatus.value = Status.Starting
         runSession()
         try {

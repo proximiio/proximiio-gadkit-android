@@ -67,4 +67,25 @@ class SkipSwipeTest {
         val button = SkipSwipe.end(offset = -60f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = false)
         assertTrue(button.isRevealed && !button.skips)
     }
+
+    /**
+     * With both ways a swipe towards the end edge asks for the skip; without it, and without
+     * `skipsAtSwipe`, it does nothing (iOS 1.71.0).
+     */
+    @Test
+    fun aSwipeTowardsTheEndEdgeAsksForTheSkipWhenSet() {
+        val trailing = SkipSwipe.end(offset = 103f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = true, bothWays = true)
+        assertTrue(!trailing.isRevealed && trailing.skips)
+        val short = SkipSwipe.end(offset = 30f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = true, bothWays = true)
+        assertTrue(!short.isRevealed && !short.skips)
+        val oneWay = SkipSwipe.end(offset = 103f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = true, bothWays = false)
+        assertTrue(!oneWay.isRevealed && !oneWay.skips)
+        val button = SkipSwipe.end(offset = 103f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = false, bothWays = true)
+        assertTrue(!button.isRevealed && !button.skips)
+        // The row follows the finger towards the end edge, then it is damped.
+        assertEquals(50f, SkipSwipe.rubberBand(50f, revealWidth, bothWays = true))
+        assertEquals(102f, SkipSwipe.rubberBand(172f, revealWidth, bothWays = true))
+        assertEquals(10f, SkipSwipe.rubberBand(50f, revealWidth))
+        assertTrue(GadSettings().skipsAtSwipeBothWays)
+    }
 }

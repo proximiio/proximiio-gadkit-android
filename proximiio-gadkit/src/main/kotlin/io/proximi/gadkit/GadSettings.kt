@@ -346,6 +346,14 @@ public data class GadSettings(
      */
     val galleryEntryOrderSeconds: Duration = 3.seconds,
     /**
+     * How long the visitor's position lies in a gallery that holds an artwork still to visit, while
+     * the current artwork is in another gallery, before [ProximiMapEvent.GalleryNearby] reports that
+     * gallery. `null`: [galleryEntryOrderSeconds], so the report comes on the position that orders the
+     * journey again. Zero reports on the first fix inside, as before 1.71.0. The gallery of the
+     * current artwork is reported without a delay. iOS `otherGalleryNearbySeconds` (1.71.0).
+     */
+    val otherGalleryNearbySeconds: Duration? = null,
+    /**
      * Personalised journeys: `true` puts the artworks of the gallery the visitor is in first in every
      * order from the visitor, also when an artwork of another gallery is nearer by the route. So the
      * entry of a gallery ([ordersAtGalleryEntry]), a resume and an order off the route lead to an
@@ -451,6 +459,13 @@ public data class GadSettings(
      * 2026-11-20: no second step; iOS 1.64.0). iOS `skipsAtSwipe` (1.51.0).
      */
     val skipsAtSwipe: Boolean = true,
+    /**
+     * With [skipsAtSwipe]: a swipe towards either edge asks for the skip. `false`: only a swipe
+     * towards the start edge (left in a left-to-right layout), as before 1.71.0 (GAD PM's video,
+     * 2026-11-22: 7 of 10 swipes went the other way and did nothing). iOS `skipsAtSwipeBothWays`
+     * (1.71.0).
+     */
+    val skipsAtSwipeBothWays: Boolean = true,
     /**
      * The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop").
      * `false`, the default: a swipe on an artwork skips nothing, sends no event and shows "Resume your

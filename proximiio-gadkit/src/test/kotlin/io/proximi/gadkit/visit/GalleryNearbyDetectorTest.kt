@@ -128,4 +128,30 @@ class GalleryNearbyDetectorTest {
         assertNull(update(2.0, active = "poi-a"))
         assertNull(update(3.0, active = "poi-a"))
     }
+
+    /**
+     * Another gallery of the journey is reported after the visitor has been inside it for the entry
+     * time; a visitor who steps out earlier gets no report (Metis T-1928; iOS 1.71.0).
+     */
+    @Test
+    fun anotherGalleryIsReportedAfterTheEntryTime() {
+        val d = 10 / 111_320.0
+        val ring = listOf(-d to -d, -d to d, d to d, d to -d).map { (lat, lng) -> Coordinate(poi.latitude + lat, poi.longitude + lng) }
+        val outline = GalleryDestination(Gallery("G403", "G403 Weaving", 3.0, ring), entry = poi, placeId = "poi-g403")
+        val detector = GalleryNearbyDetector(nearbyMeters = 5.0, otherGalleryMillis = 3_000)
+        val open = listOf(mapStop("poi-b"), mapStop("poi-a"))
+        fun update(metresNorth: Double, atMillis: Long) =
+            detector.update(position(metresNorth, 3.0), mapStop("poi-b"), places, listOf(outline), open, nowMillis = 1_000_000 + atMillis)?.id
+        // At the edge for 2 s, then out: no report.
+        assertNull(update(9.0, 0))
+        assertNull(update(9.0, 2_000))
+        assertNull(update(60.0, 4_000))
+        // In again: the time starts again; reported once after 3 s inside.
+        assertNull(update(2.0, 10_000))
+        assertNull(update(2.0, 12_900))
+        assertEquals("poi-a", update(2.0, 13_000))
+        assertNull(update(2.0, 14_000))
+        // The settings: no own value takes the entry time of the order.
+        assertNull(GadSettings.STANDARD.otherGalleryNearbySeconds)
+    }
 }

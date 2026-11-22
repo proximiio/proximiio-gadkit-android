@@ -16,7 +16,12 @@ import io.proximi.map.core.VenuePosition
  * and the gallery's id in `metadata.gallery_id`; a gallery without one uses its own POI (GAD PM,
  * Monday "Entry POIs, connected to gallery", 2026-11-15; iOS 1.42.0). A visitor inside the outline of
  * another gallery with an artwork still to visit is reported too, with the first such artwork: the
- * visitor left the route and entered that gallery. `VisitViewModel` reports it as
+ * visitor left the route and entered that gallery. That report waits until the visitor has been
+ * inside for [otherGalleryMillis] (`GadSettings.otherGalleryNearbySeconds`, by default
+ * `galleryEntryOrderSeconds`, the time after which the journey is ordered again with that gallery
+ * first), so the report and the new order come on the same position (infra, Metis T-1928,
+ * 2026-11-22: a visitor at a gallery's edge got the report 52 s before the route changed; iOS
+ * 1.71.0). `VisitViewModel` reports it as
  * [VisitEvent.GalleryNearby]; the host app can start the gallery's introduction on it (Nagarro, PM,
  * Monday "Approaching gallery information", 2026-11-10).
  *
@@ -28,12 +33,17 @@ import io.proximi.map.core.VenuePosition
 internal class GalleryNearbyDetector(
     private val nearbyMeters: Double = GadSettings.STANDARD.galleryNearbyMeters,
     private val entranceAmenityId: String = GadSettings.STANDARD.galleryEntranceAmenityId,
+    /** Milliseconds inside another gallery of the journey before it is reported. */
+    private val otherGalleryMillis: Long = 0,
 ) {
     /** The `gallery_id` of the last gallery reported, while it is still the active stop's gallery. */
     private var reportedGalleryId: String? = null
 
     /** The `gallery_id` of another gallery of the journey reported while the visitor is inside it. */
     private var reportedOtherGalleryId: String? = null
+
+    /** The other gallery of the journey the visitor is inside, and since when (milliseconds). */
+    private var otherGalleryInside: Pair<String, Long>? = null
 
     /** The next [update] reports the active stop's gallery again when it is nearby. */
     fun reset() {
@@ -45,7 +55,7 @@ internal class GalleryNearbyDetector(
      * The stop whose gallery is reported now, else `null`: [stop] when its gallery is nearby and was
      * not reported yet, else the first of [openStops] whose gallery the visitor is inside. [outlines]
      * are the gallery outlines ([GalleryDestination.id] is the `gallery_id`); [openStops] the stops
-     * still to visit, in the journey's order.
+     * still to visit, in the journey's order. [nowMillis] is the time of the position.
      */
     fun update(
         position: VenuePosition?,
@@ -53,6 +63,7 @@ internal class GalleryNearbyDetector(
         places: List<VenuePlace>,
         outlines: List<GalleryDestination>,
         openStops: List<JourneyStop> = emptyList(),
+        nowMillis: Long = System.currentTimeMillis(),
     ): JourneyStop? {
         active(position, stop, places, outlines)?.let { return it }
         if (position == null) return null
@@ -66,12 +77,16 @@ internal class GalleryNearbyDetector(
             if (galleryId == activeGalleryId) continue
             if (outlines.firstOrNull { it.id == galleryId }?.gallery?.contains(here, level) != true) continue
             if (galleryId == reportedOtherGalleryId) return null
+            if (otherGalleryInside?.first != galleryId) otherGalleryInside = galleryId to nowMillis
+            val since = otherGalleryInside?.second ?: nowMillis
+            if (nowMillis - since < otherGalleryMillis) return null
             reportedOtherGalleryId = galleryId
             FieldLog.log("gallery nearby: ${gallery.title} · stop ${other.title} · inside, not the active stop's gallery")
             return other
         }
         // Outside every other gallery of the journey: the next entry reports again.
         reportedOtherGalleryId = null
+        otherGalleryInside = null
         return null
     }
 

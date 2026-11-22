@@ -216,7 +216,11 @@ internal class VisitViewModel(
     private val stopNearby = StopNearbyDetector(settings.stopNearbyMeters)
 
     /** The gallery of the active stop within [GadSettings.galleryNearbyMeters] or around the visitor. */
-    private val galleryNearby = GalleryNearbyDetector(settings.galleryNearbyMeters, settings.galleryEntranceAmenityId)
+    private val galleryNearby = GalleryNearbyDetector(
+        settings.galleryNearbyMeters,
+        settings.galleryEntranceAmenityId,
+        (settings.otherGalleryNearbySeconds ?: settings.galleryEntryOrderSeconds).inWholeMilliseconds,
+    )
 
     /** Whether the journey has a stop. Without one the screen shows the map alone. */
     val hasStops: Boolean = journey.stops.isNotEmpty()

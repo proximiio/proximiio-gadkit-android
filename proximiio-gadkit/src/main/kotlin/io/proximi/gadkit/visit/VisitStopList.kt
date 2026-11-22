@@ -124,6 +124,7 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                         onRevealChange = { revealedStopId = if (it) stop.id else null },
                         isEnabled = allowsSkip && SkipSwipe.canSkip(stop),
                         skipsAtSwipe = model.settings.skipsAtSwipe || isSkipPaused,
+                        skipsBothWays = model.settings.skipsAtSwipeBothWays,
                         onSkip = {
                             revealedStopId = null
                             model.requestSkip(stop)
@@ -221,6 +222,8 @@ private fun SwipeToSkipRow(
     isEnabled: Boolean,
     /** [io.proximi.gadkit.GadSettings.skipsAtSwipe]: the swipe itself asks for the skip. */
     skipsAtSwipe: Boolean,
+    /** [io.proximi.gadkit.GadSettings.skipsAtSwipeBothWays]: a swipe towards the end edge asks for the skip too. */
+    skipsBothWays: Boolean,
     onSkip: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -274,7 +277,7 @@ private fun SwipeToSkipRow(
         Box(
             Modifier
                 // `offset {}` follows the layout direction: a negative x is towards the start edge.
-                .offset { IntOffset(SkipSwipe.rubberBand(offset.value, revealWidth).roundToInt(), 0) }
+                .offset { IntOffset(SkipSwipe.rubberBand(offset.value, revealWidth, bothWays = skipsAtSwipe && skipsBothWays).roundToInt(), 0) }
                 .then(
                     if (isEnabled) {
                         Modifier.draggable(
@@ -286,7 +289,7 @@ private fun SwipeToSkipRow(
                                 // already logical. Reversing it again made a quick swipe to the right
                                 // close the panel in Arabic (PM, Monday "Skipping in Arabic goes the
                                 // wrong way").
-                                val end = SkipSwipe.end(offset.value, velocity, revealWidth, skipsAtSwipe)
+                                val end = SkipSwipe.end(offset.value, velocity, revealWidth, skipsAtSwipe, bothWays = skipsBothWays, isRevealed = isRevealed)
                                 if (end.skips) {
                                     // The row slides back while the skip is asked for.
                                     scope.launch { offset.animateTo(0f, tween(250)) }
@@ -332,14 +335,29 @@ internal object SkipSwipe {
     /**
      * The end of a drag that stops at [offset] with [velocity] (px/s). With [skipsAtSwipe] a drag that
      * would reveal the panel asks for the skip and the row slides back; a shorter drag does nothing.
+     * With [bothWays] as well, a drag of the same length towards the end edge asks for the skip too,
+     * when the panel is not revealed (GAD PM's video, 2026-11-22: 7 of 10 swipes went that way and did
+     * nothing; iOS 1.71.0).
      */
-    fun end(offset: Float, velocity: Float, revealWidth: Float, skipsAtSwipe: Boolean): End {
+    fun end(
+        offset: Float,
+        velocity: Float,
+        revealWidth: Float,
+        skipsAtSwipe: Boolean,
+        bothWays: Boolean = false,
+        isRevealed: Boolean = false,
+    ): End {
+        if (skipsAtSwipe && bothWays && !isRevealed && offset + velocity * 0.1f > revealWidth / 2) return End(isRevealed = false, skips = true)
         val revealed = reveals(offset, velocity, revealWidth)
         return if (skipsAtSwipe && revealed) End(isRevealed = false, skips = true) else End(revealed, skips = false)
     }
 
-    /** Damped drag past the open position and past the closed position. */
-    fun rubberBand(raw: Float, revealWidth: Float): Float = when {
+    /**
+     * Damped drag past the open position and past the closed position. With [bothWays] the row
+     * follows a drag towards the end edge as far as [revealWidth] and is damped after it.
+     */
+    fun rubberBand(raw: Float, revealWidth: Float, bothWays: Boolean = false): Float = when {
+        raw > 0 && bothWays -> if (raw > revealWidth) revealWidth + (raw - revealWidth) * 0.3f else raw
         raw > 0 -> raw * 0.2f
         raw < -revealWidth -> -revealWidth + (raw + revealWidth) * 0.3f
         else -> raw
