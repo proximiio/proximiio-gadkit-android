@@ -187,9 +187,7 @@ internal fun SkipConfirmation(stop: String, onSkip: () -> Unit, onKeep: () -> Un
         Text(stop, style = GadTextStyle.LargeBodyRegular.textStyle, color = Palette.ink, textAlign = TextAlign.Center)
         SheetBody(stringResource(R.string.i_ll_remove_it_from_your_route), Modifier.padding(bottom = 20.dp))
         PrimaryButton(stringResource(R.string.skip_it), onSkip)
-        // 14 dp more between the two buttons: a touch meant for "Skip it" landed on "Keep it" (GAD
-        // PM's video, 2026-11-22; iOS 1.71.0).
-        TextActionButton(stringResource(R.string.keep_it), onKeep, Modifier.padding(top = 14.dp))
+        TextActionButton(stringResource(R.string.keep_it), onKeep)
     }
 }
 

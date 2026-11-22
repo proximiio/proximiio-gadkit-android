@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.71.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.71.1")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.71.0
+git -C gadkit checkout 1.71.1
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1231,7 +1231,15 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.71.0.
+No changes since 1.71.1.
+
+### [1.71.1] — 2026-11-22
+
+The Android port of iOS 1.71.1. The SDK and Map versions do not change. No change is needed in the
+code of a host app, and no setting is new.
+
+- **Visible:** "Leave this artwork out?": the space between "Skip it" and "Keep it" is as before
+  1.71.0. The 14 dp added in 1.71.0 are taken back (GAD PM, 2026-11-22: no change of the design).
 
 ### [1.71.0] — 2026-11-22
 
