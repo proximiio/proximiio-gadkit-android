@@ -3,6 +3,7 @@ package io.proximi.gadkit.wristband
 import android.content.Context
 import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.GadConfiguration
+import io.proximi.gadkit.GadWristbandTransport
 import io.proximi.gadkit.UiText
 import io.proximi.gadkit.wristband.BindingState
 import io.proximi.gadkit.wristband.WristbandConnecting
@@ -13,6 +14,7 @@ import io.proximi.sdk.blueiot.binding.BlueiotBindingConfiguration
 import io.proximi.sdk.blueiot.binding.BlueiotBindingError
 import io.proximi.sdk.blueiot.binding.BlueiotBindingSignal
 import io.proximi.sdk.blueiot.binding.BlueiotBindingState
+import io.proximi.sdk.blueiot.binding.BlueiotBindingTransport
 import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import io.proximi.sdk.setPositioningSourcePrivate
 import kotlinx.coroutines.CoroutineScope
@@ -196,7 +198,15 @@ internal class WristbandSession(context: Context, configuration: GadConfiguratio
         internal fun configuration(configuration: GadConfiguration) = BlueiotBindingConfiguration(
             relayURL = configuration.relayEndpoint,
             appToken = configuration.relayApiAppToken,
+            transport = transport(configuration.settings.wristbandTransport),
             runsInBackground = true,
         )
+
+        /** The SDK's transport for the setting. Pure; covered by tests. */
+        internal fun transport(setting: GadWristbandTransport): BlueiotBindingTransport = when (setting) {
+            GadWristbandTransport.SERVER_SENT_EVENTS -> BlueiotBindingTransport.SERVER_SENT_EVENTS
+            GadWristbandTransport.WEB_SOCKET -> BlueiotBindingTransport.WEB_SOCKET
+            GadWristbandTransport.AUTOMATIC -> BlueiotBindingTransport.AUTOMATIC
+        }
     }
 }

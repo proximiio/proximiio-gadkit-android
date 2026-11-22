@@ -59,6 +59,13 @@ internal sealed class BindingError(message: String, cause: Throwable? = null) : 
 
     internal data class Server(val status: Int, override val requestId: String? = null) : BindingError("The relay failed (HTTP $status).")
 
+    /**
+     * The network edge in front of the relay (Cloudflare) answered with a challenge, not the relay.
+     * The SDK tries again; a session is kept. SDK 6.0.0-beta.41.
+     */
+    internal data class EdgeChallenge(val status: Int, override val requestId: String? = null) :
+        BindingError("The network edge in front of the relay asked for a check (HTTP $status).")
+
     internal data class Unexpected(
         val code: String,
         val status: Int,

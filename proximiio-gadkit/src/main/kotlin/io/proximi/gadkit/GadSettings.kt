@@ -287,6 +287,15 @@ public data class GadSettings(
      */
     val usesVenueAmenityIcons: Boolean = true,
     /**
+     * The transport of the wristband positions for the binding the library creates (`ProximiMap`).
+     * [GadWristbandTransport.AUTOMATIC] since 1.69.0: on the DCT production installation the
+     * client's Azure Application Gateway buffers Server-Sent Events, the positions came in bursts
+     * and the position dot went grey (2026-11-22). A host app that creates its own
+     * `BlueiotWristbandBinding` sets `BlueiotBindingConfiguration.transport` itself.
+     * iOS `wristbandTransport` (1.69.0).
+     */
+    val wristbandTransport: GadWristbandTransport = GadWristbandTransport.AUTOMATIC,
+    /**
      * `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is
      * marked visited while the visitor stands in another gallery than the next stop's, and that gallery
      * has an artwork still to visit (GAD PM, Monday "Re-routing going from gallery 104 to 102",
@@ -581,4 +590,22 @@ public data class GadCameraBounds(
             south = 24.53557985, west = 54.39348543, north = 24.54644005, east = 54.40758853,
         )
     }
+}
+
+/**
+ * How the wristband positions reach the phone from the relay-api (`GET /v1/me/position`).
+ * iOS `GADSettings.WristbandTransport`.
+ */
+public enum class GadWristbandTransport {
+    /** Server-Sent Events. A proxy that buffers responses delivers them in bursts. */
+    SERVER_SENT_EVENTS,
+
+    /** WebSocket only. */
+    WEB_SOCKET,
+
+    /**
+     * WebSocket first. Server-Sent Events when a WebSocket cannot be opened; an open WebSocket that
+     * drops is opened again as a WebSocket.
+     */
+    AUTOMATIC,
 }

@@ -49,7 +49,7 @@ internal object WristbandCopy {
         // A refused swap to a new wristband outside reception. The current session is kept.
         is BindingError.SwapBandsApart -> res("wristband_error_swap_bands_apart")
         is BindingError.SwapAtReception -> res("wristband_error_swap_at_reception")
-        is BindingError.SigningUnavailable -> res("wristband_error_signing_unavailable")
+        is BindingError.SigningUnavailable, is BindingError.EdgeChallenge -> res("wristband_error_signing_unavailable")
         is BindingError.Network -> res("wristband_error_network")
         is BindingError.Server, is BindingError.InvalidResponse -> res("wristband_error_server")
         is BindingError.SessionLost, is BindingError.BindingClosed -> res("wristband_error_session_ended")

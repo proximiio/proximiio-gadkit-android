@@ -11,6 +11,8 @@ import io.proximi.map.core.JourneyOrderStrategy
 import io.proximi.map.core.PositionSmoothing
 import io.proximi.sdk.core.model.BarrierConfiguration
 import io.proximi.gadkit.wristband.TrackingHealth
+import io.proximi.gadkit.wristband.WristbandSession
+import io.proximi.sdk.blueiot.binding.BlueiotBindingTransport
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -200,5 +202,20 @@ class GadSettingsTest {
         assertEquals(numbered.detour, plain.detour)
         assertEquals(numbered.groupBadge, plain.groupBadge)
         assertTrue(plain.groupsOverlapping)
+    }
+
+    /**
+     * The wristband positions come over WebSocket first (SDK 6.0.0-beta.41; the DCT production
+     * proxy buffers Server-Sent Events). The setting reaches the binding configuration.
+     */
+    @Test
+    fun theWristbandTransportReachesTheBinding() {
+        val configuration = GadConfiguration("https://api.example.com", "token", "https://relay.example.com", "relay")
+        assertEquals(GadWristbandTransport.AUTOMATIC, GadSettings.STANDARD.wristbandTransport)
+        assertEquals(BlueiotBindingTransport.AUTOMATIC, WristbandSession.configuration(configuration).transport)
+        val sse = configuration.copy(settings = GadSettings(wristbandTransport = GadWristbandTransport.SERVER_SENT_EVENTS))
+        assertEquals(BlueiotBindingTransport.SERVER_SENT_EVENTS, WristbandSession.configuration(sse).transport)
+        val webSocket = configuration.copy(settings = GadSettings(wristbandTransport = GadWristbandTransport.WEB_SOCKET))
+        assertEquals(BlueiotBindingTransport.WEB_SOCKET, WristbandSession.configuration(webSocket).transport)
     }
 }

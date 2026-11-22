@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.68.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.69.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.68.0
+git -C gadkit checkout 1.69.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -73,7 +73,7 @@ Gradle resolves it to the included build.
   keeps compiling. The section "Changelog" lists every change and marks the breaking ones.
 - Declarations marked `@ProximiGadAppApi` are for the Proximi GAD app only. They need an opt-in, are
   not covered by the rule above and can change in any version.
-- The library depends on SDK `6.0.0-beta.40` and Map `6.0.0-beta.40` and exposes them, with Compose,
+- The library depends on SDK `6.0.0-beta.41` and Map `6.0.0-beta.40` and exposes them, with Compose,
   as `api` dependencies. The host app needs no dependency on them. A host app that also declares
   these artifacts must use the same versions.
 - The library uses `com.airbnb.android:lottie-compose` for the lift and stairs animations
@@ -919,6 +919,7 @@ val configuration = GadConfiguration(
 | `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
 | `shapesGalleryLabelsByType` | `false` (`true` in 1.61.0 to 1.63.0) | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill, as before 1.61.0. |
 | `usesVenueAmenityIcons` | `true` | Draws the amenity kinds (toilet, café, restaurant, help desk, prayer room, stairs, lift, museum shop, theatre) with the icon of their amenity in the venue data, tinted, and on the maps in the white circle marker. The bundled glyph is drawn when the amenity has no icon, and in lists and chips when two amenities of one kind have a place. `false` draws the bundled glyphs, as up to 1.67.0. |
+| `wristbandTransport` | `AUTOMATIC` | The transport of the wristband positions for the binding the library creates: `AUTOMATIC` (WebSocket first, Server-Sent Events when a WebSocket cannot be opened), `WEB_SOCKET` or `SERVER_SENT_EVENTS` (as up to 1.68.0). A host app with its own `BlueiotWristbandBinding` sets `BlueiotBindingConfiguration.transport` itself. |
 | `fieldLogUploadInterval` | 900 s | Time between two uploads of the field log to the relay-api ("Field log"). Zero sends nothing. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | `true` draws the leg of a personalised journey again from the visitor while they walk in the gallery of the current artwork, more than `galleryRouteRefreshMeters` off the leg, at most every `galleryRouteRefreshSeconds`. With `Option.PROGRESS` the stops ahead are ordered from the visitor first. No off-route warning shows. |
@@ -1192,7 +1193,7 @@ passes the SDK's journey validation. `gad.listJourneys` logs the current list.
 | `@_spi(GADApp) ProximiMap.sdk`, `wristbandBindingStates()` | `@ProximiGadAppApi` `sdk`, `wristbandBindingStates()`, `postNotification(…)` | The Proximi GAD app posts its notifications on the library's channel `alerts`. |
 | `onNavigator`: the previous navigator's `events` streams finish | The previous navigator's `events` flow never completes | The host app cancels its collection. A recreated activity keeps the navigator and does not call `onNavigator` again. |
 | `ProximiJourney(kind:journey:)` | `ProximiJourney.ofJourney(journey, kind)` | |
-| SDK 6.0.0-beta.73 and Map 6.0.0-beta.64 | SDK 6.0.0-beta.40 and Map 6.0.0-beta.40 | The same SDK and Map changes on both platforms, also the network changes of iOS SDK 6.0.0-beta.73 (Android SDK 6.0.0-beta.40). The SDK's database cannot go back to an older SDK. |
+| SDK 6.0.0-beta.75 and Map 6.0.0-beta.68 | SDK 6.0.0-beta.41 and Map 6.0.0-beta.40 | The same SDK and Map changes on both platforms, also the network changes of iOS SDK 6.0.0-beta.73 (Android SDK 6.0.0-beta.40) and the WebSocket transport of iOS SDK 6.0.0-beta.75 (Android SDK 6.0.0-beta.41). The SDK's database cannot go back to an older SDK. |
 
 ## Tests
 
@@ -1226,7 +1227,39 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.68.0.
+No changes since 1.69.0.
+
+### [1.69.0] — 2026-11-22
+
+The Android port of iOS 1.69.0 (Metis T-1920, T-1912). The SDK moves to 6.0.0-beta.41. The Map stays
+at 6.0.0-beta.40: it does not use the SDK types that changed.
+
+- **BREAKING:** SDK `6.0.0-beta.41`. A host app that declares the SDK moves to this version. Build
+  all modules of the app against 1.69.0: the constructors of `BlueiotBindingConfiguration` and
+  `BlueiotBindingDiagnostics` have new last parameters with defaults. A `when` without `else` over
+  `BlueiotBindingError`, `BlueiotBindingTransport` or `ProximiioAPIError` needs the new cases
+  (`EdgeChallenge`; `WEB_SOCKET`, `AUTOMATIC`).
+- SDK 6.0.0-beta.41 (the port of iOS SDK 6.0.0-beta.75):
+  - `BlueiotBindingConfiguration.transport` has `WEB_SOCKET` and `AUTOMATIC` (WebSocket first;
+    Server-Sent Events only when a WebSocket cannot be opened). The SDK's default stays
+    `SERVER_SENT_EVENTS`.
+  - A stream with no frame for 30 s is closed and opened again at once
+    (`BlueiotBindingConfiguration.streamSilenceTimeout`; 45 s before). The first reconnect after a
+    dropped stream is immediate.
+  - A Cloudflare challenge on a relay call (`BlueiotBindingError.EdgeChallenge`) is temporary and
+    is tried again; it does not end the binding. The wristband screens show "The museum's server
+    is busy. Try again in a moment." for it.
+  - The WebSocket path had not run on a phone at this release.
+- **Visible:** `GadSettings.wristbandTransport` (`GadWristbandTransport`, default `AUTOMATIC`) sets
+  the transport of the binding the library creates through `ProximiMap`. On the DCT production
+  installation the client's Azure Application Gateway buffers Server-Sent Events: the positions
+  came in bursts and the position dot went grey. WebSocket passes that path.
+  `SERVER_SENT_EVENTS` gives the transport of 1.68.0.
+- **A host app that creates its own `BlueiotWristbandBinding` sets the transport itself:**
+  `BlueiotBindingConfiguration(relayURL = …, appToken = …, transport = BlueiotBindingTransport.AUTOMATIC)`.
+  Without it the binding stays on Server-Sent Events.
+- The field log names the transport in use in `relay stream: open · binding <id> · <sse|ws|poll>`,
+  as before.
 
 ### [1.68.0] — 2026-11-22
 

@@ -39,6 +39,7 @@ internal fun BlueiotBindingError.toCore(): BindingError = when (this) {
     is BlueiotBindingError.SwapAtReception -> BindingError.SwapAtReception(requestID)
     is BlueiotBindingError.SigningUnavailable -> BindingError.SigningUnavailable(retryAfter, requestID)
     is BlueiotBindingError.Server -> BindingError.Server(status, requestID)
+    is BlueiotBindingError.EdgeChallenge -> BindingError.EdgeChallenge(status, requestID)
     is BlueiotBindingError.Unexpected -> BindingError.Unexpected(code, status, serverMessage, requestID)
     is BlueiotBindingError.InvalidResponse -> BindingError.InvalidResponse(status, requestID)
     is BlueiotBindingError.Network -> BindingError.Network(underlying.error)

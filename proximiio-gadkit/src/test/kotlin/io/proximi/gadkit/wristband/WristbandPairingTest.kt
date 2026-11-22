@@ -129,6 +129,7 @@ class WristbandCopyTest {
     fun refusedSwapAndSigningOutageHaveTheirOwnText() {
         assertEquals(UiText.Resource("wristband_error_swap_bands_apart"), WristbandCopy.message(BindingError.SwapBandsApart()))
         assertEquals(UiText.Resource("wristband_error_swap_at_reception"), WristbandCopy.message(BindingError.SwapAtReception()))
+        assertEquals(UiText.Resource("wristband_error_signing_unavailable"), WristbandCopy.message(BindingError.EdgeChallenge(403)))
         assertEquals(UiText.Resource("wristband_error_signing_unavailable"), WristbandCopy.message(BindingError.SigningUnavailable(retryAfterSeconds = 3.0)))
     }
 

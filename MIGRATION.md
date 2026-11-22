@@ -2,8 +2,8 @@
 
 This guide is for a host app on SDK 6.0.0-beta.23 and Map 6.0.0-beta.21 that shows its journey with
 the map library's `ProximiioMap` and its own `JourneyNavigator`. These are the versions of the
-Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.68.0 uses SDK
-6.0.0-beta.40 and Map 6.0.0-beta.40.
+Proximi Android integration guide of 2026-10-13. ProximiioGADKit for Android 1.69.0 uses SDK
+6.0.0-beta.41 and Map 6.0.0-beta.40.
 
 Each change has a mark:
 
@@ -84,6 +84,8 @@ built again: both have a new trailing parameter.
 | SDK 6.0.0-beta.38 | `ProximiioConfiguration.privacyZoneExitDelay` (default `null`: the `geofenceExitDelay`). ProximiioGADKit for Android sets it to 1 s from `GadSettings.privacyZoneExitDelay`. | For the same on your own SDK: `privacyZoneExitDelay = 1.0`. | Recommended |
 | Map 6.0.0-beta.40 | The Map moves to SDK 6.0.0-beta.38. Nothing in the map's code changed. | Nothing. | Info |
 | SDK 6.0.0-beta.40 | The SDK calls the server less often: the venue data package about once an hour, waits between failed uploads and retries. | Nothing. | Info |
+| SDK 6.0.0-beta.41 | `BlueiotBindingConfiguration.transport` has `WEB_SOCKET` and `AUTOMATIC` (WebSocket first, Server-Sent Events when a WebSocket cannot be opened); the default stays `SERVER_SENT_EVENTS`. A proxy that buffers Server-Sent Events delivers the positions in bursts (the DCT production installation). ProximiioGADKit for Android sets `AUTOMATIC` from `GadSettings.wristbandTransport`. | For the same on your own binding: `transport = BlueiotBindingTransport.AUTOMATIC`. | Recommended |
+| SDK 6.0.0-beta.41 | A position stream with no frame for 30 s (45 s before) is opened again at once. A Cloudflare challenge is `BlueiotBindingError.EdgeChallenge` / `ProximiioAPIError.EdgeChallenge`, tried again, not an end of the binding. The constructors of `BlueiotBindingConfiguration` and `BlueiotBindingDiagnostics` have new parameters. | Build all modules again. Add the new cases to a `when` without `else` over these types. | Required |
 | SDK 6.0.0-beta.39 | A wristband position stream that receives nothing for 45 s ends and connects again; after three failed tries in a row the SDK asks for the position instead. Before, a connection that did not answer stopped the position until the app was restarted. The SDK checks its connections to the relay every 15 s (Android only). | Nothing. | Info |
 
 ### Added
@@ -149,8 +151,8 @@ All Info.
 
 The SDK and Map changelogs of these versions have the full entries.
 
-SDK versions after 6.0.0-beta.40 and Map versions after 6.0.0-beta.40 are not used by ProximiioGADKit
-for Android 1.68.0. A host app that declares them gets them instead of the versions above.
+SDK versions after 6.0.0-beta.41 and Map versions after 6.0.0-beta.40 are not used by ProximiioGADKit
+for Android 1.69.0. A host app that declares them gets them instead of the versions above.
 
 ## 2. From ProximiioMap to ProximiMapView
 
@@ -170,9 +172,9 @@ for Android 1.68.0. A host app that declares them gets them instead of the versi
 ### Step 1: Dependencies (Required)
 
 - Add `includeGroup("io.proximi.gadkit")` to the Proximi.io repository in `settings.gradle.kts` and
-  depend on `io.proximi.gadkit:proximiio-gadkit:1.68.0` (README "Adding the library"). No git
+  depend on `io.proximi.gadkit:proximiio-gadkit:1.69.0` (README "Adding the library"). No git
   submodule is needed.
-- The library brings SDK `6.0.0-beta.40` and Map `6.0.0-beta.40` as `api` dependencies. Remove the
+- The library brings SDK `6.0.0-beta.41` and Map `6.0.0-beta.40` as `api` dependencies. Remove the
   app's own SDK and Map dependencies, or set them to exactly these versions. Gradle takes the highest
   version requested, so a newer one in the app replaces the library's.
 - `ProximiMapEvent.ArtworkReached` and `ProximiMapEvent.ArtworkVisitedOutOfOrder` are deprecated
