@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.71.1")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.71.2")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.71.1
+git -C gadkit checkout 1.71.2
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1231,7 +1231,21 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.71.1.
+No changes since 1.71.2.
+
+### [1.71.2] — 2026-11-23
+
+The Android port of iOS 1.71.2 (Metis T-1935). The SDK and Map versions do not change. No change is
+needed in the code of a host app, and no setting is new.
+
+- Journey list: the skip reads the stop again from the journey. A stop that is skipped or visited
+  opens no prompt and sends no `ProximiMapEvent.SkipRequested`; the field log has
+  `list skip: <stop id> is not a stop to skip`. Before, the list asked with the stop value of the
+  row.
+- Not ported: the one pan recognizer of the iOS list. On iOS a swipe on the row of the last artwork
+  asked to skip an artwork that was skipped before (Nagarro's video and field log, 2026-11-23).
+  The Android rows have a stable key and take the skip action again at each composition; the fault
+  was not seen on Android. A swipe can start on any part of a row, as before.
 
 ### [1.71.1] — 2026-11-22
 

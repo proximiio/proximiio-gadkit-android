@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import io.proximi.gadkit.FieldLog
 import io.proximi.gadkit.R
 import io.proximi.gadkit.map.Gallery
 import io.proximi.gadkit.visit.JourneyStop
@@ -127,7 +128,10 @@ internal fun VisitStopList(model: VisitViewModel, modifier: Modifier = Modifier)
                         skipsBothWays = model.settings.skipsAtSwipeBothWays,
                         onSkip = {
                             revealedStopId = null
-                            model.requestSkip(stop)
+                            // The stop as the journey holds it now: a row can hold an older value
+                            // of its stop. A skipped or visited stop is refused (iOS 1.71.2).
+                            val current = SkipSwipe.stopToSkip(VisitPlan.artworks(model.progress.journey), stop.id)
+                            if (current != null) model.requestSkip(current) else FieldLog.log("list skip: ${stop.id} is not a stop to skip")
                         },
                     ) {
                         StopRow(stop, numbers[stop.id] ?: 0, isRevealed = revealedStopId == stop.id, place = places[stop.poiId ?: stop.id], showsNumbers = model.settings.showsStopNumbers, showsIcons = model.settings.showsStopIcons)
@@ -317,6 +321,9 @@ private fun SwipeToSkipRow(
 internal object SkipSwipe {
     /** Only a stop still ahead can be skipped. */
     fun canSkip(stop: JourneyStop): Boolean = stop.state == StopState.PENDING || stop.state == StopState.ACTIVE
+
+    /** The stop with [stopId] among [stops] when it can be skipped now; `null` for a skipped, visited or unknown stop. */
+    fun stopToSkip(stops: List<JourneyStop>, stopId: String): JourneyStop? = stops.firstOrNull { it.id == stopId }?.takeIf(::canSkip)
 
     /** The hint under the list: the row slides towards the start edge, right in a right-to-left layout. */
     @StringRes

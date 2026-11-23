@@ -58,6 +58,18 @@ class SkipSwipeTest {
         assertFalse(SkipSwipe.canSkip(stop(StopState.REACHED)))
     }
 
+    /** iOS 1.71.2: the skip reads the stop again from the journey; a skipped or visited stop is refused. */
+    @Test
+    fun theSkipTakesTheStopAsTheJourneyHoldsItNow() {
+        fun stop(id: String, state: StopState) = JourneyStop(id = id, title = "Artwork $id", coordinate = Coordinate(24.5, 54.4), level = 1.0, poiId = id, state = state)
+        val stops = listOf(stop("a", StopState.DONE), stop("b", StopState.ACTIVE), stop("c", StopState.SKIPPED), stop("d", StopState.PENDING))
+        assertEquals("d", SkipSwipe.stopToSkip(stops, "d")?.id)
+        assertEquals(StopState.ACTIVE, SkipSwipe.stopToSkip(stops, "b")?.state)
+        assertEquals(null, SkipSwipe.stopToSkip(stops, "c"))
+        assertEquals(null, SkipSwipe.stopToSkip(stops, "a"))
+        assertEquals(null, SkipSwipe.stopToSkip(stops, "x"))
+    }
+
     @Test
     fun aSwipeAsksForTheSkipAtOnceWhenSet() {
         val revealing = SkipSwipe.end(offset = -60f, velocity = 0f, revealWidth = revealWidth, skipsAtSwipe = true)
