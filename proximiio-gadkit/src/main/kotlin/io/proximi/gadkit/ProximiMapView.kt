@@ -48,6 +48,7 @@ import io.proximi.gadkit.visit.JourneyKind
 import io.proximi.gadkit.visit.VisitEvent
 import io.proximi.gadkit.visit.VisitMode
 import io.proximi.gadkit.visit.VisitScreen
+import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.ui.HostLanguage
 import io.proximi.map.live.JourneyNavigator
 import io.proximi.sdk.Proximiio
@@ -221,7 +222,7 @@ public fun ProximiMapView(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val model: HostedMapModel = viewModel(key = HostedMapModel.KEY)
-    val language = LocalConfiguration.current.locales[0]?.toLanguageTag()
+    val language = AppLanguage.tag(LocalConfiguration.current.locales[0]?.toLanguageTag())
     SideEffect {
         model.onEvent = onEvent
         model.onJourneyChange = onJourneyChange

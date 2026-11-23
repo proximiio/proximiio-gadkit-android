@@ -17,6 +17,9 @@ import java.util.Locale
  * Times are ISO 8601 in UTC, to the second.
  */
 internal object BindingLog {
+    /** "tag <label> · started" before the bind request (iOS 1.72.0). */
+    fun bindStarted(label: String): String = "tag $label · started"
+
     /** "tag <label> · binding <id>" after a bind. */
     fun bind(label: String, bindingId: java.util.UUID): String = "tag $label · binding ${bindingId.toString().lowercase(Locale.ROOT)}"
 

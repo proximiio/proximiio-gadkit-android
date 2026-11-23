@@ -7,6 +7,9 @@ import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -23,16 +26,45 @@ import java.util.Locale
  * first locale of the composition's `LocalConfiguration`: the one the host app gives the library's
  * views, or the activity's (the app language, `LocaleManager`). "ar" for Arabic, else "en"
  * ([MapLanguage]). The map labels follow the same language.
+ *
+ * [io.proximi.gadkit.GadSettings.language] goes before both when the host app has set it (iOS 1.72.0;
+ * Nagarro, 2026-11-23: the Explore map was English in an Arabic app).
  */
 internal object AppLanguage {
     /** The language the library's views took last, for the field log. */
     private var taken: String? = null
 
-    /** Writes `app language <ar|en> (host locale <tag>)` to the field log when [language] is new (iOS). */
-    fun take(language: String, hostLocale: String?) {
+    /** `GadSettings.language` as the host app set it. */
+    @Volatile
+    var fixedValue: String? = null
+        private set
+
+    /** "ar" or "en" of [fixedValue], or `null`. A composition that reads it runs again when it changes. */
+    var fixed: String? by mutableStateOf(null)
+        private set
+
+    /** "ar" for an Arabic language identifier, else "en". Pure; covered by tests. */
+    fun code(identifier: String?): String = if (identifier?.lowercase(Locale.ROOT)?.startsWith("ar") == true) "ar" else "en"
+
+    /** The language from its sources, first the one the host app has set. Pure; covered by tests. */
+    fun resolved(fixed: String?, host: String?): String = fixed ?: code(host)
+
+    /** The language tag the library takes: [fixed], else [hostTag]. */
+    fun tag(hostTag: String?): String? = fixed ?: hostTag
+
+    /** `GadSettings.language` changed: the host app's own choice, or `null` to follow the app again. */
+    fun fix(language: String?) {
+        fixedValue = language
+        val code = language?.let(::code)
+        fixed = code
+        if (code != null) take(code, "GadSettings.language $language")
+    }
+
+    /** Writes `app language <ar|en> (<reason>)` to the field log when [language] is new (iOS). */
+    fun take(language: String, reason: String) {
         if (language == taken) return
         taken = language
-        FieldLog.log("app language $language (host locale ${hostLocale ?: "-"})")
+        FieldLog.log("app language $language ($reason)")
     }
 
     /** [context]'s resources in [language] ("ar" or "en"), or [context]'s own when they are in it already. */
@@ -57,14 +89,23 @@ internal object AppLanguage {
 @Composable
 internal fun HostLanguage(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val locale = LocalConfiguration.current.locales[0]
-    val language = MapLanguage.forAppLanguage(locale?.language)
-    SideEffect { AppLanguage.take(language, locale?.toLanguageTag()) }
+    val hostConfiguration = LocalConfiguration.current
+    val locale = hostConfiguration.locales[0]
+    val fixed = AppLanguage.fixed
+    val language = AppLanguage.resolved(fixed, locale?.language)
+    SideEffect {
+        AppLanguage.take(language, if (fixed != null) "GadSettings.language ${AppLanguage.fixedValue}" else "host locale ${locale?.toLanguageTag() ?: "-"}")
+    }
+    // With `GadSettings.language` the views below read that language from `LocalConfiguration` too.
+    val configuration = remember(hostConfiguration, fixed) {
+        if (fixed == null) hostConfiguration else Configuration(hostConfiguration).apply { setLocale(Locale.forLanguageTag(fixed)) }
+    }
     val localized = remember(context, language) {
         val resources = AppLanguage.resources(context, language)
         if (resources === context.resources) context else LocalizedContext(context, resources)
     }
     CompositionLocalProvider(
+        LocalConfiguration provides configuration,
         LocalContext provides localized,
         LocalResources provides localized.resources,
         LocalLayoutDirection provides if (language == "ar") LayoutDirection.Rtl else LayoutDirection.Ltr,

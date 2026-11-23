@@ -14,6 +14,22 @@ import kotlin.test.assertNull
 class BindingLogTest {
     private val start = 1_791_970_200_000L // 2026-10-14T09:30:00Z
 
+    /**
+     * iOS 1.72.0: the attempt has a line before the request, and `FieldLog.bind` returns the session
+     * and throws the error of the bind, a cancelled bind too (Nagarro, 2026-11-23).
+     */
+    @Test
+    fun theBindAttemptIsLoggedFromItsStart() = kotlinx.coroutines.runBlocking {
+        assertEquals("tag GAD-0042 · started", BindingLog.bindStarted("GAD-0042"))
+        val session = BlueiotBindingSession(UUID.randomUUID(), endsAt = start, tokenExpiresAt = start)
+        assertEquals(session, io.proximi.gadkit.FieldLog.logged("GAD-0042") { session })
+        val thrown = runCatching {
+            io.proximi.gadkit.FieldLog.logged("GAD-0042") { throw kotlinx.coroutines.CancellationException("cancelled") }
+        }.exceptionOrNull()
+        assertEquals(true, thrown is kotlinx.coroutines.CancellationException)
+        assertEquals(true, BindingLog.bind("GAD-0042", IllegalStateException("no network")).startsWith("tag GAD-0042 · failed: "))
+    }
+
     @Test
     fun theSessionLineHasTheBindingIdAndTheTimesInUTC() {
         val session = BlueiotBindingSession(

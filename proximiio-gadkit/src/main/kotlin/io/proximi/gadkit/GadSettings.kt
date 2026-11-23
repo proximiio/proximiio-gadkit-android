@@ -605,6 +605,22 @@ public data class GadSettings(
     public companion object {
         /** The defaults. */
         public val STANDARD: GadSettings = GadSettings()
+
+        /**
+         * The language of every view of the library: `"ar"` or `"en"` (an identifier that starts
+         * with "ar" counts as Arabic, any other as English). `null`, the default, follows the app:
+         * the locale the host app gives a view of the library, else the activity's. iOS
+         * `GADSettings.language` (1.72.0).
+         *
+         * One value for the process, not for one view. It applies at once, also to open maps: the
+         * library's texts, the texts of the venue data, the layout direction and the map labels of
+         * `ProximiMapView`, `ProximiExploreView` and `ProximiMapHost`. Set it from any thread, at
+         * the start of the app and at each change of the app's language.
+         */
+        @JvmStatic
+        public var language: String?
+            get() = io.proximi.gadkit.ui.AppLanguage.fixedValue
+            set(value) = io.proximi.gadkit.ui.AppLanguage.fix(value)
     }
 }
 

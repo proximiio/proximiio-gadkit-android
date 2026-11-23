@@ -62,6 +62,7 @@ import io.proximi.gadkit.visit.VisitPlanPicker
 import io.proximi.gadkit.visit.VisitScreen
 import io.proximi.gadkit.visit.VisitStore
 import io.proximi.gadkit.wristband.LocationDialogHost
+import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.ui.HostLanguage
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -98,7 +99,7 @@ public fun ProximiMapHost(
 ) {
     val activity = LocalActivity.current
     LaunchedEffect(map) { map.launchOptionsRead(DebugLaunch.read(activity)) }
-    val language = LocalConfiguration.current.locales[0]?.toLanguageTag()
+    val language = AppLanguage.tag(LocalConfiguration.current.locales[0]?.toLanguageTag())
     LaunchedEffect(map, language) { map.setLanguage(language) }
     AskLocation(map)
     // Location may have been allowed in Settings meanwhile: Android has no change callback.

@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.71.2")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.72.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.71.2
+git -C gadkit checkout 1.72.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -129,10 +129,11 @@ The library ships English and Arabic strings. Declare both languages in the host
 support right-to-left layouts. `ProximiMapException.message` and `WristbandStatus.NotConnected.notice`
 are in the app's language at the time they are created.
 
-The library's views show Arabic when the language is Arabic, else English. The language is the first
-locale of the composition's `LocalConfiguration`:
+The library's views show Arabic when the language is Arabic, else English. The language is:
 
-- the one the host app gives `ProximiMapView`, `ProximiExploreView` or `ProximiMapHost`;
+- `GadSettings.language`, when the host app has set it (`"ar"` or `"en"`);
+- else the first locale of the composition's `LocalConfiguration`: the one the host app gives
+  `ProximiMapView`, `ProximiExploreView` or `ProximiMapHost`;
 - else the activity's, which is the app language (`LocaleManager`).
 
 A change applies at once, also to an open map: the library's texts, the texts of the venue data
@@ -142,9 +143,15 @@ host app needs no restart, and the open map keeps its journey.
 
 A host app that switches its language another way, such as its own string tables, changes neither the
 composition's `LocalConfiguration` nor the app language, and the library's views keep their language. The
-field log shows each language the views take: `app language <ar|en> (host locale <tag>)`.
+field log shows each language the views take: `app language <ar|en> (GadSettings.language <value>)`
+or `(host locale <tag>)`.
 
 ```kotlin
+// A host app that sets the language of every view of the library itself. One value for the
+// process: set it at the start of the app and at each change of the app's language. `null`
+// follows the app.
+GadSettings.language = "ar"   // or "en"
+
 // A host app that switches its language in its composition:
 val language by viewModel.language.collectAsState()   // "ar" or "en"
 val configuration = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag(language)) }
@@ -1231,7 +1238,39 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.71.2.
+No changes since 1.72.0.
+
+### [1.72.0] — 2026-11-23
+
+The Android port of iOS 1.72.0 (Metis T-1937). The SDK and Map versions do not change. No change is
+needed in the code of a host app. Both additions are for a host app to use.
+
+- New: `GadSettings.language`, a value of the companion object: `"ar"`, `"en"` or `null`. It sets
+  the language of every view of the library in the process: the library's texts, the texts of the
+  venue data, the layout direction and the map labels of `ProximiMapView`, `ProximiExploreView` and
+  `ProximiMapHost`. It goes before the locale of the composition and before the app language, and
+  applies at once, also to open maps. An identifier that starts with "ar" counts as Arabic, any
+  other as English. `null`, the default, is the behaviour up to 1.71.2. A host app that switches
+  its language with its own string tables sets it at the start and at each change:
+
+  ```kotlin
+  GadSettings.language = "ar"   // or "en"; null follows the app
+  ```
+
+  Field log: `app language <ar|en> (GadSettings.language <value>)`.
+- New: `FieldLog.bind(tagID, binding)` binds through the host app's `BlueiotWristbandBinding`, as
+  `binding.bind(tagID)` does, and writes the attempt to the field log. A host app that binds
+  itself calls it in place of `binding.bind(tagID)`:
+
+  ```kotlin
+  val session = FieldLog.bind(tagID = label, binding = binding)
+  ```
+
+  Lines: `wristband bind: tag <label> · started` before the request, then
+  `wristband bind: tag <label> · binding <id>` or `wristband bind: tag <label> · failed: <error>`.
+  Up to 1.71.2 a host app that called `binding.bind(tagID)` itself left no line for a bind, and a
+  failed, cancelled or hanging attempt was not in the log.
+- The bind of `ProximiMap` writes the `started` line too.
 
 ### [1.71.2] — 2026-11-23
 

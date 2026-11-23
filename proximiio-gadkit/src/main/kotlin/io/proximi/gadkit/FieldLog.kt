@@ -9,6 +9,8 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import io.proximi.gadkit.wristband.BindingFieldLog
+import io.proximi.gadkit.wristband.BindingLog
+import io.proximi.sdk.blueiot.binding.BlueiotBindingSession
 import io.proximi.sdk.blueiot.binding.BlueiotWristbandBinding
 import java.io.File
 import java.net.URI
@@ -44,7 +46,7 @@ public object FieldLog {
     private const val TAG = "GAD"
 
     /** The version of the library, sent with each upload. iOS `FieldLog.packageVersion`. */
-    public const val PACKAGE_VERSION: String = "1.71.2"
+    public const val PACKAGE_VERSION: String = "1.72.0"
 
     /** The thread of every read and write of the file and of the place of the upload. */
     internal val writer = lazy { Executors.newSingleThreadExecutor { Thread(it, "gad-field-log").apply { isDaemon = true } } }
@@ -125,6 +127,37 @@ public object FieldLog {
     /** Stops the uploads. The log file stays. iOS `FieldLog.stopUploading()`. */
     public fun stopUploading() {
         FieldLogUploader.stop()
+    }
+
+    /**
+     * Binds this phone to the band with [tagID] through [binding], as `binding.bind(tagID)` does,
+     * and writes the attempt to the field log (iOS `FieldLog.bind(tagID:with:)`, 1.72.0):
+     *
+     *     wristband bind: tag <label> · started
+     *     wristband bind: tag <label> · binding <id>
+     *     wristband bind: tag <label> · failed: <error>
+     *
+     * The first line is written before the request, so an attempt that does not return, or that
+     * the app cancels, is in the log too. A host app that binds itself calls this in place of
+     * `binding.bind(tagID)`.
+     *
+     * @return the session of the bind.
+     * @throws io.proximi.sdk.blueiot.binding.BlueiotBindingError what `binding.bind(tagID)` throws.
+     */
+    public suspend fun bind(tagID: String, binding: BlueiotWristbandBinding): BlueiotBindingSession =
+        logged(tagID) { binding.bind(tagID = tagID) }
+
+    /** The lines of [bind] around [bind]. A cancelled bind is logged and thrown on. Covered by tests. */
+    internal suspend fun logged(tagID: String, bind: suspend () -> BlueiotBindingSession): BlueiotBindingSession {
+        log("wristband bind: ${BindingLog.bindStarted(tagID)}")
+        try {
+            val session = bind()
+            log("wristband bind: ${BindingLog.bind(tagID, session.bindingID)}")
+            return session
+        } catch (error: Throwable) {
+            log("wristband bind: ${BindingLog.bind(tagID, error)}")
+            throw error
+        }
     }
 
     /** Appends one line with a time stamp. */

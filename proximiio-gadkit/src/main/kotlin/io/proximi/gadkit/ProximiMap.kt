@@ -202,7 +202,7 @@ public class ProximiMap(
     /** The venue's places in the app's language, for the stop picker. */
     internal val places: StateFlow<List<VenuePlace>> = mutablePlaces.asStateFlow()
     private var galleries: List<Gallery> = emptyList()
-    private var language: String? = context.resources.configuration.locales[0]?.toLanguageTag()
+    private var language: String? = AppLanguage.tag(context.resources.configuration.locales[0]?.toLanguageTag())
 
     private var startJob: Deferred<Unit>? = null
 

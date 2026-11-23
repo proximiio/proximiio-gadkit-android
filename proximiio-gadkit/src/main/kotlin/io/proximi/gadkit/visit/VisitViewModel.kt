@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.proximi.gadkit.FieldLog
+import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.AmenityKind
 import io.proximi.gadkit.map.Gallery
@@ -177,7 +178,7 @@ internal class VisitViewModel(
     )
 
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]))
-    private var language = MapLanguage.forAppLanguage(application.resources.configuration.locales[0]?.language)
+    private var language = MapLanguage.forAppLanguage(AppLanguage.tag(application.resources.configuration.locales[0]?.language))
 
     /** The host app's times and distances, read once when the screen opens. */
     val settings = venue.settings
