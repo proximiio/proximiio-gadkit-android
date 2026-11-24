@@ -2,7 +2,10 @@ package io.proximi.gadkit.map
 
 import kotlin.math.roundToInt
 import org.maplibre.android.style.layers.SymbolLayer
+import androidx.compose.ui.text.font.FontWeight
+import io.proximi.gadkit.designsystem.GadFonts
 import io.proximi.gadkit.designsystem.GadIcon
+import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.explore.ExploreItem
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -691,7 +694,7 @@ internal class JourneyMapLayers {
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = textColor
                 textSize = 14 * density
-                typeface = ResourcesCompat.getFont(context, R.font.guggenheim_sans_display_semibold)
+                typeface = ResourcesCompat.getFont(context, GadFonts.resource(FontWeight.SemiBold, AppLanguage.current))
             }
             val text = TextUtils.ellipsize(name, TextPaint(paint), 220 * density, TextUtils.TruncateAt.END).toString()
             val inset = 12 * density

@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.72.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.73.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.72.0
+git -C gadkit checkout 1.73.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -162,7 +162,10 @@ CompositionLocalProvider(LocalConfiguration provides configuration) {
 
 ### Fonts
 
-Guggenheim Sans Display is a font resource of the library. Nothing needs registering.
+Guggenheim Sans Display and Guggenheim Arabic (BETA v2) are font resources of the library. Nothing
+needs registering. While the library's language is Arabic, the library's screens and the gallery
+names on the map use Guggenheim Arabic in the weight of the design. Guggenheim Sans Display has no
+Arabic glyphs. The name table of Guggenheim Arabic states the SIL Open Font License 1.1.
 
 ## Quick start
 
@@ -1238,7 +1241,30 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.72.0.
+No changes since 1.73.0.
+
+### [1.73.0] — 2026-11-24
+
+The Android port of iOS 1.73.0 (Metis T-1948). The SDK and Map versions do not change. No change is
+needed in the code of a host app.
+
+- New: the library holds Guggenheim Arabic (BETA v2; Light, Regular, Medium, SemiBold, Bold) as
+  font resources. While the library's language is Arabic, every text of the library's screens and
+  the gallery names on the map use it, in the weight of the design. Up to 1.72.0 Android drew
+  Arabic text in the system Arabic font, because Guggenheim Sans Display has no Arabic glyphs
+  (tester report "Arabic - Explore Museum > Museum Map", 2026-11-24).
+- **Visible:** Latin text and digits in an Arabic screen come from Guggenheim Arabic too. Its
+  Latin glyphs have the advance widths of Guggenheim Sans Display. Guggenheim Arabic has a line
+  gap, so a text of more than one line can be taller in Arabic than up to 1.72.0. Not measured on
+  Android.
+- The language of the font is the library's language: `GadSettings.language`, else the language
+  of the library's views, else the language of the process.
+- Not changed: the labels the map style draws (they use the style's fonts from the glyph server)
+  and the stop numbers on the map.
+- The AAR is about 300 kB larger (five font files).
+- Docs: the comment of `ProximiMapView.Option.PROGRESS` said an artwork is visited when the visitor
+  enters its geofence. It now says what the code does: visited when the visitor leaves it, or at
+  the entry of another artwork of the journey (Metis T-1946). No change of behaviour.
 
 ### [1.72.0] — 2026-11-23
 

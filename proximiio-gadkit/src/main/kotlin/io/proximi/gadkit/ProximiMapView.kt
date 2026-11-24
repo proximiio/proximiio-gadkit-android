@@ -109,10 +109,13 @@ public object ProximiMapView {
 
         /**
          * The view moves the journey on and reports it through `onJourneyChange`: an artwork is
-         * visited when the visitor enters its geofence or stays at it out of order, a personalised
-         * journey is ordered floor by floor and gallery by gallery, and a stop whose POI is deleted
-         * is skipped. Without it only the host app's journey changes the stops, and the view reports
-         * no journey.
+         * visited when the visitor leaves it (more than [GadSettings.artworkVisitedMeters] from the
+         * border of its geofence for [GadSettings.artworkVisitedSeconds]) or enters the geofence of
+         * another artwork of the journey; the entry gives [ProximiMapEvent.ArtworkArrived] only. With
+         * [GadSettings.advancesOnArtworkExit] `false` it is visited
+         * [GadSettings.artworkAdvanceDelay] after the arrival. A personalised journey is ordered
+         * floor by floor and gallery by gallery, and a stop whose POI is deleted is skipped. Without
+         * it only the host app's journey changes the stops, and the view reports no journey.
          */
         PROGRESS,
 

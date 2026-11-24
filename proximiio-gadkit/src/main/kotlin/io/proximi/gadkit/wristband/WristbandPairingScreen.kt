@@ -67,7 +67,6 @@ import io.proximi.gadkit.UiText
 import io.proximi.gadkit.wristband.WristbandPairing.Step
 import io.proximi.gadkit.designsystem.AuroraBox
 import io.proximi.gadkit.designsystem.GadTextStyle
-import io.proximi.gadkit.designsystem.GuggenheimSansDisplay
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.designsystem.PrimaryButton
 import io.proximi.gadkit.designsystem.TextActionButton
@@ -282,7 +281,7 @@ private fun PairingScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Column(Modifier.asHeading(merge = true), horizontalAlignment = Alignment.CenterHorizontally) {
-                    val title = GadTextStyle.H1Regular.textStyle.copy(fontFamily = GuggenheimSansDisplay, fontSize = 32.sp)
+                    val title = GadTextStyle.H1Regular.textStyle.copy(fontSize = 32.sp)
                     Text(titleLight, style = title, color = Palette.ink, textAlign = TextAlign.Center)
                     Text(titleBold, style = title.copy(fontWeight = FontWeight.Bold), color = Palette.ink, textAlign = TextAlign.Center)
                 }

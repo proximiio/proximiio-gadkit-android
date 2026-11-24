@@ -43,6 +43,22 @@ internal object AppLanguage {
     var fixed: String? by mutableStateOf(null)
         private set
 
+    /** The language the library's views drew last, "ar" or "en"; `null` before the first view. */
+    private var hosted: String? by mutableStateOf(null)
+
+    /**
+     * The library's language for what is not read from the resources, such as the font (iOS
+     * `AppLanguage.current`): `GadSettings.language`, else the language of the library's views, else
+     * the language of the process. A composition that reads it runs again when it changes.
+     */
+    val current: String
+        get() = fixed ?: hosted ?: code(Locale.getDefault().language)
+
+    /** The library's views draw in [language]. */
+    fun host(language: String) {
+        if (hosted != language) hosted = language
+    }
+
     /** "ar" for an Arabic language identifier, else "en". Pure; covered by tests. */
     fun code(identifier: String?): String = if (identifier?.lowercase(Locale.ROOT)?.startsWith("ar") == true) "ar" else "en"
 
@@ -94,6 +110,7 @@ internal fun HostLanguage(content: @Composable () -> Unit) {
     val fixed = AppLanguage.fixed
     val language = AppLanguage.resolved(fixed, locale?.language)
     SideEffect {
+        AppLanguage.host(language)
         AppLanguage.take(language, if (fixed != null) "GadSettings.language ${AppLanguage.fixedValue}" else "host locale ${locale?.toLanguageTag() ?: "-"}")
     }
     // With `GadSettings.language` the views below read that language from `LocalConfiguration` too.

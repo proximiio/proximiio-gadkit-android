@@ -36,7 +36,6 @@ import io.proximi.gadkit.visit.VisitMeta
 import io.proximi.gadkit.designsystem.AuroraBox
 import io.proximi.gadkit.designsystem.AuroraVariant
 import io.proximi.gadkit.designsystem.GadTextStyle
-import io.proximi.gadkit.designsystem.GuggenheimSansDisplay
 import io.proximi.gadkit.designsystem.Palette
 import io.proximi.gadkit.designsystem.PrimaryButton
 import io.proximi.gadkit.designsystem.TextActionButton
@@ -75,7 +74,7 @@ internal fun JourneyReadyScreen(meta: VisitMeta, isAtMuseum: Boolean, onStart: (
                 Text(
                     meta.title,
                     Modifier.asHeading(),
-                    style = GadTextStyle.H1Bold.textStyle.copy(fontFamily = GuggenheimSansDisplay, fontWeight = FontWeight.SemiBold, fontSize = 32.sp),
+                    style = GadTextStyle.H1Bold.textStyle.copy(fontWeight = FontWeight.SemiBold, fontSize = 32.sp),
                     color = Palette.ink,
                     textAlign = TextAlign.Center,
                 )
