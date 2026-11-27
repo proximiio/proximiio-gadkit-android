@@ -1,5 +1,9 @@
 package io.proximi.gadkit.explore
 
+import io.proximi.map.live.ProximiioMapSession
+import androidx.compose.animation.core.animateFloatAsState
+import kotlin.time.Duration
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.withFrameNanos
 import java.util.Locale
 import io.proximi.gadkit.MeasurementLog
@@ -211,6 +215,40 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     // The place whose card is open.
     var selected by remember { mutableStateOf<ExploreItem?>(null) }
     var hasFramed by remember { mutableStateOf(false) }
+    // The start has set the first level and the camera.
+    var isFramed by remember { mutableStateOf(false) }
+    // The map is on screen (`GadSettings.exploreMapRevealMaximumSeconds`).
+    var isRevealed by remember { mutableStateOf(settings.exploreMapRevealMaximumSeconds <= Duration.ZERO) }
+    val openedAtNanos = remember { System.nanoTime() }
+
+    fun reveal(reason: String) {
+        if (isRevealed) return
+        isRevealed = true
+        FieldLog.log("explore map shown: $reason · ${MeasurementLog.millisecondsSince(openedAtNanos)} ms after the view started")
+    }
+
+    /**
+     * Shows the map when the map library has nothing left to draw after the camera was set, or after
+     * `GadSettings.exploreMapRevealMaximumSeconds`.
+     */
+    suspend fun revealWhenDrawn() {
+        if (isRevealed) return
+        val framedAtNanos = System.nanoTime()
+        // The library reports the idle map once. A map that was idle before the camera was set draws
+        // the new frame without a report.
+        val wasIdle = session.venueDrawing.value == ProximiioMapSession.VenueDrawing.IDLE
+        while (true) {
+            val reason = ExploreReveal.reason(
+                elapsedSeconds = MeasurementLog.millisecondsSince(framedAtNanos) / 1000.0,
+                isIdle = session.venueDrawing.value == ProximiioMapSession.VenueDrawing.IDLE,
+                wasIdleAtFrame = wasIdle,
+                hasError = session.lastError.value != null,
+                maximumSeconds = settings.exploreMapRevealMaximumSeconds.inWholeMilliseconds / 1000.0,
+            )
+            if (reason != null) return reveal(reason)
+            delay(50)
+        }
+    }
     // The visitor picked a floor or a place: the first framing keeps it.
     var hasPicked by remember { mutableStateOf(false) }
     // The features the map does not draw: artworks, level changers (drawn by `layers`) and the
@@ -298,11 +336,14 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
 
     LaunchedEffect(session, language) {
         load()
-        if (hasFramed) return@LaunchedEffect
+        if (hasFramed) {
+            // After a change of the language during the wait.
+            if (isFramed) revealWhenDrawn()
+            return@LaunchedEffect
+        }
         hasFramed = true
         // A floor the visitor picked while the venue loaded stays.
-        if (hasPicked) return@LaunchedEffect
-        withContext(Dispatchers.Main.immediate) {
+        if (!hasPicked) withContext(Dispatchers.Main.immediate) {
             // The lowest floor with a gallery, framed on the whole museum.
             show(catalog.spaces.minOfOrNull { it.level } ?: catalog.levels.firstOrNull() ?: 0.0)
             // Without the spaces far from the building (GAD PM, on site, 2026-11-19; iOS 1.58.0).
@@ -319,6 +360,13 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
                 session.camera.fitBounds(bounds, insets, animated = false)
             }
         }
+        isFramed = true
+        revealWhenDrawn()
+    }
+    // The map shows after `mapLoadingTimeout` whatever the start does.
+    LaunchedEffect(Unit) {
+        delay(settings.mapLoadingTimeout)
+        reveal("after the loading timeout")
     }
     LaunchedEffect(session, language) { venue.data.version.drop(1).collect { load() } }
     LaunchedEffect(session) { MapDiagnostics.follow(session, "explore", this) }
@@ -380,17 +428,19 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     BackHandler(enabled = panel != null) { panel = null }
 
     val backdrop = rememberGlassBackdrop()
+    val mapAlpha by animateFloatAsState(if (isRevealed) 1f else 0f, tween(250), label = "exploreMapReveal")
     Box(modifier.fillMaxSize().onSizeChanged { mapSize = it }) {
         ProximiioMap(
             session = session,
-            modifier = Modifier.fillMaxSize().glassBackdrop(backdrop).softEdges(cornerRadius = 40.dp),
+            // Hidden until the whole venue is drawn (`GadSettings.exploreMapRevealMaximumSeconds`).
+            modifier = Modifier.fillMaxSize().glassBackdrop(backdrop).softEdges(cornerRadius = 40.dp).graphicsLayer { alpha = mapAlpha },
             configure = { canvas ->
                 layers.attach(canvas)
                 canvas.onStyleLoaded { loaded, _ -> map = loaded }
             },
         )
         ProvideGlassBackdrop(backdrop) {
-            MapLoadingSpinner(session, settings.mapLoadingTimeout)
+            MapLoadingSpinner(session, settings.mapLoadingTimeout, isBusy = !isRevealed)
             val card = selected
             AnimatedVisibility(visible = panel == null && card != null, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
                 val shown = remember { mutableStateOf(card) }
@@ -403,7 +453,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
                     ExploreCallout(item, amenityIcons, mapSize, point, onClose = { selected = null })
                 }
             }
-            Header(level, catalog.levels, onPick = { hasPicked = true; show(it) })
+            Header(level, isLevelKnown = isFramed, catalog.levels, onPick = { hasPicked = true; show(it) })
             AnimatedVisibility(
                 visible = panel != null,
                 enter = slideInVertically(tween(250)) { it },
@@ -424,14 +474,29 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     }
 }
 
-/** "Level N" and the floor changer. */
+/** When the hidden Explore map shows (`GadSettings.exploreMapRevealMaximumSeconds`), as iOS `revealReason` (1.76.0). */
+internal object ExploreReveal {
+    /** Seconds a map that was idle before the camera was set gets to draw the new frame. */
+    const val SETTLE_SECONDS: Double = 0.5
+
+    /** Why the hidden map shows now, [elapsedSeconds] after the camera was set; `null` while it waits. Pure; covered by tests. */
+    fun reason(elapsedSeconds: Double, isIdle: Boolean, wasIdleAtFrame: Boolean, hasError: Boolean, maximumSeconds: Double): String? = when {
+        hasError -> "map error"
+        elapsedSeconds >= maximumSeconds -> "after the longest wait"
+        wasIdleAtFrame -> if (elapsedSeconds >= SETTLE_SECONDS) "drawn before the camera was set" else null
+        isIdle -> "venue drawn"
+        else -> null
+    }
+}
+
+/** "Level N" and the floor changer. The level shows when the first level is known ([isLevelKnown]). */
 @Composable
-private fun Header(level: Double, levels: List<Double>, onPick: (Double) -> Unit) {
+private fun Header(level: Double, isLevelKnown: Boolean, levels: List<Double>, onPick: (Double) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.Top) {
         // Regular 24 as in the Figma frame 12129:102006 (PM, Monday "Font size and style", 2026-10-26).
         Text(
             stringResource(R.string.level_n, level.roundToInt()),
-            Modifier.padding(top = 8.dp).testTag("exploreLevel"),
+            Modifier.padding(top = 8.dp).graphicsLayer { alpha = if (isLevelKnown) 1f else 0f }.testTag("exploreLevel"),
             style = GadTextStyle.H1Regular.textStyle,
             color = Palette.ink,
         )

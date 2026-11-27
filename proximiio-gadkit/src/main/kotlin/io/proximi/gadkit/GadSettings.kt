@@ -507,6 +507,15 @@ public data class GadSettings(
      * after this time.
      */
     val mapLoadingTimeout: Duration = 20.seconds,
+    /**
+     * The Explore map stays hidden under its spinner until the map library has drawn the whole venue
+     * at the first frame of the camera: the floor plan, the tiles, the galleries, the icons and the
+     * labels. It then fades in at once (Nagarro, 2026-11-27: the parts of the map came on screen one
+     * after another). This is the longest time the map waits for that after its camera is set; after
+     * it the map shows as it is. Zero: the map shows from the start, as before 1.76.0.
+     * [mapLoadingTimeout] still ends the spinner. iOS `exploreMapRevealMaximumSeconds` (1.76.0).
+     */
+    val exploreMapRevealMaximumSeconds: Duration = 4.seconds,
 
     // Lift
 

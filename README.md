@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.75.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.76.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.75.0
+git -C gadkit checkout 1.76.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -958,6 +958,7 @@ val configuration = GadConfiguration(
 | `bearingSettlingTime`, `bearingDeadband` | 1.5 s, 5° | The heading-up map takes `bearingSettlingTime` to turn to a new heading and does not turn for a change smaller than `bearingDeadband` (Nagarro: the rotation was too fast, 2026-10-29). The map library's defaults are 0.9 s and 0°. |
 | `smoothsPosition` | `false` | `false` draws the position dot on each fix. `true` slides it toward each fix, which shows a fix a moment later. |
 | `mapLoadingTimeout` | 20 s | The longest time the maps show their spinner while the map library draws the venue. |
+| `exploreMapRevealMaximumSeconds` | 4 s | The Explore map stays hidden under its spinner until the map library has drawn the whole venue at the first frame of the camera, then fades in at once. This is the longest wait after the camera is set. Zero: the map shows from the start. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
 | `exploreFramingMaximumMeters` | 150 m | The Explore Museum map opens on the spaces whose centre is at most this far from the median centre of all spaces. `null` frames every space. |
 | `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
@@ -1242,7 +1243,29 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.75.0.
+No changes since 1.76.0.
+
+### [1.76.0] — 2026-11-27
+
+The Android port of iOS 1.76.0 (Metis T-1954). The SDK and Map versions do not change. No change is
+needed in the code of a host app.
+
+- **Visible:** Explore map (`ProximiExploreView`): the map stays hidden under its spinner until the
+  map library has drawn the whole venue at the first frame of the camera, and then fades in at once,
+  in 0.25 s. Up to 1.75.0 the spinner went when the venue's features reached the map, and the parts
+  of the map came on screen one after another (Nagarro's iOS video, 2026-11-27). The spinner stays
+  longer than before, until the map is complete.
+- The map shows when the map library reports the idle map after the venue was drawn
+  (`venueDrawing == IDLE`): no camera move, tile load or fade is left. A map that was idle before
+  the camera was set shows 0.5 s after it.
+- New: `GadSettings.exploreMapRevealMaximumSeconds` (default 4 s), the longest wait after the camera
+  is set; after it the map shows as it is. A map error shows the map at once, and
+  `mapLoadingTimeout` shows it whatever the start does. `Duration.ZERO`: the map shows from the
+  start, as up to 1.75.0.
+- The level title of the Explore map shows when the first level is known. Before, it read "Level 0"
+  until then.
+- Field log: `explore map shown: <venue drawn | drawn before the camera was set | after the longest wait | map error | after the loading timeout> · <ms> ms after the view started`.
+- Not changed: the journey map.
 
 ### [1.75.0] — 2026-11-27
 
