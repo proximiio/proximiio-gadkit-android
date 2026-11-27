@@ -53,7 +53,7 @@ Then depend on the library at a version:
 
 ```kotlin
 dependencies {
-    implementation("io.proximi.gadkit:proximiio-gadkit:1.73.0")
+    implementation("io.proximi.gadkit:proximiio-gadkit:1.74.0")
 }
 ```
 
@@ -62,7 +62,7 @@ a tag, for example at `gadkit`:
 
 ```
 git submodule add https://github.com/proximiio/proximiio-gadkit-android.git gadkit
-git -C gadkit checkout 1.73.0
+git -C gadkit checkout 1.74.0
 ```
 
 Add `includeBuild("gadkit")` to `settings.gradle.kts` and depend on the library without a version.
@@ -1241,7 +1241,39 @@ under a heading with the version and the date; `[Unreleased]` then says that not
 
 ### [Unreleased]
 
-No changes since 1.73.0.
+No changes since 1.74.0.
+
+### [1.74.0] — 2026-11-27
+
+The Android port of iOS 1.74.0 (Metis T-1950). Field log only, for the measurements of the contract
+KPIs. No change of behaviour, no new API, no new setting. The SDK and Map versions do not change. A
+host app raises the version.
+
+Added to the field log:
+
+- `search category <title> (<screen>): <n> places · nearest <title> L<level> · <ms> ms` for each
+  amenity category the visitor picks in the search of the journey map (`journey`): the count of the
+  category's places, the place the map shows, and the time from the pick to the result. A category
+  of the design has its name without the language (`toilet`, `cafe`); an amenity of the venue data
+  has its title.
+- `explore list <spaces|highlights|amenities>: <n> items · shown in <ms> ms` for each list the visitor
+  opens in `ProximiExploreView`: the time from the tap on the tab to the frame that shows the list.
+- `destination <title>: <outcome> in <ms> ms` for each `destination` the host app sets on
+  `ProximiMapView`: the time from the change to the outcome. The outcome is `routed`,
+  `journey stop made the next stop`, `no route` or `no position`. The library has no text search in
+  `ProximiMapView` and `ProximiExploreView`: a host app measures its own search up to this change.
+- `drawn position <journey|explore>: <lat>,<lng> L<level> · at <epoch ms> · fix <lat>,<lng> ts <epoch ms> · relay <lat>,<lng> ts <epoch ms>`,
+  at most one line a second for each open map, and only while a value of the line changes. The first
+  coordinate is the centre of the position dot in the last frame the map drew, `at` the time of the
+  line. `fix` is the position of the SDK the dot moves toward, with its floor (`L`) and its time.
+  `relay` is the last position of the relay-api the binding gave, with the time of the positioning
+  engine (the relay-api `ts`); it links the line to the relay's history. Coordinates have 7 decimals.
+  `relay -` means the log follows no binding: a host app on `ProximiMapView` gets the relay part
+  after `FieldLog.startUploading`.
+- `relay positions: <n> in <s> s`, about once a minute: the positions the binding gave in that time.
+  The line is written with the first position after the minute, so a gap shows as a longer time.
+- `search text <n> chars (<screen>): <n> of <n> places · <ms> ms` for the text search of the screens of
+  `ProximiMap`. The line holds the length of the query, not its text.
 
 ### [1.73.0] — 2026-11-24
 

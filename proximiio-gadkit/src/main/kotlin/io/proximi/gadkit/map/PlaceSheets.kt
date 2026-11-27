@@ -1,5 +1,7 @@
 package io.proximi.gadkit.map
 
+import androidx.compose.runtime.remember
+import io.proximi.gadkit.MeasurementLog
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -97,7 +99,7 @@ internal fun PlaceSearchSheet(
             )
             SystemSearchField(query, { query = it }, stringResource(R.string.search_the_museum), Modifier.padding(horizontal = 16.dp))
             val amenities = shortcuts
-            val matches = VenuePlace.matching(query, places)
+            val matches = remember(query, places) { MeasurementLog.places(query, places, screen = "museum") }
             val showsAmenities = query.isEmpty() && amenities.isNotEmpty()
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),

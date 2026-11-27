@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.gadkit.MeasurementLog
 import io.proximi.gadkit.DebugLaunch
 import android.content.res.Resources
 import androidx.activity.compose.LocalActivity
@@ -193,7 +194,7 @@ internal fun MuseumMapView(
     fun routeToNearest(shortcut: AmenityShortcut) {
         val here = session.position.value
         val from = here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) }
-        val place = shortcut.nearest(places, from, here?.floor?.level) ?: return
+        val place = MeasurementLog.nearest(shortcut, places, from, here?.floor?.level, screen = "museum") ?: return
         selectedPlace = null
         scope.launch {
             route(place)

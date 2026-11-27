@@ -1,5 +1,6 @@
 package io.proximi.gadkit.wristband
 
+import io.proximi.gadkit.MeasurementLog
 import io.proximi.gadkit.FieldLog
 import io.proximi.sdk.blueiot.binding.BlueiotBindingDiagnostics
 import io.proximi.sdk.blueiot.binding.BlueiotBindingLink
@@ -49,6 +50,7 @@ internal object BindingFieldLog {
     fun follow(binding: BlueiotWristbandBinding, logsStates: Boolean) {
         jobs.forEach { it.cancel() }
         jobs = emptyList()
+        MeasurementLog.latestRelayPosition = null
         if (!FieldLog.isEnabled) return
         val started = mutableListOf<Job>()
         started += scope.launch {
@@ -65,8 +67,11 @@ internal object BindingFieldLog {
         }
         started += scope.launch {
             var last: Long? = null
+            val rate = MeasurementLog.RateLog()
             binding.positionProvider.samples().collect { sample ->
                 val now = System.nanoTime() / 1_000_000
+                MeasurementLog.latestRelayPosition = sample
+                rate.position(now / 1000.0)?.let { FieldLog.log(it) }
                 if (!logsPosition(now, last)) return@collect
                 last = now
                 FieldLog.log(positionLine(sample.timestamp, System.currentTimeMillis()))

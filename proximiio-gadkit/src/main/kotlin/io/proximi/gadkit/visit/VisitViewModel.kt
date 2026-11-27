@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.proximi.gadkit.FieldLog
+import io.proximi.gadkit.MeasurementLog
 import io.proximi.gadkit.ui.AppLanguage
 import io.proximi.gadkit.Coordinate
 import io.proximi.gadkit.map.AmenityKind
@@ -1395,7 +1396,7 @@ internal class VisitViewModel(
         isShowingAmenities = false
         val here = session.position.value
         val from = here?.let { Coordinate(it.coordinate.latitude, it.coordinate.longitude) }
-        selectedAmenity = shortcut.nearest(places, from, here?.floor?.level)
+        selectedAmenity = MeasurementLog.nearest(shortcut, places, from, here?.floor?.level, screen = "journey")
         selectedAmenity?.let { onEvent(VisitEvent.AmenitySelected(it)) }
     }
 
@@ -1491,15 +1492,19 @@ internal class VisitViewModel(
             return
         }
         destination ?: return
-        scope.launch { route(destination) }
+        val start = System.nanoTime()
+        scope.launch { route(destination, start) }
     }
 
     /**
      * Routes to the host app's destination at once, as "Add a stop" does: the visitor agreed with the
      * host app (the audio guide). A stop of the journey still to visit becomes the next stop instead.
+     * [requestedAtNanos] is the time the host app's change of `destination` arrived, for the field log.
      */
-    private suspend fun route(destination: ProximiDestination) {
+    private suspend fun route(destination: ProximiDestination, requestedAtNanos: Long) {
         val place = VenuePlace.place(destination.poiId, places) ?: return destinationFailed(destination.poiId, ProximiDestination.Failure.UNKNOWN_PLACE)
+        // Field log only: the time from the host app's change to the outcome.
+        fun log(outcome: String) = FieldLog.log(MeasurementLog.destinationLine(place.title, outcome, MeasurementLog.millisecondsSince(requestedAtNanos)))
         // The feature id; the host app can give `properties.id`.
         val id = place.id
         val routed = RoutedDestination(destination.poiId, id)
@@ -1511,17 +1516,22 @@ internal class VisitViewModel(
             route(place)
             if (routedDestination != routed || routedAmenity?.id != id) return
             if (session.position.value == null) {
+                log("no position")
                 endAmenityRoute()
                 destinationFailed(routed.requested, ProximiDestination.Failure.NO_POSITION)
             } else if (amenityRouteError != null) {
+                log("no route")
                 endAmenityRoute()
                 destinationFailed(routed.requested, ProximiDestination.Failure.NO_ROUTE)
+            } else {
+                log("routed")
             }
             return
         }
         val stop = controller.navigator.journey.value.stops.firstOrNull { (it.poiId ?: it.id) == id && it.kind != MapJourneyStop.Kind.DETOUR }
         if (stop != null && stop.state in OPEN_STATES) {
             if (stop.state == MapJourneyStop.State.PENDING) controller.activate(stop.id)
+            log("journey stop made the next stop")
             clearDestination()
             return
         }
@@ -1529,10 +1539,12 @@ internal class VisitViewModel(
         onEvent(VisitEvent.DetourStarted(place))
         if (routedDestination != routed) return
         if (controller.navigator.noRouteReasons.value[stopId] != null) {
+            log("no route")
             controller.cancelDetour()
             destinationFailed(routed.requested, ProximiDestination.Failure.NO_ROUTE)
             return
         }
+        log("routed")
         // As "Add a stop": the host app's pause control shows the journey paused, and its resume is
         // "Resume your Journey" (Nagarro, 2026-11-15: a destination paused the journey on the map
         // only; iOS 1.42.0).

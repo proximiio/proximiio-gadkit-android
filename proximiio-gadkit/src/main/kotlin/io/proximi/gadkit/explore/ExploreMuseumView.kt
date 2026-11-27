@@ -1,5 +1,8 @@
 package io.proximi.gadkit.explore
 
+import androidx.compose.runtime.withFrameNanos
+import java.util.Locale
+import io.proximi.gadkit.MeasurementLog
 import io.proximi.gadkit.map.KindIcon
 import io.proximi.gadkit.map.VenueGlyphs
 import io.proximi.gadkit.map.VenueTitles
@@ -191,6 +194,18 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
     var level by remember { mutableStateOf(0.0) }
     // The open list or the legend, or `null` for the map alone.
     var panel by remember { mutableStateOf<ExplorePanel?>(null) }
+    // When the visitor asked for the open list (`System.nanoTime`), until its field log line is written.
+    var listRequestedAtNanos by remember { mutableStateOf<Long?>(null) }
+    // Field log only: the time from the tap on the tab to the list on screen.
+    (panel as? ExplorePanel.TabList)?.let { list ->
+        LaunchedEffect(list.tab) {
+            val start = listRequestedAtNanos ?: return@LaunchedEffect
+            listRequestedAtNanos = null
+            // The frame that shows the list.
+            withFrameNanos { }
+            FieldLog.log(MeasurementLog.listLine(list.tab.name.lowercase(Locale.ROOT), items(list.tab, catalog).size, MeasurementLog.millisecondsSince(start)))
+        }
+    }
     // The amenities' icons from the venue data, by amenity id.
     var amenityIcons by remember { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
     // The place whose card is open.
@@ -357,6 +372,7 @@ internal fun ExploreMuseumView(venue: VenueService, modifier: Modifier = Modifie
             panel = null
         } else {
             selected = null
+            if (target is ExplorePanel.TabList) listRequestedAtNanos = System.nanoTime()
             panel = target
         }
     }

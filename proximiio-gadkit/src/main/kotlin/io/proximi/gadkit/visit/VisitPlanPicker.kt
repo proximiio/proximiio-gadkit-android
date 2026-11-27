@@ -1,5 +1,6 @@
 package io.proximi.gadkit.visit
 
+import io.proximi.gadkit.MeasurementLog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,7 +60,7 @@ import io.proximi.gadkit.ui.listRowShape
 internal fun VisitPlanPicker(places: List<VenuePlace>, onStart: (List<String>) -> Unit, onCancel: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var picked by rememberSaveable { mutableStateOf(listOf<String>()) }
-    val matching = remember(query, places) { VenuePlace.matching(query, places) }
+    val matching = remember(query, places) { MeasurementLog.places(query, places, screen = "plan") }
     Column(Modifier.fillMaxSize().background(GroupedBackground).safeDrawingPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             BarButton(stringResource(R.string.cancel), enabled = true, onClick = onCancel)

@@ -105,6 +105,7 @@ internal class VenueService private constructor(
         sampleLog = scope.launch {
             val levels = buildMap { sdk.floors().forEach { putIfAbsent(it.id, it.level.toInt()) } }
             provider.samples().collect { sample ->
+                MeasurementLog.latestRelayPosition = sample
                 val floor = sample.floorId?.let { levels[it]?.toString() ?: it } ?: "-"
                 FieldLog.log(
                     String.format(

@@ -1,5 +1,6 @@
 package io.proximi.gadkit.map
 
+import io.proximi.gadkit.MeasurementLog
 import io.proximi.gadkit.FieldLog
 import io.proximi.map.live.ProximiioMapSession
 import java.util.Locale
@@ -109,7 +110,14 @@ internal object MapDiagnostics {
         val recorder = TimingRecorder(session, name, scope)
         try {
             var last: Snapshot? = null
+            var lastDrawn: MeasurementLog.DrawnSample? = null
             while (coroutineContext.isActive) {
+                // One line a second while the dot, its position or the relay position changes.
+                val drawn = MeasurementLog.drawnSample(session)
+                if (drawn != null && drawn != lastDrawn) {
+                    FieldLog.log(MeasurementLog.drawnLine(drawn, name, System.currentTimeMillis()))
+                    lastDrawn = drawn
+                }
                 val snapshot = Snapshot(
                     features = session.featureCount.value,
                     dropped = session.droppedFeatureCount.value,
