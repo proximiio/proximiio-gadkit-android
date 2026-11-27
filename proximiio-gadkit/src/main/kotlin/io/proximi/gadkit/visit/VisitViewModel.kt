@@ -498,6 +498,7 @@ internal class VisitViewModel(
                 }
         }
         scope.launch { MapDiagnostics.follow(session, "journey", scope) }
+        scope.launch { followAgainAfterIdle() }
         scope.launch { floorGuide.phase.drop(1).collect(::floorGuidePhaseChanged) }
         scope.launch { snapshotFlow { visitorGallery?.id }.distinctUntilChanged().collect { applyFollowZoom() } }
         scope.launch {
@@ -1208,6 +1209,39 @@ internal class VisitViewModel(
         recentre(reason = if (visitorGalleryId == null) "gallery left" else "gallery entered")
     }
 
+    /**
+     * Reads the camera every [FollowAfterIdle.INTERVAL_MILLIS] and follows the visitor again when a
+     * gesture left the camera free and it has been still for [GadSettings.followsAgainAfterSeconds].
+     * iOS `followAgainAfterIdle` (1.75.0).
+     */
+    private suspend fun followAgainAfterIdle() {
+        val seconds = settings.followsAgainAfterSeconds.inWholeMilliseconds / 1000.0
+        if (seconds <= 0) return
+        val idle = FollowAfterIdle()
+        while (true) {
+            delay(FollowAfterIdle.INTERVAL_MILLIS)
+            val centre = session.camera.center
+            val zoom = session.camera.zoomLevel
+            val camera = if (centre != null && zoom != null) {
+                FollowAfterIdle.Camera.of(centre.latitude, centre.longitude, zoom, session.camera.direction ?: 0.0)
+            } else {
+                null
+            }
+            val isAllowed = followsAgainAfterIdle(
+                isPaused = controller.isPaused.value,
+                isFloorGuideActive = floorGuide.isActive,
+                isStartZoomPending = startZoomFollow != null,
+                showsPlace = selectedAmenity != null || isShowingAmenities || showsStopWithoutPosition || showsList,
+                visitorLevel = session.position.value?.floor?.level,
+                shownLevel = session.selectedFloor.value.level,
+            )
+            val isFree = session.cameraMode.value == MapCameraFollow.Mode.FREE
+            if (!idle.reading(camera, isFree, isAllowed, seconds, System.nanoTime() / 1e9)) continue
+            session.followMyFloor()
+            recentre(reason = "camera still for ${String.format(Locale.ROOT, "%.1f", seconds)} s")
+        }
+    }
+
     // Floor without positioning
 
     /** The leg's destination: the detour's place, else the active stop's. */
@@ -1867,6 +1901,24 @@ internal class VisitViewModel(
             isFloorGuideActive: Boolean,
             hasPosition: Boolean,
         ): Boolean = settings.followsAgainAtGalleryChange && !isFollowing && !isPaused && !isFloorGuideActive && hasPosition
+
+        /**
+         * Whether a still, free camera may take the follow again: the journey is not paused, the lift
+         * or stairs view and the start zoom are not running, the map shows no place the visitor
+         * picked and no list, and the map shows the visitor's floor. Without a position it may not.
+         * Pure; covered by tests. iOS `followsAgainAfterIdle` (1.75.0).
+         */
+        internal fun followsAgainAfterIdle(
+            isPaused: Boolean,
+            isFloorGuideActive: Boolean,
+            isStartZoomPending: Boolean,
+            showsPlace: Boolean,
+            visitorLevel: Double?,
+            shownLevel: Double,
+        ): Boolean {
+            if (isPaused || isFloorGuideActive || isStartZoomPending || showsPlace || visitorLevel == null) return false
+            return VenueLevel.same(visitorLevel, shownLevel)
+        }
 
         internal fun isRouteDeviation(event: JourneyEvent): Boolean =
             event is JourneyEvent.LeftRoute || event is JourneyEvent.FarFromRoute ||
